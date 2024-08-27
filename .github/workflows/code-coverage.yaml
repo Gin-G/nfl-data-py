@@ -1,0 +1,13 @@
+name: Codecov discovery
+
+on:
+  push
+
+jobs:
+  check-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install pytest
+        run: pip install pytest pytest-cov
+      - name: Run pytest
+        run: pytest --cov
