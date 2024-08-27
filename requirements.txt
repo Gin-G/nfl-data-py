@@ -1,0 +1,12 @@
+celery
+flask
+IPython
+nfl_data_py==0.3.0
+numpy==1.24.4
+python-snappy
+redis
+tk
+matplotlib
+pandas
+tensorflow[and-cuda]==2.13.0
+scikit-learn==1.3.1
