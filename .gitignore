@@ -1,3 +1,7 @@
+# Files from ML/AI model generation
+*.joblib
+*.h5
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

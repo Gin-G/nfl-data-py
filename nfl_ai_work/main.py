@@ -8,7 +8,7 @@ import os
 
 def main():
     # Initial setup
-    current_season = 2024
+    current_season = 2023
     current_week = 1
 
     # Load or create initial dataset

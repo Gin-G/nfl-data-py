@@ -1,7 +1,7 @@
 # Configuration variables
 
 # Seasons to consider for data
-SEASONS = list(range(2018, 2024))
+SEASONS = list(range(2018, 2022))
 
 # Target columns for prediction
 TARGET_COLS = [

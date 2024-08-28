@@ -7,7 +7,15 @@ jobs:
   check-coverage:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
       - name: Install pytest
         run: pip install pytest pytest-cov
       - name: Run pytest
         run: pytest --cov
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secret.CODECOV_TOKEN }}
