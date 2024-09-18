@@ -1,0 +1,7 @@
+pandas
+numpy
+scipy
+matplotlib
+tensorflow[and-cuda]
+plotly
+flask

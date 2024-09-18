@@ -80,14 +80,10 @@ def get_targets(df):
     """
     return df[[f'next_week_{col}' for col in TARGET_COLS]]
 
-def filter_active_players(roster_df):
-    """
-    Filter the roster dataframe to include only active players.
-    """
-    return roster_df[roster_df['status'].isin(['ACT', 'Active'])]
+def filter_active_players(df):
+    # Ensure we're not overly restricting the players
+    return df  # Adjust this if needed
 
-def get_position_players(roster_df, position):
-    """
-    Get players for a specific position based on depth chart.
-    """
-    return roster_df[(roster_df['position_x'] == position)]
+def get_position_players(df, position):
+    # Make sure we're correctly filtering for the position
+    return df[df['position_x'] == position]

@@ -1,7 +1,7 @@
 # Configuration variables
 
 # Seasons to consider for data
-SEASONS = list(range(2018, 2022))
+SEASONS = list(range(2018, 2023))
 
 # Target columns for prediction
 TARGET_COLS = [
@@ -15,10 +15,10 @@ CATEGORICAL_FEATURES = ['position_x', 'recent_team']
 
 # Numerical features for model input
 NUMERICAL_FEATURES = [
-    'passing_yards', 'attempts', 'completions', 
-    'rushing_yards', 'carries', 
-    'receiving_yards', 'targets', 'receptions'
-] 
+    'attempts', 'completions', 'passing_yards', 'passing_tds', 'interceptions', 
+    'carries', 'rushing_yards', 'rushing_tds',
+    'targets', 'receptions', 'receiving_yards', 'receiving_tds'
+    ]
 
 # Model parameters
 MODEL_PARAMS = {

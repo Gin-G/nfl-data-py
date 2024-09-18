@@ -69,28 +69,18 @@ def create_and_train_models(df):
     
     return models, preprocessor
 
-def save_models(models, preprocessor, directory='saved_models'):
-    """
-    Save trained models and preprocessor to disk.
-    """
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    
-    for stat, model in models.items():
-        model.save(f'{directory}/{stat}_model.h5')
-    
-    joblib.dump(preprocessor, f'{directory}/preprocessor.joblib')
+def save_models(models, preprocessor):
+    for model_name, model in models.items():
+        joblib.dump(model, f'saved_models/model_{model_name}.joblib')
+    joblib.dump(preprocessor, 'saved_models/preprocessor.joblib')
 
-def load_models(directory='saved_models'):
-    """
-    Load trained models and preprocessor from disk.
-    """
+def load_models():
     models = {}
-    for stat in TARGET_COLS:
-        models[stat] = load_model(f'{directory}/{stat}_model.h5')
-    
-    preprocessor = joblib.load(f'{directory}/preprocessor.joblib')
-    
+    for filename in os.listdir('saved_models'):
+        if filename.startswith('model_') and filename.endswith('.joblib'):
+            model_name = filename[6:-7]  # Remove 'model_' prefix and '.joblib' suffix
+            models[model_name] = joblib.load(f'saved_models/{filename}')
+    preprocessor = joblib.load('saved_models/preprocessor.joblib')
     return models, preprocessor
 
 def update_models(models, preprocessor, new_data, current_week, current_season):

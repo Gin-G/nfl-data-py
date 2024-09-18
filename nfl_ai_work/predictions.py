@@ -2,63 +2,118 @@ import pandas as pd
 import numpy as np
 from data_loader import get_player_data, filter_active_players, get_position_players
 from models import predict_with_models
-from config import TARGET_COLS
+from config import TARGET_COLS, NUMERICAL_FEATURES, CATEGORICAL_FEATURES
 import os
 
 def predict_next_week(player_name, df, models, preprocessor, current_week, current_season):
     """
-    Predict next week's stats for a specific player.
+    Predict stats for a player for the next week.
     """
-    player_data = get_player_data(player_name, df, current_season, current_week)
+    print(f"\nDebugging predict_next_week for {player_name}")
     
-    if player_data is None:
-        print(f"Error: No stats found for '{player_name}' in week {current_week}.")
-        return None
-    
-    input_data = player_data[preprocessor.feature_names_in_]
-    
-    if input_data.isnull().any():
-        print(f"Error: Missing data for {player_name}. Null values in: {input_data.columns[input_data.isnull().any()].tolist()}")
-        return None
-    
-    predictions = predict_with_models(models, preprocessor, input_data.to_frame().T)
-    
-    return {stat: predictions[stat][0] for stat in TARGET_COLS}
+    if current_week == 1:
+        player_data = df[(df['player_display_name'] == player_name) & 
+                         (df['season'] == current_season - 1)].sort_values('week').tail(16)
+    else:
+        player_data = df[(df['player_display_name'] == player_name) & 
+                         (df['season'] == current_season) & 
+                         (df['week'] < current_week)]
 
+    print(f"Player data shape: {player_data.shape}")
+    
+    if len(player_data) < 1:
+        print(f"Not enough data for {player_name}")
+        return None
+
+    position = player_data['position_x'].iloc[0]
+    print(f"Player position: {position}")
+
+    # Use the most recent game for prediction
+    X = player_data.iloc[-1:] 
+
+    # Add missing numerical columns with zero values
+    for feature in NUMERICAL_FEATURES:
+        if feature not in X.columns:
+            X[feature] = 0
+
+    # Ensure all categorical features are present
+    for feature in CATEGORICAL_FEATURES:
+        if feature not in X.columns:
+            X[feature] = 'Unknown'  # or some appropriate default value
+
+    # Ensure all required features are in the correct order
+    X = X[NUMERICAL_FEATURES + CATEGORICAL_FEATURES]
+
+    X = preprocessor.transform(X)
+
+    # Define target columns based on position
+    if position == 'QB':
+        target_cols = ['passing_yards', 'attempts', 'completions']
+    elif position == 'RB':
+        target_cols = ['rushing_yards', 'carries', 'receiving_yards']
+    elif position in ['WR', 'TE']:
+        target_cols = ['receiving_yards', 'targets', 'receptions']
+    else:
+        print(f"Unsupported position: {position}")
+        return None
+
+    print(f"Available models: {list(models.keys())}")
+    predictions = {}
+    for target in target_cols:
+        model_key = f"{position}_{target}"
+        if model_key in models:
+            predictions[target] = models[model_key].predict(X)[0]
+        else:
+            print(f"No model found for {model_key}")
+            predictions[target] = 0
+
+    return predictions
 
 def get_all_predictions(position, df, models, preprocessor, current_week, current_season):
     """
     Get predictions for all players in a specific position.
     """
-    latest_rosters = filter_active_players(df[(df['season'] == current_season) & (df['week'] == current_week)])
-    print(f"Number of active players: {len(latest_rosters)}")
+    print(f"\nDebugging get_all_predictions for {position}")
+    print(f"DataFrame shape: {df.shape}")
+    print(f"Unique seasons: {df['season'].unique()}")
+    print(f"Unique weeks: {df['week'].unique()}")
+    
+    if current_week == 1:
+        # For Week 1, use the last week of the previous season
+        latest_rosters = df[(df['season'] == current_season - 1) & (df['week'] == df[df['season'] == current_season - 1]['week'].max())]
+    else:
+        latest_rosters = df[(df['season'] == current_season) & (df['week'] == current_week - 1)]
+    
+    print(f"Latest rosters shape: {latest_rosters.shape}")
+    print(f"Unique positions in latest rosters: {latest_rosters['position_x'].unique()}")
+    
+    latest_rosters = filter_active_players(latest_rosters)
+    print(f"Active players after filtering: {len(latest_rosters)}")
 
-    if position == 'QB':
-        players = get_position_players(latest_rosters, position)
-    elif position == 'RB':
-        players = get_position_players(latest_rosters, position)
-    elif position == 'WR':
-        players = get_position_players(latest_rosters, position)
-    elif position == 'TE':
+    players = get_position_players(latest_rosters, position)
+    print(f"Number of {position} players: {len(players)}")
+    print(f"Unique {position} players: {players['player_display_name'].unique()}")
+
+    if position in ['QB', 'RB', 'WR', 'TE']:
         players = get_position_players(latest_rosters, position)
     else:
-        players = latest_rosters[latest_rosters['position'] == position]
+        players = latest_rosters[latest_rosters['position_x'] == position]
 
     print(f"Number of {position} players: {len(players)}")
 
     predictions = []
     for _, player in players.iterrows():
-        print(f"Predicting for player: {player['player_name']}")
-        pred = predict_next_week(player['player_name'], df, models, preprocessor, current_week, current_season)
+        print(f"Predicting for player: {player['player_display_name']}")
+        pred = predict_next_week(player['player_display_name'], df, models, preprocessor, current_week, current_season)
         if pred:
             if position == 'QB':
-                predictions.append((player['player_name'], pred['passing_yards'], pred['attempts'], pred['completions']))
+                predictions.append((player['player_display_name'], pred['passing_yards'], pred['attempts'], pred['completions']))
             elif position == 'RB':
-                predictions.append((player['player_name'], pred['rushing_yards'], pred['carries'], pred['receiving_yards']))
+                predictions.append((player['player_display_name'], pred['rushing_yards'], pred['carries'], pred['receiving_yards']))
             elif position in ['WR', 'TE']:
-                predictions.append((player['player_name'], pred['receiving_yards'], pred['targets'], pred['receptions']))
+                predictions.append((player['player_display_name'], pred['receiving_yards'], pred['targets'], pred['receptions']))
         else:
-            print(f"No valid prediction for {player['player_name']}")
+            print(f"No valid prediction for {player['player_display_name']}")
 
     predictions.sort(key=lambda x: x[1], reverse=True)
     return predictions
@@ -68,11 +123,11 @@ def store_predictions(predictions, week, season, position):
     Store predictions in a CSV file.
     """
     if position == 'QB':
-        columns = ['player_name', 'predicted_passing_yards', 'predicted_attempts', 'predicted_completions']
+        columns = ['player_display_name', 'predicted_passing_yards', 'predicted_attempts', 'predicted_completions']
     elif position == 'RB':
-        columns = ['player_name', 'predicted_rushing_yards', 'predicted_carries', 'predicted_receiving_yards']
+        columns = ['player_display_name', 'predicted_rushing_yards', 'predicted_carries', 'predicted_receiving_yards']
     else:  # WR and TE
-        columns = ['player_name', 'predicted_receiving_yards', 'predicted_targets', 'predicted_receptions']
+        columns = ['player_display_name', 'predicted_receiving_yards', 'predicted_targets', 'predicted_receptions']
     
     prediction_df = pd.DataFrame(predictions, columns=columns)
     prediction_df['week'] = week
@@ -100,7 +155,7 @@ def compare_predictions_to_actual(week, season):
         if os.path.exists(prediction_file):
             predictions = pd.read_csv(prediction_file)
             
-            merged_data = pd.merge(predictions, actual_data, left_on='player_name', right_on='player_display_name', how='left')
+            merged_data = pd.merge(predictions, actual_data, left_on='player_display_name', right_on='player_display_name', how='left')
             
             if position == 'QB':
                 merged_data['actual_stat'] = merged_data['passing_yards']
@@ -122,7 +177,7 @@ def compare_predictions_to_actual(week, season):
                 'position': position,
                 'stat': stat_name,
                 'mse': mse,
-                'data': merged_data[['player_name', 'predicted_stat', 'actual_stat', 'difference']]
+                'data': merged_data[['player_display_name', 'predicted_stat', 'actual_stat', 'difference']]
             })
     
     return results
