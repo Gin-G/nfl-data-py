@@ -130,7 +130,7 @@ def plot_correlation_matrix(df, features):
     plt.tight_layout()
     plt.show()
 
-plot_top_predictions('predictions/QB_predictions_week3_season2024.csv', 'QB', 'fanduel_fantasy_points', '3','2024', 36)
-plot_top_predictions('predictions/RB_predictions_week3_season2024.csv', 'RB', 'fanduel_fantasy_points', '3','2024', 36)
-plot_top_predictions('predictions/WR_predictions_week3_season2024.csv', 'WR', 'fanduel_fantasy_points', '3','2024', 36)
-plot_top_predictions('predictions/TE_predictions_week3_season2024.csv', 'TE', 'fanduel_fantasy_points', '3','2024', 36)
+plot_top_predictions('predictions/QB_predictions_week5_season2024.csv', 'QB', 'fanduel_fantasy_points', '5','2024', 24)
+plot_top_predictions('predictions/RB_predictions_week5_season2024.csv', 'RB', 'fanduel_fantasy_points', '5','2024', 36)
+plot_top_predictions('predictions/WR_predictions_week5_season2024.csv', 'WR', 'fanduel_fantasy_points', '5','2024', 24)
+plot_top_predictions('predictions/TE_predictions_week5_season2024.csv', 'TE', 'fanduel_fantasy_points', '5','2024', 12)

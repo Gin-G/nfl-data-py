@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from nfl_data_py import import_weekly_data, import_players, import_rosters, import_schedules
+from nfl_data_py import import_weekly_data, import_players, import_weekly_rosters, import_schedules
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
@@ -29,10 +29,9 @@ logging.info("Loading data from CSV...")
 df = pd.read_csv('data/nfl_dataset.csv')
 logging.info(f"Data loaded. Shape: {df.shape}")
 logging.debug(f"Columns: {df.columns.tolist()}")
-logging.debug(f"Sample data:\n{df.head()}")
 
 seasons = list(range(2018, 2025))
-latest_rosters = import_rosters([2024])
+latest_rosters = import_weekly_rosters([2024])
 schedule_2024 = import_schedules([2024])
 
 # Create target variables
@@ -190,7 +189,6 @@ plt.close()
 # Update prediction function with error handling and logging
 def predict_2024_week(player_name, week):
     try:
-        logging.info(f"Predicting for player: {player_name}, week: {week}")
         player_matches = latest_rosters[latest_rosters['player_name'].str.contains(player_name, case=False, na=False)]
         
         if player_matches.empty:
@@ -198,7 +196,6 @@ def predict_2024_week(player_name, week):
             return None
         
         player_info = player_matches.iloc[0]
-        logging.debug(f"Player info: {player_info}")
         
         # Get the player's stats from the previous week
         player_stats = df[(df['player_id'] == player_info['player_id']) & (df['season'] == 2024) & (df['week'] == week - 1)]
@@ -206,15 +203,13 @@ def predict_2024_week(player_name, week):
         if player_stats.empty:
             logging.info(f"No stats for previous week. Using last available stats from 2023 for {player_name}")
             # If no stats for the previous week, use the last available stats from 2023
-            player_stats = df[(df['player_id'] == player_info['player_id']) & (df['season'] == 2023)]
+            player_stats = df[(df['player_id'] == player_info['player_id']) & (df['season'] == max(seasons))]
             if player_stats.empty:
                 logging.warning(f"No historical stats found for player: {player_name}")
                 return None
             last_stats = player_stats.sort_values('week').iloc[-1]
         else:
             last_stats = player_stats.iloc[0]
-        
-        logging.debug(f"Last stats for {player_name}: {last_stats}")
         
         # Prepare input data with new features
         input_data = pd.DataFrame({col: [last_stats[col]] for col in numerical_features})
@@ -224,19 +219,15 @@ def predict_2024_week(player_name, week):
         # Apply preprocessing to the input data
         input_data = preprocess_data(input_data)
         
-        logging.debug(f"Input data for prediction: {input_data}")
-        
         input_transformed = preprocessor.transform(input_data)
         
         predictions = model.predict(input_transformed)[0]
-        logging.debug(f"Raw predictions for {player_name}: {predictions}")
         
         # Apply a small threshold to avoid near-zero predictions
         threshold = 0.01
         adjusted_predictions = [max(pred, threshold) if i != target_cols.index('offensive_snap_pct') else pred for i, pred in enumerate(predictions)]
         
         result = {stat: round(pred, 2) for stat, pred in zip(target_cols, adjusted_predictions)}
-        logging.info(f"Final predictions for {player_name}: {result}")
         return result
     
     except Exception as e:
@@ -249,7 +240,6 @@ def get_all_predictions(position, week):
     # Filter players by position and active status
     active_players = latest_rosters[(latest_rosters['position'] == position) & (latest_rosters['status'] == 'ACT')]
 
-    logging.info(f"Processing {len(active_players)} active {position} players for Week {week}")
     for _, player in tqdm(active_players.iterrows(), total=len(active_players), desc=f"Predicting {position}"):
         pred = predict_2024_week(player['player_name'], week)
         if pred:
@@ -262,6 +252,9 @@ def get_all_predictions(position, week):
     if not predictions_df.empty:
         # Sort the DataFrame by fantasy points
         predictions_df = predictions_df.sort_values(by='fanduel_fantasy_points', ascending=False)
+        
+        # Remove duplicate rows based on all columns
+        predictions_df = predictions_df.drop_duplicates()
 
     # Create directory if it doesn't exist
     os.makedirs('predictions', exist_ok=True)
@@ -273,16 +266,16 @@ def get_all_predictions(position, week):
 
     return predictions_df
 
+#print(predict_2024_week('Marvin Harrison',3))
+
 # Main execution
 positions = ['QB', 'RB', 'WR', 'TE']
-week_to_predict = 3  # Set this to the week you want to predict
+week_to_predict = 5  # Set this to the week you want to predict
 
 start_time = time.time()
 
 for position in tqdm(positions, desc="Processing positions"):
     predictions_df = get_all_predictions(position, week_to_predict)
-    logging.info(f"Predictions for {position}:\n{predictions_df.head()}")
-    logging.info(f"Shape of predictions for {position}: {predictions_df.shape}")
 
 end_time = time.time()
 print(f"Total execution time: {end_time - start_time:.2f} seconds")

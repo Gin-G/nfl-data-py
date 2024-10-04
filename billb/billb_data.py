@@ -1,21 +1,21 @@
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-from nfl_data_py import import_weekly_data, import_players, import_rosters, import_schedules, import_pbp_data, import_depth_charts
+from nfl_data_py import import_weekly_data, import_players, import_weekly_rosters, import_schedules, import_pbp_data, import_depth_charts
 
 # 1. Fetch data
-seasons = list(range(2020, 2025))  # Include 2024
+seasons = list(range(2023, 2025))  # Include 2024
 current_season = seasons[len(seasons)-1]
 print("Importing weekly data...")
 player_stats = pd.concat([import_weekly_data(seasons)])
 print("Importing players data...")
 players = import_players()
 print("Importing rosters data...")
-latest_rosters = import_rosters([current_season])
+latest_rosters = import_weekly_rosters([current_season])
 print("Importing schedules data...")
 schedule_2024 = import_schedules([current_season])
 print("Importing play-by-play data...")
-pbp_data_2018_2023 = import_pbp_data(list(range(2020, 2024)))
+pbp_data_2018_2023 = import_pbp_data([2023])
 pbp_data_2024 = import_pbp_data([current_season], include_participation=False)
 print("Importing depth charts...")
 depth_charts = import_depth_charts(seasons)

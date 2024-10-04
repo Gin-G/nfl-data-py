@@ -82,7 +82,7 @@ def get_weekly_data(year):
     return weekly_data
 
 def get_roster_data(year, columns=None):
-    roster_data = nfl.import_rosters([year], columns)
+    roster_data = nfl.import_weekly_rosters([year], columns)
     return roster_data
 
 def get_team_roster_data(team, year):
