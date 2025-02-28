@@ -25,11 +25,12 @@ def merge_dataframes(fanduel_df, predictions_df):
 
 # Load the data
 logging.info("Loading data from CSV...")
-qbpredictions_df = pd.read_csv('predictions/QB_predictions_week5_season2024.csv')
-rbpredictions_df = pd.read_csv('predictions/RB_predictions_week5_season2024.csv')
-tepredictions_df = pd.read_csv('predictions/TE_predictions_week5_season2024.csv')
-wrpredictions_df = pd.read_csv('predictions/WR_predictions_week5_season2024.csv')
-fanduel_df = pd.read_csv('data/FanDuel-NFL-2024-Week5-MainSlate-players-list.csv')
+week = str(8)
+qbpredictions_df = pd.read_csv('predictions/QB_predictions_week' + week + '_season2024.csv')
+rbpredictions_df = pd.read_csv('predictions/RB_predictions_week' + week + '_season2024.csv')
+tepredictions_df = pd.read_csv('predictions/TE_predictions_week' + week + '_season2024.csv')
+wrpredictions_df = pd.read_csv('predictions/WR_predictions_week' + week + '_season2024.csv')
+fanduel_df = pd.read_csv('data/FanDuel-NFL-2024-Week' + week + '-MainSlate-players-list.csv')
 
 # Combine all prediction dataframes
 all_predictions = pd.concat([qbpredictions_df, rbpredictions_df, tepredictions_df, wrpredictions_df], ignore_index=True)
@@ -41,7 +42,7 @@ df = merge_dataframes(fanduel_df, all_predictions)
 df['value'] = (df['fanduel_fantasy_points'] / df['Salary']) * 1000
 
 # Sort and save to CSV
-df.sort_values(['value'], ascending=False).to_csv('predictions/fanduel_value_week5.csv', index=False)
+df.sort_values(['value'], ascending=False).to_csv('predictions/fanduel_value_week' + week + '.csv', index=False)
 
 # Display the resulting dataframe
 print(df)

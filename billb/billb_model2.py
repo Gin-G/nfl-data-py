@@ -45,9 +45,6 @@ target_cols = [
 for col in target_cols:
     df[f'next_week_{col}'] = df.groupby(['player_id', 'season'])[col].shift(-1)
 
-# Remove last week of each season for each player
-df = df.groupby(['player_id', 'season']).apply(lambda x: x.iloc[:-1]).reset_index(drop=True)
-
 # Improved data preprocessing
 def preprocess_data(df):
     # Log-transform highly skewed variables
@@ -166,11 +163,11 @@ model.compile(optimizer=Adam(lr=1e-3), loss=improved_custom_loss)
 # Train the model
 history = model.fit(
     X_train, y_train, 
-    epochs=200, 
+    epochs=100, 
     batch_size=64, 
     validation_split=0.2, 
     verbose=0,
-    callbacks=[EpochProgressBar(total_epochs=200), lr_scheduler]
+    callbacks=[EpochProgressBar(total_epochs=100), lr_scheduler]
 )
 
 logging.info("Model training completed.")
@@ -270,7 +267,7 @@ def get_all_predictions(position, week):
 
 # Main execution
 positions = ['QB', 'RB', 'WR', 'TE']
-week_to_predict = 5  # Set this to the week you want to predict
+week_to_predict = 13  # Set this to the week you want to predict
 
 start_time = time.time()
 

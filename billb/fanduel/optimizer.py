@@ -190,7 +190,7 @@ def display_lineups(lineups):
         print(f"Projected Points: {total_points:.2f}")
 
 # Example usage
-csv_file = '../predictions/fanduel_value_week5.csv'  # Replace with your CSV file path
+csv_file = '../predictions/fanduel_value_week8.csv'  # Replace with your CSV file path
 num_lineups = 5  # Number of unique lineups to generate
 salary_cap = 60000
 exclude_players = []  # Replace with actual names

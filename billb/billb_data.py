@@ -15,8 +15,7 @@ latest_rosters = import_weekly_rosters([current_season])
 print("Importing schedules data...")
 schedule_2024 = import_schedules([current_season])
 print("Importing play-by-play data...")
-pbp_data_2018_2023 = import_pbp_data([2023])
-pbp_data_2024 = import_pbp_data([current_season], include_participation=False)
+pbp_data = import_pbp_data(seasons)
 print("Importing depth charts...")
 depth_charts = import_depth_charts(seasons)
 
@@ -156,7 +155,7 @@ def create_dataframe(seasons):
     snap_counts_list = []
     for season in seasons:
         weeks = range(1, 19) if season >= 2021 else range(1, 18)
-        season_pbp = pbp_data_2018_2023[pbp_data_2018_2023['season'] == season]
+        season_pbp = pbp_data[pbp_data['season'] == season]
         for week in weeks:
             print(f"Processing season {season}, week {week} PBP")
             week_pbp = season_pbp[season_pbp['week'] == week]
@@ -187,12 +186,6 @@ def create_dataframe(seasons):
                   right_on=['gsis_id', 'season', 'week'], 
                   how='left', 
                   suffixes=('', '_depth_chart'))
-
-    # Handle 2024 data
-    df_2024 = df[df['season'] == 2024]
-
-    # Update 2024 data in the main dataframe
-    df.update(df_2024)
 
     # Calculate total_snaps
     df['total_snaps'] = df['offensive_snaps'] + df['defensive_snaps'] + df['special_teams_snaps']
