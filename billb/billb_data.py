@@ -4,7 +4,7 @@ from collections import defaultdict
 from nfl_data_py import import_weekly_data, import_players, import_weekly_rosters, import_schedules, import_pbp_data, import_depth_charts
 
 # 1. Fetch data
-seasons = list(range(2023, 2025))  # Include 2024
+seasons = list(range(2018, 2025))  # Include 2024
 current_season = seasons[len(seasons)-1]
 print("Importing weekly data...")
 player_stats = pd.concat([import_weekly_data(seasons)])
