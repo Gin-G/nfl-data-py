@@ -1,0 +1,690 @@
+nfl_player_id,nfl_player_name,nfl_display_name,nfl_position,nfl_position_group,sportradar_player_id,sportradar_name,sportradar_display_name,sportradar_first_name,sportradar_last_name,sportradar_position,sportradar_jersey,sportradar_height,sportradar_weight,sportradar_birth_date,sportradar_experience,sportradar_college,sportradar_team_alias,sportradar_status,match_type,match_score
+00-0023459,A.Rodgers,Aaron Rodgers,QB,QB,0ce48193-e2fa-466e-a986-33f751add206,Aaron Rodgers,,Aaron,Rodgers,QB,8.0,74,223.0,1983-12-02,21,California,PIT,ACT,exact_name_position,1.0
+00-0023500,F.Gore,Frank Gore,RB,RB,cd4c8e90-06f7-11ef-a3ab-0317e25dec4e,Frank Gore Jr.,,Frank,Gore,RB,20.0,68,195.0,2002-03-13,1,Southern Miss,BUF,ACT,fuzzy_name_position,1.0
+00-0026158,J.Flacco,Joe Flacco,QB,QB,64797df2-efd3-4b27-86ee-1d48f7edb09f,Joe Flacco,,Joe,Flacco,QB,15.0,78,245.0,1985-01-16,19,Delaware,CLE,ACT,exact_name_position,1.0
+00-0026300,J.Johnson,Josh Johnson,QB,QB,73e133bf-d3f7-4fda-bd25-2fde66cb8ee1,Josh Johnson,,Josh,Johnson,QB,14.0,75,219.0,1986-05-15,11,San Diego,WAS,ACT,exact_name_position,1.0
+00-0026498,M.Stafford,Matthew Stafford,QB,QB,ade43b1a-0601-4672-83b6-d246bc066a19,Matthew Stafford,,Matthew,Stafford,QB,9.0,75,214.0,1988-02-07,17,Georgia,LA,ACT,exact_name_position,1.0
+00-0027114,T.Morstead,Thomas Morstead,P,SPEC,e5371625-0c83-4f1f-9252-c7e0b6bc616e,Thomas Morstead,,Thomas,Morstead,P,7.0,76,225.0,1986-03-08,17,SMU,SF,ACT,exact_name_position,1.0
+00-0027857,T.Williams,Trent Williams,T,OL,b070601c-7985-4a1c-b71a-9f72bb5dbc59,Trent Williams,,Trent,Williams,OT,71.0,77,320.0,1988-07-19,16,Oklahoma,SF,ACT,fuzzy_name_position,1.0
+00-0027973,A.Dalton,Andy Dalton,QB,QB,d2a0e5af-3850-4f16-8e40-a0b1d15c2ce1,Andy Dalton,,Andy,Dalton,QB,14.0,74,220.0,1987-10-29,15,TCU,CAR,ACT,exact_name_position,1.0
+00-0028118,T.Taylor,Tyrod Taylor,QB,QB,7f3ef024-eb34-46af-8b9e-544cdf09378f,Tyrod Taylor,,Tyrod,Taylor,QB,2.0,73,217.0,1989-08-03,15,Virginia Tech,NYJ,ACT,exact_name_position,1.0
+00-0028292,N.Bellore,Nick Bellore,ILB,LB,eeb9e3f4-e378-44ca-94b6-a724011ad710,Nick Bellore,,Nick,Bellore,LB,57.0,73,250.0,1989-05-12,15,Central Michigan,WAS,ACT,fuzzy_name_position,1.0
+00-0028872,J.Hekker,Johnny Hekker,P,SPEC,380435a9-1833-4381-a12b-498a43732798,Johnny Hekker,,Johnny,Hekker,P,3.0,77,225.0,1990-02-08,14,Oregon State,TEN,ACT,exact_name_position,1.0
+00-0028986,C.Keenum,Case Keenum,QB,QB,1b3d350a-478b-4542-a430-d12cc96adc22,Case Keenum,,Case,Keenum,QB,11.0,73,220.0,1988-02-17,13,Houston,CHI,ACT,exact_name_position,1.0
+00-0029263,R.Wilson,Russell Wilson,QB,QB,409d4cac-ee90-4470-9710-ebe671678339,Russell Wilson,,Russell,Wilson,QB,3.0,71,206.0,1988-11-29,14,Wisconsin,NYG,ACT,exact_name_position,1.0
+00-0029604,K.Cousins,Kirk Cousins,QB,QB,bbd0942c-6f77-4f83-a6d0-66ec6548019e,Kirk Cousins,,Kirk,Cousins,QB,18.0,75,205.0,1988-08-19,14,Michigan State,ATL,ACT,exact_name_position,1.0
+00-0029692,B.Anger,Bryan Anger,P,SPEC,6ee71282-c2b8-416a-8de1-29c0185d9b7b,Bryan Anger,,Bryan,Anger,P,5.0,75,202.0,1988-10-06,14,California,DAL,ACT,exact_name_position,1.0
+00-0029892,K.Juszczyk,Kyle Juszczyk,FB,RB,67da5b5c-0db9-4fbc-b98d-7eb8e97b69f6,Kyle Juszczyk,,Kyle,Juszczyk,FB,44.0,73,235.0,1991-04-23,13,Harvard,SF,ACT,exact_name_position,1.0
+00-0030035,A.Thielen,Adam Thielen,WR,WR,2fa2b2da-4aa9-44b5-b27e-56876dfe2ad4,Adam Thielen,,Adam,Thielen,WR,19.0,74,195.0,1990-08-22,12,Minnesota State,CAR,ACT,exact_name_position,1.0
+00-0030061,Z.Ertz,Zach Ertz,TE,TE,de3421f7-2147-4835-89a5-724e87bad463,Zach Ertz,,Zach,Ertz,TE,86.0,77,250.0,1990-11-10,13,Stanford,WAS,ACT,exact_name_position,1.0
+00-0030092,S.Martin,Sam Martin,P,SPEC,80b403da-381f-467e-883b-5b83ac02aac3,Sam Martin,,Sam,Martin,P,6.0,73,205.0,1990-02-27,13,Appalachian State,CAR,ACT,exact_name_position,1.0
+00-0030097,D.Quessenberry,David Quessenberry,T,OL,496680c4-2432-481b-883c-6f311da3a4a3,David Quessenberry,,David,Quessenberry,OL,68.0,77,306.0,1990-08-24,8,San Jose State,LA,ACT,fuzzy_name_position,1.0
+00-0030140,T.Way,Tress Way,P,SPEC,55e1ecbd-96c5-456e-833b-9cd3f046f3fc,Tress Way,,Tress,Way,P,10.0,73,220.0,1990-04-18,12,Oklahoma,WAS,ACT,exact_name_position,1.0
+00-0030279,K.Allen,Keenan Allen,WR,WR,5f424505-f29f-433c-b3f2-1a143a04a010,Keenan Allen,,Keenan,Allen,WR,13.0,74,211.0,1992-04-27,12,California,LAC,ACT,exact_name_position,1.0
+00-0030431,R.Woods,Robert Woods,WR,WR,618bedee-9259-4536-b0ff-fec98d2a20de,Robert Woods,,Robert,Woods,WR,16.0,72,190.0,1992-04-10,13,USC,PIT,ACT,exact_name_position,1.0
+00-0030506,T.Kelce,Travis Kelce,TE,TE,c3859e06-5f23-4302-a71b-04820a899d5f,Travis Kelce,,Travis,Kelce,TE,87.0,77,250.0,1989-10-05,13,Cincinnati,KC,ACT,exact_name_position,1.0
+00-0030561,L.Johnson,Lane Johnson,T,OL,3edf64e6-603b-4437-a3be-53fe030c6f56,Lane Johnson,,Lane,Johnson,T,65.0,78,325.0,1990-05-08,13,Oklahoma,PHI,ACT,exact_name_position,1.0
+00-0030564,D.Hopkins,DeAndre Hopkins,WR,WR,5c48ade7-4b9a-4757-9643-87a6e3839e2b,DeAndre Hopkins,,DeAndre,Hopkins,WR,10.0,73,210.0,1992-06-06,13,Clemson,BAL,ACT,exact_name_position,1.0
+00-0030565,G.Smith,Geno Smith,QB,QB,cfc93f5e-105e-4a5e-88d3-f4279893cfa8,Geno Smith,,Geno,Smith,QB,7.0,75,221.0,1990-10-10,13,West Virginia,LV,ACT,exact_name_position,1.0
+00-0031136,C.Boswell,Chris Boswell,K,SPEC,441eb531-1ec8-4f65-9174-78bc6adada63,Chris Boswell,,Chris,Boswell,K,9.0,74,185.0,1991-03-16,11,Rice,PIT,ACT,exact_name_position,1.0
+00-0031236,B.Cooks,Brandin Cooks,WR,WR,b6b954eb-4591-4b7a-86b9-a481f15fdd58,Brandin Cooks,,Brandin,Cooks,WR,10.0,70,193.0,1993-09-25,12,Oregon State,NO,ACT,exact_name_position,1.0
+00-0031237,T.Bridgewater,Teddy Bridgewater,QB,QB,d4cb52a9-f6b4-42ed-b40b-27bff5f1eea7,Teddy Bridgewater,,Teddy,Bridgewater,QB,16.0,74,210.0,1992-11-10,11,Louisville,TB,ACT,exact_name_position,1.0
+00-0031345,J.Garoppolo,Jimmy Garoppolo,QB,QB,42de9d1d-0352-460b-9172-9452414fd7fd,Jimmy Garoppolo,,Jimmy,Garoppolo,QB,11.0,74,225.0,1991-11-02,12,Eastern Illinois,LA,ACT,exact_name_position,1.0
+00-0031357,C.Goodwin,C.J. Goodwin,CB,DB,6d62aaa2-fe41-4672-941f-7314a0b9b367,C.J. Goodwin,,C.J.,Goodwin,CB,29.0,75,190.0,1990-02-04,10,PennWest California,DAL,ACT,exact_name_position,1.0
+00-0031360,K.Van Noy,Kyle Van Noy,OLB,LB,0ad845ff-44e8-4576-bc91-61b557e06f05,Kyle Van Noy,,Kyle,Van Noy,OLB,53.0,75,255.0,1991-03-26,12,BYU,BAL,ACT,exact_name_position,1.0
+00-0031381,D.Adams,Davante Adams,WR,WR,e7d6ae25-bf15-4660-8b37-c37716551de3,Davante Adams,,Davante,Adams,WR,17.0,73,215.0,1992-12-24,12,Fresno State,LA,ACT,exact_name_position,1.0
+00-0031408,M.Evans,Mike Evans,WR,WR,c48c21d9-0ae5-478c-ad34-30a660cfa9b8,Mike Evans,,Mike,Evans,WR,13.0,77,231.0,1993-08-21,12,Texas A&M,TB,ACT,exact_name_position,1.0
+00-0031484,C.Manhertz,Chris Manhertz,TE,TE,7c7b5515-7786-4e24-9ce0-34e6a8bd5727,Chris Manhertz,,Chris,Manhertz,TE,85.0,78,235.0,1992-04-10,10,Canisius,NYG,ACT,exact_name_position,1.0
+00-0031503,J.Winston,Jameis Winston,QB,QB,fb3b36fc-b985-4807-8199-d038d7e62a93,Jameis Winston,,Jameis,Winston,QB,19.0,76,231.0,1994-01-06,11,Florida State,NYG,ACT,exact_name_position,1.0
+00-0031588,S.Diggs,Stefon Diggs,WR,WR,a1c40664-b265-4083-aad2-54b4c734f2c5,Stefon Diggs,,Stefon,Diggs,WR,8.0,72,191.0,1993-11-29,11,Maryland,NE,ACT,exact_name_position,1.0
+00-0031595,M.Burton,Michael Burton,FB,RB,80715ecf-ffc9-4a93-a305-2193451b3382,Michael Burton,,Michael,Burton,FB,20.0,72,247.0,1992-02-01,11,Rutgers,DEN,ACT,exact_name_position,1.0
+00-0031610,D.Waller,Darren Waller,TE,TE,14c97c9f-26e8-4944-9299-f90de6aeada3,Darren Waller,,Darren,Waller,TE,83.0,78,238.0,1992-09-13,8,Georgia Tech,MIA,PUP,exact_name_position,1.0
+00-0031687,R.Mostert,Raheem Mostert,RB,RB,b040e601-ec40-4757-bf3d-71bf64ef99cf,Raheem Mostert,,Raheem,Mostert,RB,31.0,70,212.0,1992-04-09,11,Purdue,LV,ACT,exact_name_position,1.0
+00-0031763,D.Carter,DeAndre Carter,WR,WR,9ae2584a-40c1-4b30-be34-a9567659eacd,DeAndre Carter,,DeAndre,Carter,WR,2.0,68,190.0,1993-04-10,8,Sacramento State,CLE,ACT,exact_name_position,1.0
+00-0031800,T.Heinicke,Taylor Heinicke,QB,QB,2c259733-ec2c-4e3c-bb7b-34dc0d37dc34,Taylor Heinicke,,Taylor,Heinicke,QB,4.0,73,210.0,1993-03-15,8,Old Dominion,LAC,ACT,exact_name_position,1.0
+00-0031921,K.Lamm,Kendall Lamm,T,OL,a87f6156-c028-4634-84a8-e3388d6dff2b,Kendall Lamm,,Kendall,Lamm,T,74.0,78,305.0,1992-06-05,10,Appalachian State,PHI,ACT,exact_name_position,1.0
+00-0032104,A.Abdullah,Ameer Abdullah,RB,RB,c5e430c5-7a8e-4e29-b30f-1a527f05cb89,Ameer Abdullah,,Ameer,Abdullah,RB,38.0,69,203.0,1993-06-13,11,Nebraska,SF,ACT,exact_name_position,1.0
+00-0032208,P.Dorsett,Phillip Dorsett,WR,WR,c682e8ea-fe48-45d2-af60-682a6125ab22,Phillip Dorsett,,Phillip,Dorsett,WR,13.0,70,185.0,1993-01-05,9,Miami (FL),LV,ACT,exact_name_position,1.0
+00-0032211,T.Lockett,Tyler Lockett,WR,WR,dffa69ad-331e-4f09-ae38-40a5a4406be6,Tyler Lockett,,Tyler,Lockett,WR,4.0,70,182.0,1992-09-28,11,Kansas State,TEN,ACT,exact_name_position,1.0
+00-0032268,M.Mariota,Marcus Mariota,QB,QB,7c16c04c-04de-41f3-ac16-ad6a9435e3f7,Marcus Mariota,,Marcus,Mariota,QB,18.0,76,222.0,1993-10-30,11,Oregon,WAS,ACT,exact_name_position,1.0
+00-0032381,T.Decker,Taylor Decker,T,OL,1b17a67d-c771-4e7d-80ea-fb1d19adb200,Taylor Decker,,Taylor,Decker,T,68.0,79,324.0,1994-08-23,10,Ohio State,DET,ACT,exact_name_position,1.0
+00-0032383,R.Kelly,Ryan Kelly,C,OL,66990fc9-f98d-4712-8a0e-524372b9102f,Ryan Kelly,,Ryan,Kelly,C,78.0,76,307.0,1993-05-30,10,Alabama,MIN,ACT,exact_name_position,1.0
+00-0032385,S.Shepard,Sterling Shepard,WR,WR,1ffc735b-74d8-44d2-ab32-00c5485c799f,Sterling Shepard,,Sterling,Shepard,WR,17.0,70,194.0,1993-02-10,10,Oklahoma,TB,ACT,exact_name_position,1.0
+00-0032392,A.Hooper,Austin Hooper,TE,TE,90c2a93f-d837-4e1b-b57c-56648903a8db,Austin Hooper,,Austin,Hooper,TE,81.0,76,254.0,1994-10-29,10,Stanford,NE,ACT,exact_name_position,1.0
+00-0032394,N.Vannett,Nick Vannett,TE,TE,c731aa8a-778b-4ccd-a19f-517eb66f47b7,Nick Vannett,,Nick,Vannett,TE,45.0,77,257.0,1993-03-06,9,Ohio State,MIN,ACT,exact_name_position,1.0
+00-0032398,C.Moore,Chris Moore,WR,WR,0b504d67-639b-4ba8-979a-498a3086257b,Chris Moore,,Chris,Moore,WR,19.0,73,200.0,1993-06-16,9,Cincinnati,WAS,ACT,exact_name_position,1.0
+00-0032399,M.Killebrew,Miles Killebrew,SS,DB,4419b655-867f-436b-8233-6d45f4dfef77,Miles Killebrew,,Miles,Killebrew,SAF,28.0,74,222.0,1993-05-10,10,Southern Utah,PIT,ACT,fuzzy_name_position,1.0
+00-0032434,B.Allen,Brandon Allen,QB,QB,a8c3bcd7-69d0-4c5e-a876-6b33857942bc,Brandon Allen,,Brandon,Allen,QB,10.0,74,209.0,1992-09-05,9,Arkansas,TEN,ACT,exact_name_position,1.0
+00-0032442,E.Roberts,Elandon Roberts,ILB,LB,f6d7cf0f-72d2-473f-a44b-4a253587ca0f,Elandon Roberts,,Elandon,Roberts,LB,52.0,71,235.0,1994-04-22,10,Houston,LV,ACT,fuzzy_name_position,1.0
+00-0032464,K.Raymond,Kalif Raymond,WR,WR,e0a31d02-9d1c-4dab-adb4-a5d9bbee8b36,Kalif Raymond,,Kalif,Raymond,WR,11.0,68,180.0,1994-08-08,9,Holy Cross,DET,ACT,exact_name_position,1.0
+00-0032688,R.Chosen,Robbie Chosen,WR,WR,e81fb788-1478-4936-ae12-f6ed7ec23476,Robbie Chosen,,Robbie,Chosen,WR,3.0,75,185.0,1993-05-09,10,Temple,SF,ACT,exact_name_position,1.0
+00-0032764,D.Henry,Derrick Henry,RB,RB,87c481c7-7414-43cc-82df-19ca0c2ae22e,Derrick Henry,,Derrick,Henry,RB,22.0,74,252.0,1994-01-04,10,Alabama,BAL,ACT,exact_name_position,1.0
+00-0032775,D.Robinson,Demarcus Robinson,WR,WR,46b16198-116f-4913-85db-2bc21462bd66,Demarcus Robinson,,Demarcus,Robinson,WR,5.0,73,202.0,1994-09-21,10,Florida,SF,ACT,exact_name_position,1.0
+00-0032918,C.Ham,C.J. Ham,FB,RB,971fc9e5-bebb-4a2c-a822-8c52f92a3d07,C.J. Ham,,C.J.,Ham,FB,30.0,71,250.0,1993-07-22,9,Augustana,MIN,ACT,exact_name_position,1.0
+00-0032943,R.Dixon,Riley Dixon,P,SPEC,f45835c5-aa9e-4e32-b545-20d1e322fe8f,Riley Dixon,,Riley,Dixon,P,92.0,76,221.0,1993-08-24,10,Syracuse,TB,ACT,exact_name_position,1.0
+00-0032951,L.Treadwell,Laquon Treadwell,WR,WR,2e0badcd-b78c-40ee-a83b-a1bbb36bc545,Laquon Treadwell,,Laquon,Treadwell,WR,13.0,74,215.0,1995-06-14,9,Ole Miss,IND,ACT,exact_name_position,1.0
+00-0033040,T.Hill,Tyreek Hill,WR,WR,01d8aee3-e1c4-4988-970a-8c0c2d08bd83,Tyreek Hill,,Tyreek,Hill,WR,10.0,70,191.0,1994-03-01,10,West Alabama,MIA,ACT,exact_name_position,1.0
+00-0033057,J.Conklin,Jack Conklin,T,OL,0e7d7ddc-6515-4034-8857-5ab9da6b7c25,Jack Conklin,,Jack,Conklin,T,78.0,78,308.0,1994-08-17,10,Michigan State,CLE,ACT,exact_name_position,1.0
+00-0033077,D.Prescott,Dak Prescott,QB,QB,86197778-8d4b-4eba-affe-08ef7be7c70b,Dak Prescott,,Dak,Prescott,QB,4.0,74,238.0,1993-07-29,10,Mississippi State,DAL,ACT,exact_name_position,1.0
+00-0033090,H.Henry,Hunter Henry,TE,TE,705899da-3c20-4bc3-b5d0-2e6e40655131,Hunter Henry,,Hunter,Henry,TE,85.0,77,249.0,1994-12-07,10,Arkansas,NE,ACT,exact_name_position,1.0
+00-0033106,J.Goff,Jared Goff,QB,QB,aba8f925-ffbf-4654-bfa7-a25d3d237494,Jared Goff,,Jared,Goff,QB,16.0,76,217.0,1994-10-14,10,California,DET,ACT,exact_name_position,1.0
+00-0033110,T.Higbee,Tyler Higbee,TE,TE,0df7912d-9e81-47ea-b4f7-d04986df4ee8,Tyler Higbee,,Tyler,Higbee,TE,89.0,78,255.0,1993-01-01,10,Western Kentucky,LA,ACT,exact_name_position,1.0
+00-0033119,J.Brissett,Jacoby Brissett,QB,QB,ad2258ab-67f0-41c2-bcf3-f3ba145187dc,Jacoby Brissett,,Jacoby,Brissett,QB,7.0,76,235.0,1992-12-11,10,North Carolina State,ARI,ACT,exact_name_position,1.0
+00-0033217,M.Alie-Cox,Mo Alie-Cox,TE,TE,8809c0dd-786b-4255-a7d0-333c9498c19a,Mo Alie-Cox,,Mo,Alie-Cox,TE,81.0,77,267.0,1993-09-19,8,VCU,IND,ACT,exact_name_position,1.0
+00-0033246,J.Mundt,Johnny Mundt,TE,TE,6414998b-5831-44aa-8bd8-39e42a323c2c,Johnny Mundt,,Johnny,Mundt,TE,86.0,76,243.0,1994-11-23,8,Oregon,JAC,ACT,exact_name_position,1.0
+00-0033251,Z.Pascal,Zach Pascal,WR,WR,7fc949b6-a1cb-4f9d-a06d-b65773409a44,Zach Pascal,,Zach,Pascal,WR,83.0,74,219.0,1994-12-18,8,Old Dominion,NYG,ACT,exact_name_position,1.0
+00-0033280,C.McCaffrey,Christian McCaffrey,RB,RB,f96db0af-5e25-42d1-a07a-49b4e065b364,Christian McCaffrey,,Christian,McCaffrey,RB,23.0,71,210.0,1996-06-07,9,Stanford,SF,ACT,exact_name_position,1.0
+00-0033282,C.Samuel,Curtis Samuel,WR,WR,66a21b6d-97e5-4732-8bb0-062145d6bbc6,Curtis Samuel,,Curtis,Samuel,WR,1.0,71,195.0,1996-08-11,9,Ohio State,BUF,ACT,exact_name_position,1.0
+00-0033288,G.Kittle,George Kittle,TE,TE,2ada91b0-036e-454f-83c3-6d939ff584a9,George Kittle,,George,Kittle,TE,85.0,76,250.0,1993-10-09,9,Iowa,SF,ACT,exact_name_position,1.0
+00-0033292,T.Taylor,Trent Taylor,WR,WR,3e2e74e9-18a8-4275-9437-b275db27e2ff,Trent Taylor,,Trent,Taylor,WR,81.0,68,180.0,1994-04-30,7,Louisiana Tech,SF,IR,exact_name_position,1.0
+00-0033293,A.Jones,Aaron Jones,RB,RB,27dd5b6e-ea65-4622-a6b4-460fd144407c,Aaron Jones Sr.,,Aaron,Jones,RB,33.0,70,208.0,1994-12-02,9,UTEP,MIN,ACT,fuzzy_name_position,1.0
+00-0033307,K.Bourne,Kendrick Bourne,WR,WR,5aba3610-ab55-4922-ac46-806ded5eb8bf,Kendrick Bourne,,Kendrick,Bourne,WR,84.0,73,205.0,1995-08-04,9,Eastern Washington,NE,ACT,exact_name_position,1.0
+00-0033319,N.Mullens,Nick Mullens,QB,QB,7738fea8-7ea2-4c4c-b589-bca90b070819,Nick Mullens,,Nick,Mullens,QB,14.0,72,210.0,1995-03-21,7,Southern Miss,JAC,ACT,exact_name_position,1.0
+00-0033375,T.Patrick,Tim Patrick,WR,WR,2a443351-5e63-4a49-819e-912b51a745f2,Tim Patrick,,Tim,Patrick,WR,12.0,77,210.0,1993-11-23,8,Utah,DET,ACT,exact_name_position,1.0
+00-0033376,P.Ricard,Patrick Ricard,FB,RB,cb68b95f-ef6f-4e5e-b861-8bfe6cfeacf5,Patrick Ricard,,Patrick,Ricard,FB,42.0,75,300.0,1994-05-27,9,Maine,BAL,ACT,exact_name_position,1.0
+00-0033439,P.Brown,Pharaoh Brown,TE,TE,6733b953-de77-44e5-acbf-c2d3a0940243,Pharaoh Brown,,Pharaoh,Brown,TE,85.0,77,260.0,1994-05-04,8,Oregon,MIA,ACT,exact_name_position,1.0
+00-0033503,A.Maulet,Arthur Maulet,CB,DB,bf21bd83-9c97-4faf-97be-859f033848e2,Arthur Maulet,,Arthur,Maulet,CB,22.0,69,190.0,1993-07-13,9,Memphis,HOU,ACT,exact_name_position,1.0
+00-0033526,S.Perine,Samaje Perine,RB,RB,e601812f-ce24-4e99-bee0-e33c1e9014e4,Samaje Perine,,Samaje,Perine,RB,34.0,71,240.0,1995-09-16,9,Oklahoma,CIN,ACT,exact_name_position,1.0
+00-0033537,D.Watson,Deshaun Watson,QB,QB,eec5265c-7731-4bb6-8af2-4f98a67f9ab7,Deshaun Watson,,Deshaun,Watson,QB,4.0,75,223.0,1995-09-14,9,Clemson,CLE,PUP,exact_name_position,1.0
+00-0033553,J.Conner,James Conner,RB,RB,28a084c0-14df-499f-bd1f-b975603626b7,James Conner,,James,Conner,RB,6.0,73,233.0,1995-05-05,9,Pittsburgh,ARI,ACT,exact_name_position,1.0
+00-0033555,M.Hollins,Mack Hollins,WR,WR,93cb5790-1012-4c42-bccb-5748c27ba7d6,Mack Hollins,,Mack,Hollins,WR,13.0,76,221.0,1993-09-16,9,North Carolina,NE,ACT,exact_name_position,1.0
+00-0033572,J.Agnew,Jamal Agnew,WR,WR,c871b3a8-72c4-425e-a357-2de37e033c8d,Jamal Agnew,,Jamal,Agnew,WR,14.0,70,190.0,1995-04-03,9,San Diego,ATL,ACT,exact_name_position,1.0
+00-0033576,E.Saubert,Eric Saubert,TE,TE,582dc00e-e7ec-4ca7-bff0-f7b1d604017b,Eric Saubert,,Eric,Saubert,TE,81.0,77,253.0,1994-05-09,8,Drake,SEA,ACT,exact_name_position,1.0
+00-0033589,D.Moore,David Moore,WR,WR,aecc1809-4628-4c3a-8b2b-c8f2858d2492,David Moore,,David,Moore,WR,83.0,72,220.0,1995-01-15,7,East Central,CAR,ACT,exact_name_position,1.0
+00-0033591,N.Brown,Noah Brown,WR,WR,36f62824-1cdb-4e9e-8a11-55df97e562b9,Noah Brown,,Noah,Brown,WR,85.0,74,225.0,1996-01-06,9,Ohio State,WAS,ACT,exact_name_position,1.0
+00-0033662,C.Rush,Cooper Rush,QB,QB,4595c8ea-9d85-4504-8a34-2c8a02349105,Cooper Rush,,Cooper,Rush,QB,15.0,75,225.0,1993-11-21,8,Central Michigan,BAL,ACT,exact_name_position,1.0
+00-0033699,A.Ekeler,Austin Ekeler,RB,RB,e5b8c439-a48a-4f83-b63b-1a4d30e04cd3,Austin Ekeler,,Austin,Ekeler,RB,30.0,69,200.0,1995-05-17,9,Western Colorado,WAS,ACT,exact_name_position,1.0
+00-0033729,C.Johnston,Cameron Johnston,P,SPEC,d2f6de91-089a-4845-9b90-bfbc00487444,Cameron Johnston,,Cameron,Johnston,P,5.0,71,194.0,1992-02-24,8,Ohio State,PIT,ACT,exact_name_position,1.0
+00-0033757,R.Tonyan,Robert Tonyan,TE,TE,7c9c7800-69d0-459b-812b-a07ac48e9f2a,Robert Tonyan,,Robert,Tonyan,TE,85.0,77,240.0,1994-04-30,7,Indiana State,KC,ACT,exact_name_position,1.0
+00-0033787,J.Elliott,Jake Elliott,K,SPEC,059e5bb7-1842-4558-9aaf-77c352a21216,Jake Elliott,,Jake,Elliott,K,4.0,69,167.0,1995-01-21,9,Memphis,PHI,ACT,exact_name_position,1.0
+00-0033854,D.Ogunbowale,Dare Ogunbowale,RB,RB,42b57148-fc06-4aee-b40b-bb941271b5b7,Dare Ogunbowale,,Dare,Ogunbowale,RB,33.0,70,205.0,1994-05-04,7,Wisconsin,HOU,ACT,exact_name_position,1.0
+00-0033857,J.Smith-Schuster,JuJu Smith-Schuster,WR,WR,9547fbb1-0d4f-4d9e-83b9-e2fa30463bb9,JuJu Smith-Schuster,,JuJu,Smith-Schuster,WR,9.0,73,215.0,1996-11-22,9,USC,KC,ACT,exact_name_position,1.0
+00-0033858,J.Smith,Jonnu Smith,TE,TE,e4f25a37-74de-4bfb-b6c9-f50a4fab0b87,Jonnu Smith,,Jonnu,Smith,TE,81.0,75,248.0,1995-08-22,9,Florida International,PIT,ACT,exact_name_position,1.0
+00-0033863,D.Skipper,Dan Skipper,T,OL,8106a0d3-1cc9-4038-8c1b-9c7886a6bcba,Dan Skipper,,Dan,Skipper,T,70.0,81,334.0,1994-09-20,6,Arkansas,DET,ACT,exact_name_position,1.0
+00-0033869,M.Trubisky,Mitchell Trubisky,QB,QB,7a1b8f1a-9024-4897-86b0-01c63e00305e,Mitchell Trubisky,,Mitchell,Trubisky,QB,11.0,75,222.0,1994-08-20,9,North Carolina,BUF,ACT,exact_name_position,1.0
+00-0033873,P.Mahomes,Patrick Mahomes,QB,QB,11cad59d-90dd-449c-a839-dddaba4fe16c,Patrick Mahomes,,Patrick,Mahomes,QB,15.0,74,225.0,1995-09-17,9,Texas Tech,KC,ACT,exact_name_position,1.0
+00-0033881,E.Engram,Evan Engram,TE,TE,e21365af-8d66-416e-b0a5-8816d18fcfd9,Evan Engram,,Evan,Engram,TE,1.0,75,240.0,1994-09-02,9,Ole Miss,DEN,ACT,exact_name_position,1.0
+00-0033885,D.Njoku,David Njoku,TE,TE,8f86fcea-90e8-49ea-bc78-5c7659313e57,David Njoku,,David,Njoku,TE,85.0,76,246.0,1996-07-10,9,Miami (FL),CLE,ACT,exact_name_position,1.0
+00-0033891,Z.Jones,Zay Jones,WR,WR,a28f7368-0306-4d20-855f-285a1a09c09c,Zay Jones,,Zay,Jones,WR,17.0,74,200.0,1995-03-30,9,East Carolina,ARI,ACT,exact_name_position,1.0
+00-0033897,J.Mixon,Joe Mixon,RB,RB,7797f36e-87e8-4282-b6d2-bdb1774fc3b3,Joe Mixon,,Joe,Mixon,RB,28.0,73,220.0,1996-07-24,9,Oklahoma,HOU,NON,exact_name_position,1.0
+00-0033904,D.Dawkins,Dion Dawkins,T,OL,522a97f7-8cf7-4c50-afe9-1beb6ffadcb2,Dion Dawkins,,Dion,Dawkins,T,73.0,77,320.0,1994-04-26,9,Temple,BUF,ACT,exact_name_position,1.0
+00-0033906,A.Kamara,Alvin Kamara,RB,RB,d9c857b2-97da-4fb8-a527-afbbb2a67413,Alvin Kamara,,Alvin,Kamara,RB,41.0,70,215.0,1995-07-25,9,Tennessee,NO,ACT,exact_name_position,1.0
+00-0033908,C.Kupp,Cooper Kupp,WR,WR,2806e915-c46f-492f-8a29-71d3a85e5620,Cooper Kupp,,Cooper,Kupp,WR,10.0,73,205.0,1993-06-15,9,Eastern Washington,SEA,ACT,exact_name_position,1.0
+00-0033921,C.Godwin,Chris Godwin,WR,WR,baa61bb5-f8d0-4f90-bbe2-028576b8d33d,Chris Godwin,,Chris,Godwin,WR,14.0,73,209.0,1996-02-27,9,Penn State,TB,PUP,exact_name_position,1.0
+00-0033923,K.Hunt,Kareem Hunt,RB,RB,0ef0d0ca-2d2d-455b-ab63-a20c01303e37,Kareem Hunt,,Kareem,Hunt,RB,29.0,71,216.0,1995-08-06,9,Toledo,KC,ACT,exact_name_position,1.0
+00-0033928,J.Lewis,Jourdan Lewis,CB,DB,7ff68f1d-204c-4d49-9179-ecb2514094dc,Jourdan Lewis,,Jourdan,Lewis,CB,2.0,70,190.0,1995-08-31,9,Michigan,JAC,ACT,exact_name_position,1.0
+00-0033943,J.Reynolds,Josh Reynolds,WR,WR,682eda79-0026-4ad8-8f45-a61ce42cb908,Josh Reynolds,,Josh,Reynolds,WR,83.0,75,192.0,1995-02-16,9,Texas A&M,NYJ,ACT,exact_name_position,1.0
+00-0033949,J.Dobbs,Joshua Dobbs,QB,QB,15bedebc-839e-450a-86f6-1f5ad1f4f820,Joshua Dobbs,,Joshua,Dobbs,QB,11.0,75,220.0,1995-01-26,9,Tennessee,NE,ACT,exact_name_position,1.0
+00-0033955,J.McNichols,Jeremy McNichols,RB,RB,25cc3585-6194-4786-968a-2600db46b6c6,Jeremy McNichols,,Jeremy,McNichols,RB,26.0,69,214.0,1995-12-26,5,Boise State,WAS,ACT,exact_name_position,1.0
+00-0034073,R.Dwelley,Ross Dwelley,TE,TE,70473218-5ae3-47b4-86fd-151e68f1e8b9,Ross Dwelley,,Ross,Dwelley,TE,82.0,77,235.0,1995-01-26,8,San Diego,SF,ACT,exact_name_position,1.0
+00-0034159,W.Dissly,Will Dissly,TE,TE,383f4814-6836-4766-a297-fc063e8509cc,Will Dissly,,Will,Dissly,TE,89.0,76,265.0,1996-07-08,8,Washington,LAC,ACT,exact_name_position,1.0
+00-0034160,M.Dickson,Michael Dickson,P,SPEC,d1ae3222-8892-49bc-bb3e-0bcd7c74522e,Michael Dickson,,Michael,Dickson,P,4.0,74,208.0,1996-01-04,8,Texas,SEA,ACT,exact_name_position,1.0
+00-0034162,J.Scott,J.K. Scott,P,SPEC,5067e5ee-bae8-411e-bc05-011a88a3d954,JK Scott,,JK,Scott,P,16.0,77,208.0,1995-10-30,7,Alabama,LAC,ACT,fuzzy_name_position,0.8888888888888888
+00-0034177,T.Boyle,Tim Boyle,QB,QB,d897b70f-29d9-477e-a72a-c9bfbadb70d3,Tim Boyle,,Tim,Boyle,QB,15.0,76,232.0,1994-10-03,7,Eastern Kentucky,TEN,ACT,exact_name_position,1.0
+00-0034203,D.Williams,Darious Williams,CB,DB,a40a9b55-7850-4572-8197-f57a5354f921,Darious Williams,,Darious,Williams,CB,31.0,69,192.0,1993-03-15,8,UAB,LA,ACT,exact_name_position,1.0
+00-0034270,T.Conklin,Tyler Conklin,TE,TE,f0d17dfa-ebf3-416c-a8d2-c6bc30675103,Tyler Conklin,,Tyler,Conklin,TE,83.0,75,248.0,1995-07-30,8,Central Michigan,LAC,ACT,exact_name_position,1.0
+00-0034272,M.Valdes-Scantling,Marquez Valdes-Scantling,WR,WR,e7f0a505-8060-403e-a3b3-9d4e88dda1dc,Marquez Valdes-Scantling,,Marquez,Valdes-Scantling,WR,1.0,76,206.0,1994-10-10,8,South Florida,SEA,ACT,exact_name_position,1.0
+00-0034278,T.Smith,Tremon Smith,CB,DB,aecd8785-d22b-43b4-bbff-76b7e4319ed6,Tremon Smith,,Tremon,Smith,CB,11.0,71,190.0,1996-07-20,8,Central Arkansas,HOU,ACT,exact_name_position,1.0
+00-0034279,E.St. Brown,Equanimeous St. Brown,WR,WR,0b97067d-9e06-4ec0-97b2-e1cb491e12a6,Equanimeous St. Brown,,Equanimeous,St. Brown,WR,7.0,77,214.0,1996-09-30,7,Notre Dame,SF,ACT,exact_name_position,1.0
+00-0034317,K.Kirkwood,Keith Kirkwood,WR,WR,430446f6-a74c-496b-8f49-4464e7d8149d,Keith Kirkwood,,Keith,Kirkwood,WR,18.0,75,210.0,1994-12-26,5,Temple,BAL,ACT,exact_name_position,1.0
+00-0034342,Q.Nelson,Quenton Nelson,G,OL,d3fee51d-67f5-413b-a4b2-bde86b97babe,Quenton Nelson,,Quenton,Nelson,G,56.0,77,330.0,1996-03-19,8,Notre Dame,IND,ACT,exact_name_position,1.0
+00-0034348,C.Sutton,Courtland Sutton,WR,WR,b55ae5ba-593f-4560-9cab-14e10698e01d,Courtland Sutton,,Courtland,Sutton,WR,14.0,76,216.0,1995-10-10,8,SMU,DEN,ACT,exact_name_position,1.0
+00-0034351,D.Goedert,Dallas Goedert,TE,TE,e8029983-87cf-49a2-bc04-04c8233a0630,Dallas Goedert,,Dallas,Goedert,TE,88.0,77,256.0,1995-01-03,8,South Dakota State,PHI,ACT,exact_name_position,1.0
+00-0034353,A.Miller,Anthony Miller,WR,WR,bfaedf99-7618-4925-b362-90415c22a3b6,Anthony Miller,,Anthony,Miller,WR,6.0,71,195.0,1994-10-09,6,Memphis,BAL,ACT,exact_name_position,1.0
+00-0034355,M.Stewart,M.J. Stewart,SS,DB,3d405d21-bfdd-4495-afe3-9e96d1972ee2,M.J. Stewart,,M.J.,Stewart,SAF,29.0,71,205.0,1995-09-16,8,North Carolina,HOU,ACT,fuzzy_name_position,1.0
+00-0034361,J.Reid,Justin Reid,SS,DB,bb9db665-7f9f-425d-9e4b-df78c65c8b97,Justin Reid,,Justin,Reid,SAF,21.0,73,207.0,1997-02-15,8,Stanford,NO,ACT,fuzzy_name_position,1.0
+00-0034365,I.Thomas,Ian Thomas,TE,TE,ed8a8fd2-df67-45e7-a34f-984afb82f6ea,Ian Thomas,,Ian,Thomas,TE,80.0,75,253.0,1996-06-06,8,Indiana,LV,ACT,exact_name_position,1.0
+00-0034383,D.Schultz,Dalton Schultz,TE,TE,8caec1b4-e0b6-4a84-b8c8-617d6e91ef6a,Dalton Schultz,,Dalton,Schultz,TE,86.0,77,242.0,1996-07-11,8,Stanford,HOU,ACT,exact_name_position,1.0
+00-0034386,J.Watson,Justin Watson,WR,WR,bdb77276-7191-4454-85c2-e1693a33d709,Justin Watson,,Justin,Watson,WR,84.0,74,215.0,1996-04-04,8,Pennsylvania,HOU,ACT,exact_name_position,1.0
+00-0034391,S.Neal,Siran Neal,CB,DB,82100457-f4ee-4f24-8ca2-584bfdc85749,Siran Neal,,Siran,Neal,CB,33.0,72,206.0,1994-08-04,8,Jacksonville State,SF,ACT,exact_name_position,1.0
+00-0034399,W.Teller,Wyatt Teller,G,OL,2b6a749f-5e78-484f-8a87-92c6da991b19,Wyatt Teller,,Wyatt,Teller,G,77.0,76,315.0,1994-11-21,8,Virginia Tech,CLE,ACT,exact_name_position,1.0
+00-0034401,M.White,Mike White,QB,QB,f4808328-86e9-459d-a2bc-18e90c7d211e,Mike White,,Mike,White,QB,14.0,77,220.0,1995-03-25,6,Western Kentucky,BUF,ACT,exact_name_position,1.0
+00-0034406,D.Cain,Deon Cain,WR,WR,3da67e95-bd15-409f-b5de-b2feb54efda7,Deon Cain,,Deon,Cain,WR,32.0,74,202.0,1996-08-09,3,Clemson,BUF,ACT,exact_name_position,1.0
+00-0034411,R.Gage,Russell Gage,WR,WR,4501e6f4-4683-4357-b241-8b4a0b6aae81,Russell Gage Jr.,,Russell,Gage,WR,84.0,72,184.0,1996-01-22,7,LSU,SF,ACT,fuzzy_name_position,1.0
+00-0034418,C.Wilson,Cedrick Wilson,WR,WR,a964f59b-af2b-48e1-b64d-c376cc1d8c28,Cedrick Wilson Jr.,,Cedrick,Wilson,WR,11.0,74,197.0,1995-11-20,8,Boise State,NO,ACT,fuzzy_name_position,1.0
+00-0034419,B.Berrios,Braxton Berrios,WR,WR,18f0bd30-1432-4fae-9cb4-c212bad6d0bb,Braxton Berrios,,Braxton,Berrios,WR,17.0,69,185.0,1995-10-06,8,Miami (FL),HOU,ACT,exact_name_position,1.0
+00-0034437,L.Cooke,Logan Cooke,P,SPEC,8301d82b-0ad1-4988-a978-2925e2ae9377,Logan Cooke,,Logan,Cooke,P,9.0,77,230.0,1995-07-28,8,Mississippi State,JAC,ACT,exact_name_position,1.0
+00-0034473,D.Gardeck,Dennis Gardeck,OLB,LB,48700b7b-210c-4ced-9c57-3e21162e7752,Dennis Gardeck,,Dennis,Gardeck,OLB,57.0,72,232.0,1994-08-09,8,Sioux Falls,JAC,ACT,exact_name_position,1.0
+00-0034485,J.Owens,Jonathan Owens,SS,DB,411c2af8-64c9-4982-8d72-3ba4c683c0db,Jonathan Owens,,Jonathan,Owens,SAF,36.0,71,204.0,1995-07-22,7,Missouri Western,CHI,ACT,fuzzy_name_position,1.0
+00-0034487,T.Sherfield,Trent Sherfield,WR,WR,18ccb826-5584-4f6a-8434-cf9a3b927b0f,Trent Sherfield Sr.,,Trent,Sherfield,WR,5.0,73,205.0,1996-02-25,8,Vanderbilt,DEN,ACT,fuzzy_name_position,1.0
+00-0034488,T.Thomas,Tavierre Thomas,CB,DB,0a63f97d-9cc2-44d0-b65a-ac2e78db73f9,Tavierre Thomas,,Tavierre,Thomas,CB,37.0,70,205.0,1996-03-11,8,Ferris State,MIN,ACT,exact_name_position,1.0
+00-0034490,E.Turner,Ezekiel Turner,ILB,LB,83849bc5-0b6c-4c76-b622-9c7042758e97,Ezekiel Turner,,Ezekiel,Turner,LB,47.0,74,225.0,1996-06-09,8,Washington,DET,ACT,fuzzy_name_position,1.0
+00-0034521,A.Lazard,Allen Lazard,WR,WR,6a23db75-021b-4808-99e6-21a33d34202b,Allen Lazard,,Allen,Lazard,WR,10.0,77,227.0,1995-12-11,7,Iowa State,NYJ,ACT,exact_name_position,1.0
+00-0034577,K.Allen,Kyle Allen,QB,QB,d2023f5b-f73b-43ad-a816-f10dadfdfaed,Kyle Allen,,Kyle,Allen,QB,8.0,75,210.0,1996-03-08,7,Houston,DET,ACT,exact_name_position,1.0
+00-0034613,T.Hudson,Tanner Hudson,TE,TE,2fa75e05-cac4-4b40-8924-dbc9ae0c959c,Tanner Hudson,,Tanner,Hudson,TE,87.0,77,241.0,1994-11-12,6,Southern Arkansas,CIN,ACT,exact_name_position,1.0
+00-0034721,C.Bojorquez,Corey Bojorquez,P,SPEC,1073ac8d-d12f-4ad0-845d-5351503931bd,Corey Bojorquez,,Corey,Bojorquez,P,13.0,72,217.0,1996-09-13,8,New Mexico,CLE,ACT,exact_name_position,1.0
+00-0034753,M.Andrews,Mark Andrews,TE,TE,0618f387-9b72-4270-8b8f-dec4cccc9e4a,Mark Andrews,,Mark,Andrews,TE,89.0,77,250.0,1995-09-06,8,Oklahoma,BAL,ACT,exact_name_position,1.0
+00-0034764,M.Gallup,Michael Gallup,WR,WR,9e174ff2-ca0e-4e6b-96f7-90f0088f7edd,Michael Gallup,,Michael,Gallup,WR,12.0,73,205.0,1996-03-04,7,Colorado State,WAS,ACT,exact_name_position,1.0
+00-0034771,M.Rudolph,Mason Rudolph,QB,QB,be4ca0ad-f3d6-4b98-a37f-79d0cbc06390,Mason Rudolph,,Mason,Rudolph,QB,2.0,77,235.0,1995-07-17,8,Oklahoma State,PIT,ACT,exact_name_position,1.0
+00-0034773,V.Vea,Vita Vea,NT,DL,503eb9a7-83ed-4b96-b0f2-7afe4920bde9,Vita Vea,,Vita,Vea,NT,50.0,76,347.0,1995-02-05,8,Washington,TB,ACT,exact_name_position,1.0
+00-0034775,C.Kirk,Christian Kirk,WR,WR,ebcd87ce-218c-4144-810b-921c2f59d6e8,Christian Kirk,,Christian,Kirk,WR,13.0,71,200.0,1996-11-18,8,Texas A&M,HOU,ACT,exact_name_position,1.0
+00-0034777,D.Chark,D.J. Chark,WR,WR,c2a7bd8a-d141-423a-8810-0988a59ff0b4,DJ Chark,,DJ,Chark,WR,16.0,75,198.0,1996-09-23,8,LSU,ATL,ACT,fuzzy_name_position,0.8888888888888888
+00-0034791,N.Chubb,Nick Chubb,RB,RB,4bd60b33-9fbf-4156-ba2b-8264ac37b418,Nick Chubb,,Nick,Chubb,RB,21.0,71,227.0,1995-12-27,8,Georgia,HOU,ACT,exact_name_position,1.0
+00-0034794,J.Sanders,Jason Sanders,K,SPEC,5ffb654f-0de5-424b-aa2f-ad511deb5b51,Jason Sanders,,Jason,Sanders,K,7.0,71,195.0,1995-11-16,8,New Mexico,MIA,ACT,exact_name_position,1.0
+00-0034796,L.Jackson,Lamar Jackson,QB,QB,e06a9c07-453a-4bb0-a7e9-2c3a64166dad,Lamar Jackson,,Lamar,Jackson,QB,8.0,74,205.0,1997-01-07,8,Louisville,BAL,ACT,exact_name_position,1.0
+00-0034798,D.Smythe,Durham Smythe,TE,TE,7e42a22a-c47b-4387-aeeb-2cc2e76dc1d8,Durham Smythe,,Durham,Smythe,TE,81.0,77,248.0,1995-08-09,8,Notre Dame,CHI,ACT,exact_name_position,1.0
+00-0034827,D.Moore,D.J. Moore,WR,WR,d8202e6d-d03b-4cd1-a793-ff8fd39d9755,DJ Moore,,DJ,Moore,WR,2.0,72,213.0,1997-04-14,8,Maryland,CHI,ACT,fuzzy_name_position,0.8888888888888888
+00-0034829,M.Gesicki,Mike Gesicki,TE,TE,1012cbe0-7eba-4169-bfca-183a0204e1a7,Mike Gesicki,,Mike,Gesicki,TE,88.0,78,245.0,1995-10-03,8,Penn State,CIN,ACT,exact_name_position,1.0
+00-0034837,C.Ridley,Calvin Ridley,WR,WR,926e2674-52d6-4cec-9991-46ee85cc8cfd,Calvin Ridley,,Calvin,Ridley,WR,0.0,73,190.0,1994-12-20,7,Alabama,TEN,ACT,exact_name_position,1.0
+00-0034844,S.Barkley,Saquon Barkley,RB,RB,9811b753-347c-467a-b3cb-85937e71e2b9,Saquon Barkley,,Saquon,Barkley,RB,26.0,72,233.0,1997-02-09,8,Penn State,PHI,ACT,exact_name_position,1.0
+00-0034854,K.Hodge,KhaDarel Hodge,WR,WR,6f124753-5c6c-454b-97c7-0f9b4d14e7c2,KhaDarel Hodge,,KhaDarel,Hodge,WR,4.0,74,210.0,1995-01-03,8,Prairie View A&M,ATL,ACT,exact_name_position,1.0
+00-0034855,B.Mayfield,Baker Mayfield,QB,QB,30198d30-9769-4e10-ac86-b4c91d940802,Baker Mayfield,,Baker,Mayfield,QB,6.0,73,215.0,1995-04-14,8,Oklahoma,TB,ACT,exact_name_position,1.0
+00-0034857,J.Allen,Josh Allen,QB,QB,3069db07-aa43-4503-ab11-2ae5c0002721,Josh Allen,,Josh,Allen,QB,17.0,77,237.0,1996-05-21,8,Wyoming,BUF,ACT,exact_name_position,1.0
+00-0034860,D.Pettis,Dante Pettis,WR,WR,20d16690-560b-4a01-af20-8870ef07ea70,Dante Pettis,,Dante,Pettis,WR,17.0,74,200.0,1995-10-23,7,Washington,NO,ACT,exact_name_position,1.0
+00-0034869,S.Darnold,Sam Darnold,QB,QB,13d826c5-9b22-4e0a-a877-02d8c84c546b,Sam Darnold,,Sam,Darnold,QB,14.0,75,225.0,1997-06-05,8,USC,SEA,ACT,exact_name_position,1.0
+00-0034899,J.Wolford,John Wolford,QB,QB,2ab1b694-1013-4661-85d4-55415d3b147f,John Wolford,,John,Wolford,QB,18.0,73,218.0,1995-10-16,5,Wake Forest,JAC,ACT,exact_name_position,1.0
+00-0034928,S.Sims,Steven Sims,WR,WR,4a213e4e-b0ba-4124-833e-33c528bd5908,Steven Sims,,Steven,Sims,WR,84.0,70,190.0,1997-03-31,5,Kansas,SEA,ACT,exact_name_position,1.0
+00-0034955,B.Rypien,Brett Rypien,QB,QB,9ab44516-2a26-4049-b630-66539c7a5dfd,Brett Rypien,,Brett,Rypien,QB,11.0,74,210.0,1996-07-09,7,Boise State,MIN,ACT,exact_name_position,1.0
+00-0034959,A.Beck,Andrew Beck,FB,RB,b556a98d-16aa-4a0d-9134-1b59c46cc640,Andrew Beck,,Andrew,Beck,FB,47.0,75,255.0,1996-05-15,6,Texas,NYJ,ACT,exact_name_position,1.0
+00-0034960,J.Meyers,Jakobi Meyers,WR,WR,73e194d1-a4b7-4de4-b1c2-3c24ef502918,Jakobi Meyers,,Jakobi,Meyers,WR,16.0,74,193.0,1996-11-09,7,North Carolina State,LV,ACT,exact_name_position,1.0
+00-0034970,I.Smith,Irv Smith,TE,TE,ed0e6a30-83d5-4f4b-bf49-f7ff80e21304,Irv Smith Jr.,,Irv,Smith,TE,83.0,74,242.0,1998-08-09,6,Alabama,HOU,ACT,fuzzy_name_position,1.0
+00-0034972,A.Mattison,Alexander Mattison,RB,RB,ae4faec0-509d-4080-b5cb-d1a44d062858,Alexander Mattison,,Alexander,Mattison,RB,8.0,71,220.0,1998-06-19,7,Boise State,MIA,ACT,exact_name_position,1.0
+00-0034974,J.Love,Julian Love,SS,DB,a1052a59-114e-4340-8936-bffb17431300,Julian Love,,Julian,Love,FS,20.0,71,195.0,1998-03-19,7,Notre Dame,SEA,ACT,fuzzy_name_position,1.0
+00-0034975,J.Hill,Justice Hill,RB,RB,528e71ec-8fb3-4928-ace5-fc5ffbf26eb3,Justice Hill,,Justice,Hill,RB,43.0,70,205.0,1997-11-14,7,Oklahoma State,BAL,ACT,exact_name_position,1.0
+00-0034981,F.Moreau,Foster Moreau,TE,TE,9c3a67fd-5c6e-4689-9e08-9ff6d4db6c9a,Foster Moreau,,Foster,Moreau,TE,87.0,76,250.0,1997-05-06,7,LSU,NO,PUP,exact_name_position,1.0
+00-0034983,H.Renfrow,Hunter Renfrow,WR,WR,34c523c7-bc58-49f0-a9cc-f9edd91fe00f,Hunter Renfrow,,Hunter,Renfrow,WR,13.0,70,185.0,1995-12-21,6,Clemson,CAR,ACT,exact_name_position,1.0
+00-0034987,E.Speed,E.J. Speed,OLB,LB,e653effc-2bdc-4bfe-bf3d-272e783ae4c4,E.J. Speed,,E.J.,Speed,LB,45.0,76,227.0,1995-06-01,7,Tarleton State,HOU,ACT,fuzzy_name_position,1.0
+00-0035021,A.Dulin,Ashton Dulin,WR,WR,f374262b-d642-4d05-9584-5955548ee4d1,Ashton Dulin,,Ashton,Dulin,WR,16.0,74,215.0,1997-05-15,7,Malone (OH),IND,ACT,exact_name_position,1.0
+00-0035039,S.Carlson,Stephen Carlson,TE,TE,013477a2-0271-4441-a0af-9bc25924a2f6,Stephen Carlson,,Stephen,Carlson,TE,88.0,76,248.0,1996-12-12,4,Princeton,CHI,ACT,exact_name_position,1.0
+00-0035042,J.Gillan,Jamie Gillan,P,SPEC,bc63567a-81e7-44c9-a85f-8aa9532ab4fd,Jamie Gillan,,Jamie,Gillan,P,12.0,73,207.0,1997-07-04,7,Arkansas-Pine Bluff,NYG,ACT,exact_name_position,1.0
+00-0035045,D.Montgomery,D.J. Montgomery,WR,WR,021f2c32-0876-4db3-9605-e829f7d449d7,D.J. Montgomery,,D.J.,Montgomery,WR,2.0,73,201.0,1996-11-17,4,Austin Peay,IND,ACT,exact_name_position,1.0
+00-0035100,J.Browning,Jake Browning,QB,QB,f2f29019-7306-4b1c-a9d8-e9f802cb06e0,Jake Browning,,Jake,Browning,QB,6.0,74,209.0,1996-04-11,3,Washington,CIN,ACT,exact_name_position,1.0
+00-0035125,A.Ingold,Alec Ingold,FB,RB,7ade135c-0760-4548-b7d9-cf1174e2be33,Alec Ingold,,Alec,Ingold,FB,30.0,73,232.0,1996-07-09,7,Wisconsin,MIA,ACT,exact_name_position,1.0
+00-0035133,K.Nixon,Keisean Nixon,CB,DB,e94ac14d-0122-4dc8-ad20-b71226cb8cfe,Keisean Nixon,,Keisean,Nixon,CB,25.0,70,200.0,1997-06-22,7,South Carolina,GB,ACT,exact_name_position,1.0
+00-0035140,M.Hardman,Mecole Hardman,WR,WR,fe6dc768-d576-476c-b150-53b85af2a1d1,Mecole Hardman,,Mecole,Hardman,WR,6.0,70,187.0,1998-03-12,7,Georgia,GB,ACT,exact_name_position,1.0
+00-0035149,N.Allegretti,Nick Allegretti,G,OL,806f81d1-6d4b-465c-8a16-b1a767c30fb0,Nick Allegretti,,Nick,Allegretti,G,67.0,76,320.0,1996-04-21,7,Illinois,WAS,ACT,exact_name_position,1.0
+00-0035156,J.Fox,Jack Fox,P,SPEC,7141ec7a-4f3d-44a4-979e-6644ab9e8f7b,Jack Fox,,Jack,Fox,P,3.0,74,218.0,1996-09-01,6,Rice,DET,ACT,exact_name_position,1.0
+00-0035190,A.Cole,A.J. Cole,P,SPEC,36f93677-a95b-4362-ac5f-6722f5c05b6d,AJ Cole,,AJ,Cole,P,6.0,76,220.0,1995-11-27,7,North Carolina State,LV,ACT,fuzzy_name_position,0.875
+00-0035208,O.Zaccheaus,Olamide Zaccheaus,WR,WR,d8281390-f081-41e5-b55e-75779536fe94,Olamide Zaccheaus,,Olamide,Zaccheaus,WR,14.0,68,199.0,1997-07-23,7,Virginia,CHI,ACT,exact_name_position,1.0
+00-0035216,D.Johnson,Diontae Johnson,WR,WR,244c00c7-fe9a-4f4f-adff-1d5b9c8877e7,Diontae Johnson,,Diontae,Johnson,WR,16.0,70,183.0,1996-07-05,7,Toledo,CLE,ACT,exact_name_position,1.0
+00-0035228,K.Murray,Kyler Murray,QB,QB,dd5a6b6e-ffae-45a5-b8e6-718a9251f374,Kyler Murray,,Kyler,Murray,QB,1.0,70,207.0,1997-08-07,7,Oklahoma,ARI,ACT,exact_name_position,1.0
+00-0035229,T.Hockenson,T.J. Hockenson,TE,TE,bd1120b6-38b3-4225-a4b0-20660a149d0d,T.J. Hockenson,,T.J.,Hockenson,TE,87.0,77,248.0,1997-07-03,7,Iowa,MIN,ACT,exact_name_position,1.0
+00-0035235,K.McGary,Kaleb McGary,T,OL,37095914-53be-4d16-b5c7-2194dbb6d6c2,Kaleb McGary,,Kaleb,McGary,T,76.0,78,330.0,1995-02-22,7,Washington,ATL,ACT,exact_name_position,1.0
+00-0035243,M.Sanders,Miles Sanders,RB,RB,ef3ceaf4-b733-4e06-a7f4-a94fc67361c1,Miles Sanders,,Miles,Sanders,RB,27.0,71,211.0,1997-05-01,7,Penn State,DAL,ACT,exact_name_position,1.0
+00-0035244,L.Johnson,Lonnie Johnson,FS,DB,acbf5978-d7da-4d01-8f1d-22dd65d4484c,Lonnie Johnson Jr.,,Lonnie,Johnson,SAF,32.0,74,221.0,1995-11-04,7,Kentucky,LV,ACT,fuzzy_name_position,1.0
+00-0035249,J.Oliver,Josh Oliver,TE,TE,dc83f7af-7b30-4c4a-9c93-f67bd8db954b,Josh Oliver,,Josh,Oliver,TE,84.0,77,259.0,1997-03-21,7,San Jose State,MIN,ACT,exact_name_position,1.0
+00-0035250,D.Singletary,Devin Singletary,RB,RB,a961b0d4-5d7c-438e-90f0-2e1fa09f6c89,Devin Singletary,,Devin,Singletary,RB,26.0,67,203.0,1997-09-03,7,Florida Atlantic,NYG,ACT,exact_name_position,1.0
+00-0035251,W.Grier,Will Grier,QB,QB,7905e9be-2f66-4ff5-a6e9-dbe281bf4822,Will Grier,,Will,Grier,QB,15.0,73,220.0,1995-04-03,6,West Virginia,DAL,ACT,exact_name_position,1.0
+00-0035261,T.Pollard,Tony Pollard,RB,RB,33b0227d-4c21-4e71-b4cd-be35f7db9123,Tony Pollard,,Tony,Pollard,RB,20.0,72,209.0,1997-04-30,7,Memphis,TEN,ACT,exact_name_position,1.0
+00-0035264,J.Stidham,Jarrett Stidham,QB,QB,582fe465-135a-4901-beef-60aebce99067,Jarrett Stidham,,Jarrett,Stidham,QB,8.0,75,215.0,1996-08-08,6,Auburn,DEN,ACT,exact_name_position,1.0
+00-0035272,A.Van Ginkel,Andrew Van Ginkel,OLB,LB,7b47d190-168b-44bc-bb91-a688fe28f768,Andrew Van Ginkel,,Andrew,Van Ginkel,OLB,43.0,76,242.0,1995-07-01,7,Wisconsin,MIN,ACT,exact_name_position,1.0
+00-0035280,J.Bailey,Jake Bailey,P,SPEC,af1335c6-c262-4488-9352-86ba80754583,Jake Bailey,,Jake,Bailey,P,16.0,74,212.0,1997-06-18,7,Stanford,MIA,ACT,exact_name_position,1.0
+00-0035282,E.Stick,Easton Stick,QB,QB,af291d43-a51f-44ce-b8ac-430ec68c78c8,Easton Stick,,Easton,Stick,QB,12.0,73,224.0,1995-09-15,6,North Dakota State,ATL,ACT,exact_name_position,1.0
+00-0035289,G.Minshew,Gardner Minshew,QB,QB,dabb52c0-455b-48fe-996b-abf758120623,Gardner Minshew,,Gardner,Minshew,QB,17.0,73,225.0,1996-05-16,7,Washington State,KC,ACT,exact_name_position,1.0
+00-0035291,T.Williams,Trayveon Williams,RB,RB,478fcd24-2617-41d5-a900-b272aa6ef515,Trayveon Williams,,Trayveon,Williams,RB,36.0,68,206.0,1997-10-18,7,Texas A&M,CLE,ACT,exact_name_position,1.0
+00-0035328,M.Nelson,Matt Nelson,T,OL,b38b6c46-7b53-4c5b-864c-04e261c97ddc,Matt Nelson,,Matt,Nelson,OL,69.0,79,315.0,1995-12-19,5,Iowa,MIN,ACT,fuzzy_name_position,1.0
+00-0035329,D.Parham,Donald Parham,TE,TE,4f246e92-3d21-450f-977a-dc16892c7238,Donald Parham Jr.,,Donald,Parham,TE,89.0,80,237.0,1997-08-16,5,Stetson,PIT,IR,fuzzy_name_position,1.0
+00-0035341,T.Irwin,Trenton Irwin,WR,WR,ee79ad2e-353a-40cd-9344-c9d84f7e4b63,Trenton Irwin,,Trenton,Irwin,WR,83.0,74,204.0,1995-12-10,6,Stanford,JAC,ACT,exact_name_position,1.0
+00-0035345,C.Myarick,Chris Myarick,TE,TE,002adaa8-5dc2-4b4b-95bc-53a38dce3849,Chris Myarick,,Chris,Myarick,TE,43.0,77,261.0,1995-10-06,4,Temple,MIA,ACT,exact_name_position,1.0
+00-0035356,T.Jackson,Tyree Jackson,TE,TE,2fc1c9f1-9e85-449a-9a87-fa8203e8e8f9,Tyree Jackson,,Tyree,Jackson,TE,80.0,79,249.0,1997-11-07,3,Buffalo,WAS,IR,exact_name_position,1.0
+00-0035359,D.Sills,David Sills,WR,WR,97f6c20c-1110-4551-82c1-41d3247397a2,David Sills,,David,Sills,WR,87.0,75,211.0,1996-05-29,3,West Virginia,ATL,ACT,exact_name_position,1.0
+00-0035378,A.Wingard,Andrew Wingard,FS,DB,65e778fa-4639-4973-bb82-c76efa2ff309,Andrew Wingard,,Andrew,Wingard,SAF,42.0,72,200.0,1996-12-05,7,Wyoming,JAC,ACT,fuzzy_name_position,1.0
+00-0035406,L.Humphrey,Lil'Jordan Humphrey,WR,WR,b7f930af-ddd2-4a48-9617-96bda81b0334,Lil'Jordan Humphrey,,Lil'Jordan,Humphrey,WR,81.0,76,225.0,1998-04-19,6,Texas,NYG,ACT,exact_name_position,1.0
+00-0035480,M.Taylor,Malik Taylor,WR,WR,228b0dd8-3f75-4b60-90d1-59036858b8ae,Malik Taylor,,Malik,Taylor,WR,86.0,73,220.0,1995-12-21,5,Ferris State,DET,ACT,exact_name_position,1.0
+00-0035500,G.Dortch,Greg Dortch,WR,WR,4484c7d1-025a-4f26-8e9b-48503afb0c68,Greg Dortch,,Greg,Dortch,WR,4.0,67,180.0,1998-05-29,5,Wake Forest,ARI,ACT,exact_name_position,1.0
+00-0035535,D.Slayton,Darius Slayton,WR,WR,82ed30a5-54a8-4ed0-b040-99c3a78fb055,Darius Slayton,,Darius,Slayton,WR,18.0,73,198.0,1997-01-12,7,Auburn,NYG,ACT,exact_name_position,1.0
+00-0035537,T.Johnson,Ty Johnson,RB,RB,96e6687b-2b89-4dd9-98df-6e7507cd82cf,Ty Johnson,,Ty,Johnson,RB,26.0,70,210.0,1997-09-17,7,Maryland,BUF,ACT,exact_name_position,1.0
+00-0035544,T.Kennedy,Tom Kennedy,WR,WR,dc51b38c-dc82-44ee-a88b-764d681ce58a,Tom Kennedy,,Tom,Kennedy,WR,85.0,70,195.0,1996-07-29,3,Bryant,DET,ACT,exact_name_position,1.0
+00-0035567,C.Reynolds,Craig Reynolds,RB,RB,0deb1dc9-0945-470d-8352-220d26d03d7d,Craig Reynolds,,Craig,Reynolds,RB,13.0,71,216.0,1996-06-15,6,Kutztown,DET,ACT,exact_name_position,1.0
+00-0035588,G.Bradbury,Garrett Bradbury,C,OL,acdd0b8b-d840-44ac-9dfa-05fe8baabe09,Garrett Bradbury,,Garrett,Bradbury,C,65.0,75,300.0,1995-06-20,7,North Carolina State,NE,ACT,exact_name_position,1.0
+00-0035594,T.Homer,Travis Homer,RB,RB,4afb77d8-4564-469b-be4c-5a8587df8046,Travis Homer,,Travis,Homer,RB,21.0,70,211.0,1998-08-07,7,Miami (FL),CHI,ACT,exact_name_position,1.0
+00-0035628,D.Johnson,D'Ernest Johnson,RB,RB,f46e812f-14c6-4af8-9316-01a880adebc5,D'Ernest Johnson,,D'Ernest,Johnson,RB,30.0,70,208.0,1996-02-27,6,South Florida,BAL,ACT,exact_name_position,1.0
+00-0035631,D.Sample,Drew Sample,TE,TE,15a4f552-ecaf-45bd-9006-aa5dda93bee6,Drew Sample,,Drew,Sample,TE,89.0,77,260.0,1996-04-16,7,Washington,CIN,ACT,exact_name_position,1.0
+00-0035632,A.Hooker,Amani Hooker,FS,DB,aac96096-362f-4254-952a-5b3b04472f19,Amani Hooker,,Amani,Hooker,SAF,37.0,71,210.0,1998-06-14,7,Iowa,TEN,ACT,fuzzy_name_position,1.0
+00-0035640,D.Metcalf,DK Metcalf,WR,WR,754faf0f-40f7-45f0-b23b-6ce990ecaf26,DK Metcalf,,DK,Metcalf,WR,4.0,76,229.0,1997-12-14,7,Ole Miss,PIT,ACT,exact_name_position,1.0
+00-0035643,J.Simmons,Jeffery Simmons,DT,DL,dcbe3642-aa52-43e6-8f4c-4b9809377c4d,Jeffery Simmons,,Jeffery,Simmons,DT,98.0,76,305.0,1997-07-28,7,Mississippi State,TEN,ACT,exact_name_position,1.0
+00-0035644,N.Fant,Noah Fant,TE,TE,cdc98acc-9eb6-4b44-81bb-61d7b8a3b55f,Noah Fant,,Noah,Fant,TE,86.0,76,249.0,1997-11-20,7,Iowa,CIN,ACT,exact_name_position,1.0
+00-0035645,G.Olszewski,Gunner Olszewski,WR,WR,625a1777-dd9a-48c6-b512-c450b0914450,Gunner Olszewski,,Gunner,Olszewski,WR,0.0,72,190.0,1996-11-26,7,Bemidji State,NYG,ACT,exact_name_position,1.0
+00-0035659,T.McLaurin,Terry McLaurin,WR,WR,7e8c4641-2beb-4213-ba22-69fe0307005f,Terry McLaurin,,Terry,McLaurin,WR,17.0,72,210.0,1995-09-15,7,Ohio State,WAS,PUP,exact_name_position,1.0
+00-0035662,M.Brown,Marquise Brown,WR,WR,feeee40a-dd63-41a7-89cd-6c95b5456833,Marquise Brown,,Hollywood,Brown,WR,5.0,69,180.0,1997-06-04,7,Oklahoma,KC,ACT,exact_name_position,1.0
+00-0035669,N.Scott,Nick Scott,SS,DB,4d383922-53ab-48f8-bb8a-29176ea3ffbc,Nick Scott,,Nick,Scott,SAF,21.0,71,200.0,1995-05-17,7,Penn State,CAR,ACT,fuzzy_name_position,1.0
+00-0035676,A.Brown,A.J. Brown,WR,WR,a9e580f2-1fbe-46fb-887c-c84089b507e4,A.J. Brown,,A.J.,Brown,WR,11.0,73,226.0,1997-06-30,7,Ole Miss,PHI,ACT,exact_name_position,1.0
+00-0035685,D.Montgomery,David Montgomery,RB,RB,1c9e1cd5-8cb1-4a15-a2c8-3a0c0fd5423c,David Montgomery,,David,Montgomery,RB,5.0,71,230.0,1997-06-07,7,Iowa State,DET,ACT,exact_name_position,1.0
+00-0035686,M.Deiter,Michael Deiter,C,OL,6d96bf47-e8c7-4683-8291-74dc426a38cb,Michael Deiter,,Michael,Deiter,C,60.0,78,310.0,1996-09-03,7,Wisconsin,WAS,ACT,exact_name_position,1.0
+00-0035689,D.Knox,Dawson Knox,TE,TE,5fb525c5-4e70-4ede-8c49-94ad0cf66b7d,Dawson Knox,,Dawson,Knox,TE,88.0,76,254.0,1996-11-14,7,Ole Miss,BUF,ACT,exact_name_position,1.0
+00-0035700,J.Jacobs,Josh Jacobs,RB,RB,61694ab9-b099-408e-b48d-6a643dd069ec,Josh Jacobs,,Josh,Jacobs,RB,8.0,70,223.0,1998-02-11,7,Alabama,GB,ACT,exact_name_position,1.0
+00-0035703,M.Boykin,Miles Boykin,WR,WR,d1ed6f8c-1611-4695-8b48-5adce0de50dd,Miles Boykin,,Miles,Boykin,WR,80.0,75,231.0,1996-10-12,6,Notre Dame,CHI,ACT,exact_name_position,1.0
+00-0035704,D.Lock,Drew Lock,QB,QB,94325301-e0ad-4a9f-a0e5-ffec0f529be3,Drew Lock,,Drew,Lock,QB,2.0,76,228.0,1996-11-10,7,Missouri,SEA,ACT,exact_name_position,1.0
+00-0035710,D.Jones,Daniel Jones,QB,QB,0042266b-cb28-4012-bfd2-06650badad97,Daniel Jones,,Daniel,Jones,QB,17.0,77,230.0,1997-05-27,7,Duke,IND,ACT,exact_name_position,1.0
+00-0035719,D.Samuel,Deebo Samuel,WR,WR,628a6a0a-4fde-4024-8d7c-28674953d5af,Deebo Samuel,,Deebo,Samuel,WR,1.0,72,215.0,1996-01-15,7,South Carolina,WAS,ACT,exact_name_position,1.0
+00-0035726,J.Johnson,Jakob Johnson,FB,RB,12b701c8-7f40-4437-aeef-782fd1d25f2e,Jakob Johnson,,Jakob,Johnson,FB,43.0,75,255.0,1994-12-15,6,Tennessee,HOU,ACT,exact_name_position,1.0
+00-0035771,M.Wilcox,Mitchell Wilcox,TE,TE,b2d98b60-b4b3-4610-81d2-2154c723fdbb,Mitchell Wilcox,,Mitchell,Wilcox,TE,,76,250.0,1996-11-07,4,South Florida,MIA,ACT,exact_name_position,1.0
+00-0035795,J.Pierre,James Pierre,CB,DB,6e0bbdc7-fa74-41d2-b3de-4eaa8e670f87,James Pierre,,James,Pierre,CB,42.0,74,185.0,1996-09-16,6,Florida Atlantic,PIT,ACT,exact_name_position,1.0
+00-0035806,J.Hasty,Jamycal Hasty,RB,RB,c6c50d09-f14f-41c2-9eb3-87514f0121f6,JaMycal Hasty,,JaMycal,Hasty,RB,39.0,68,205.0,1996-09-12,5,Baylor,NE,ACT,fuzzy_name_position,1.0
+00-0035859,B.Gillikin,Blake Gillikin,P,SPEC,53213f81-77ad-48d0-9d42-00e3633b0e90,Blake Gillikin,,Blake,Gillikin,P,12.0,74,196.0,1998-01-21,6,Penn State,ARI,ACT,exact_name_position,1.0
+00-0035876,A.Baccellia,Andre Baccellia,WR,WR,58266b36-fa48-4f51-b41c-909bf82748f3,Andre Baccellia,,Andre,Baccellia,WR,82.0,70,180.0,1997-01-07,2,Washington,ARI,ACT,exact_name_position,1.0
+00-0035889,T.Townsend,Tommy Townsend,P,SPEC,edfc712a-54f7-4c34-a838-c50c14dbf7dc,Tommy Townsend,,Tommy,Townsend,P,6.0,73,191.0,1996-11-12,6,Florida,HOU,ACT,exact_name_position,1.0
+00-0035891,C.White,Cody White,WR,WR,d25a19a7-7de6-4476-b42a-833c8c3cb208,Cody White,,Cody,White,WR,82.0,75,227.0,1998-11-28,4,Michigan State,SEA,ACT,exact_name_position,1.0
+00-0035924,J.Ward,Jonathan Ward,RB,RB,1dc6b133-355f-451e-856f-d02839681578,Jonathan Ward,,Jonathan,Ward,RB,23.0,72,202.0,1997-09-30,6,Central Michigan,NYG,ACT,exact_name_position,1.0
+00-0035934,T.Jackson,Trishton Jackson,WR,WR,9a2cd41e-a6e8-42d6-aad4-65c42939d733,Trishton Jackson,,Trishton,Jackson,WR,86.0,73,200.0,1998-03-09,3,Syracuse,ARI,ACT,exact_name_position,1.0
+00-0035956,G.Ricci,Giovanni Ricci,TE,TE,689de342-1d99-4a4d-976d-f6573ef3a8c2,Giovanni Ricci,,Giovanni,Ricci,TE,49.0,75,240.0,1996-10-16,3,Western Michigan,MIN,ACT,exact_name_position,1.0
+00-0035973,P.Taylor,Patrick Taylor,RB,RB,ef87e355-8e0c-40ed-a85d-bca4896d4f1e,Patrick Taylor Jr.,,Patrick,Taylor,RB,32.0,74,217.0,1998-04-29,5,Memphis,SF,ACT,fuzzy_name_position,1.0
+00-0035993,T.Huntley,Tyler Huntley,QB,QB,7c226f73-a59f-4db6-ad98-2766d05d4d5a,Tyler Huntley,,Tyler,Huntley,QB,7.0,73,205.0,1998-02-03,5,Utah,CLE,ACT,exact_name_position,1.0
+00-0036011,B.Price,Bobby Price,FS,DB,b80be347-fd65-4a40-bdad-e11c75bded39,Bobby Price,,Bobby,Price,CB,37.0,76,205.0,1998-04-25,5,Norfolk State,WAS,ACT,fuzzy_name_position,1.0
+00-0036020,S.Ahmed,Salvon Ahmed,RB,RB,0dbbd211-0372-4751-9751-e4df4ab1f8eb,Salvon Ahmed,,Salvon,Ahmed,RB,36.0,71,197.0,1998-12-30,5,Washington,IND,ACT,exact_name_position,1.0
+00-0036032,S.McKeon,Sean McKeon,TE,TE,0f369885-8ecd-4ca0-a3dc-df8530a0db6e,Sean McKeon,,Sean,McKeon,TE,49.0,77,255.0,1997-12-28,5,Michigan,IND,ACT,exact_name_position,1.0
+00-0036036,T.Steele,Terence Steele,T,OL,9b1a3246-4f3b-47f7-9bf8-a33d6e454723,Terence Steele,,Terence,Steele,T,78.0,78,310.0,1997-06-04,6,Texas Tech,DAL,ACT,exact_name_position,1.0
+00-0036037,S.Franklin,Sam Franklin,SS,DB,3b1bb0da-607a-4502-8855-8ab5095334da,Sam Franklin Jr.,,Sam,Franklin,SAF,42.0,75,210.0,1996-02-02,6,Temple,DEN,ACT,fuzzy_name_position,1.0
+00-0036040,J.Johnson,Juwan Johnson,TE,TE,0226b03b-f91d-4223-9813-9fcd2e9c3acc,Juwan Johnson,,Juwan,Johnson,TE,83.0,76,231.0,1996-09-13,6,Oregon,NO,ACT,exact_name_position,1.0
+00-0036059,T.Mabry,Tyler Mabry,TE,TE,bad1a0c1-7ea2-4898-b5d9-ad1aec45c8b1,Tyler Mabry,,Tyler,Mabry,TE,43.0,75,247.0,1996-11-21,2,Maryland,CAR,ACT,exact_name_position,1.0
+00-0036096,J.Taylor,J.J. Taylor,RB,RB,879325b1-c961-4c9a-a3a4-679d77a28293,J.J. Taylor,,J.J.,Taylor,RB,26.0,66,185.0,1998-01-04,3,Arizona,HOU,ACT,exact_name_position,1.0
+00-0036124,K.Dorsey,Khalil Dorsey,CB,DB,e8b1322a-6162-4535-b6af-4ca60ce8b09c,Khalil Dorsey,,Khalil,Dorsey,CB,30.0,68,188.0,1998-03-31,5,Northern Arizona,DET,PUP,exact_name_position,1.0
+00-0036132,B.Bredeson,Ben Bredeson,G,OL,ab3ce81f-6625-45d3-aa6d-79f95ae4f503,Ben Bredeson,,Ben,Bredeson,G,68.0,77,315.0,1998-02-20,6,Michigan,TB,ACT,exact_name_position,1.0
+00-0036139,R.Dowdle,Rico Dowdle,RB,RB,bba755a2-63b6-4ac1-b806-0609816135de,Rico Dowdle,,Rico,Dowdle,RB,5.0,71,215.0,1998-06-14,6,South Carolina,CAR,ACT,exact_name_position,1.0
+00-0036145,L.Cager,Lawrence Cager,TE,TE,2f2181f8-cb0a-42e4-9468-17f5f5a219cc,Lawrence Cager,,Lawrence,Cager,TE,89.0,77,220.0,1997-08-20,4,Georgia,WAS,ACT,exact_name_position,1.0
+00-0036158,J.Dobbins,J.K. Dobbins,RB,RB,a57b9914-4315-4295-98b4-9b348c52d6a1,J.K. Dobbins,,J.K.,Dobbins,RB,27.0,70,212.0,1998-12-17,6,Ohio State,DEN,ACT,exact_name_position,1.0
+00-0036165,I.Hodgins,Isaiah Hodgins,WR,WR,1d1c217b-6407-40d7-aebb-ba95fa05d127,Isaiah Hodgins,,Isaiah,Hodgins,WR,18.0,75,200.0,1998-10-21,4,Oregon State,SF,ACT,exact_name_position,1.0
+00-0036171,A.Brewer,Aaron Brewer,G,OL,2a41d03d-aec1-4821-a241-6fbe1878d3fd,Aaron Brewer,,Aaron,Brewer,OL,55.0,73,295.0,1997-10-28,6,Texas State,MIA,ACT,name_position_group,0.95
+00-0036176,M.Kinsey,Mason Kinsey,WR,WR,4d14a6cd-273f-4cf4-aac0-7fe041b6c650,Mason Kinsey,,Mason,Kinsey,WR,12.0,71,200.0,1998-08-29,3,Berry College,TEN,ACT,exact_name_position,1.0
+00-0036182,N.Westbrook-Ikhine,Nick Westbrook-Ikhine,WR,WR,5e63e674-adf3-4f4e-929e-4a0ff2cfb1df,Nick Westbrook-Ikhine,,Nick,Westbrook-Ikhine,WR,18.0,74,211.0,1997-03-21,6,Indiana,MIA,ACT,exact_name_position,1.0
+00-0036183,K.Wilkerson,Kristian Wilkerson,WR,WR,b9a6720d-9c6f-46f2-bcee-b80550026437,Kristian Wilkerson,,Kristian,Wilkerson,WR,82.0,73,214.0,1997-01-10,3,Southeast Missouri State,BUF,ACT,exact_name_position,1.0
+00-0036187,R.Gilliam,Reggie Gilliam,FB,RB,4475bb8a-b5a6-4527-bfc7-8e7e03900984,Reggie Gilliam,,Reggie,Gilliam,FB,41.0,72,244.0,1997-08-20,6,Toledo,BUF,ACT,exact_name_position,1.0
+00-0036212,T.Tagovailoa,Tua Tagovailoa,QB,QB,26ad9c27-de38-495e-913c-6fb2428e76d3,Tua Tagovailoa,,Tua,Tagovailoa,QB,1.0,73,225.0,1998-03-02,6,Alabama,MIA,ACT,exact_name_position,1.0
+00-0036215,D.Pinter,Danny Pinter,C,OL,22febe45-170a-4f01-b144-3b35b44c7da4,Danny Pinter,,Danny,Pinter,C,63.0,76,301.0,1996-06-19,6,Ball State,IND,ACT,exact_name_position,1.0
+00-0036222,I.Rodgers,Isaiah Rodgers,CB,DB,72100db3-2daa-4c17-aaa8-6c2c52bea5f3,Isaiah Rodgers,,Isaiah,Rodgers,CB,2.0,70,176.0,1998-01-07,5,UMass,MIN,ACT,exact_name_position,1.0
+00-0036223,J.Taylor,Jonathan Taylor,RB,RB,925195a4-06ba-4e37-ae7d-a3d6a5419139,Jonathan Taylor,,Jonathan,Taylor,RB,28.0,70,226.0,1999-01-19,6,Wisconsin,IND,ACT,exact_name_position,1.0
+00-0036225,D.Keene,Dalton Keene,TE,TE,4da5e05d-fc5c-4e87-aa38-d9cde42dd476,Dalton Keene,,Dalton,Keene,TE,49.0,76,251.0,1999-04-14,2,Virginia Tech,HOU,ACT,exact_name_position,1.0
+00-0036232,H.Bryant,Harrison Bryant,TE,TE,f58a5899-8b78-46e8-a29a-ba6273b7d872,Harrison Bryant,,Harrison,Bryant,TE,85.0,77,243.0,1998-04-23,6,Florida Atlantic,PHI,ACT,exact_name_position,1.0
+00-0036233,D.Peoples-Jones,Donovan Peoples-Jones,WR,WR,924edb03-29a9-42ae-92dd-ef7e8a498095,Donovan Peoples-Jones,,Donovan,Peoples-Jones,WR,14.0,74,204.0,1999-02-19,5,Michigan,NO,ACT,exact_name_position,1.0
+00-0036244,C.Parkinson,Colby Parkinson,TE,TE,1ea7affb-e5e7-491a-aaa3-55e200b2eb48,Colby Parkinson,,Colby,Parkinson,TE,84.0,79,265.0,1999-01-08,6,Stanford,LA,ACT,exact_name_position,1.0
+00-0036252,M.Pittman,Michael Pittman,WR,WR,1aefd5e2-1f85-471a-91a5-4aad4cf6fe6d,Michael Pittman Jr.,,Michael,Pittman,WR,11.0,76,223.0,1997-10-05,6,USC,IND,ACT,fuzzy_name_position,1.0
+00-0036254,C.Johnson,Collin Johnson,WR,WR,214ae0bc-d6ed-4216-a154-f253c85bb90b,Collin Johnson,,Collin,Johnson,WR,17.0,77,220.0,1997-09-23,5,Texas,LV,ACT,exact_name_position,1.0
+00-0036259,J.Jennings,Jauan Jennings,WR,WR,3ae9f0fa-c711-4663-80cf-4707856c07aa,Jauan Jennings,,Jauan,Jennings,WR,15.0,75,212.0,1997-07-10,5,Tennessee,SF,ACT,exact_name_position,1.0
+00-0036261,B.Aiyuk,Brandon Aiyuk,WR,WR,c90471cc-fa60-4416-9388-5aebb5d877eb,Brandon Aiyuk,,Brandon,Aiyuk,WR,11.0,72,200.0,1998-03-17,6,Arizona State,SF,PUP,exact_name_position,1.0
+00-0036264,J.Love,Jordan Love,QB,QB,e5094779-e94f-4052-8597-bdbee3719f6b,Jordan Love,,Jordan,Love,QB,10.0,76,219.0,1998-11-02,6,Utah State,GB,ACT,exact_name_position,1.0
+00-0036265,A.Dillon,A.J. Dillon,RB,RB,e10bfeb8-ea01-47bc-bfa8-45f6dcbf71b3,A.J. Dillon,,A.J.,Dillon,RB,29.0,72,247.0,1998-05-02,6,Boston College,PHI,ACT,exact_name_position,1.0
+00-0036268,L.Shenault,Laviska Shenault Jr.,WR,WR,131d3b1a-5746-499e-98ee-4bbf67cd377e,Laviska Shenault Jr.,,Laviska,Shenault,WR,15.0,73,227.0,1998-10-05,6,Colorado,BUF,ACT,exact_name_position,1.0
+00-0036271,Q.Watkins,Quez Watkins,WR,WR,ca85137c-205c-458e-8b77-8457849f614c,Quez Watkins,,Quez,Watkins,WR,16.0,72,193.0,1998-06-09,5,Southern Miss,ARI,IR,exact_name_position,1.0
+00-0036275,D.Swift,D'Andre Swift,RB,RB,cc4b5f58-a11c-4450-a1df-617ad88336e4,D'Andre Swift,,D'Andre,Swift,RB,4.0,68,204.0,1999-01-14,6,Georgia,CHI,ACT,exact_name_position,1.0
+00-0036277,Q.Cephus,Quintez Cephus,WR,WR,3bd012f5-1fdf-4ed7-b660-5013122df93f,Quintez Cephus,,Quintez,Cephus,WR,14.0,73,208.0,1998-04-01,4,Wisconsin,HOU,ACT,exact_name_position,1.0
+00-0036287,N.Igbinoghene,Noah Igbinoghene,CB,DB,b4b346b6-6175-407c-a6cd-103368a1609f,Noah Igbinoghene,,Noah,Igbinoghene,CB,6.0,71,197.0,1999-11-27,6,Auburn,WAS,ACT,exact_name_position,1.0
+00-0036290,C.Kmet,Cole Kmet,TE,TE,036feeb6-9a22-43c5-a8e3-7ac611d8ff49,Cole Kmet,,Cole,Kmet,TE,85.0,78,257.0,1999-03-10,6,Notre Dame,CHI,ACT,exact_name_position,1.0
+00-0036293,J.Chinn,Jeremy Chinn,FS,DB,5f623fbc-415e-4035-b423-7850cf1153b4,Jeremy Chinn,,Jeremy,Chinn,SAF,11.0,75,220.0,1998-02-26,6,Southern Illinois,LV,ACT,fuzzy_name_position,1.0
+00-0036297,D.Evans,Darrynton Evans,RB,RB,eb3c219d-6489-4f2f-a542-bdbf7423a325,Darrynton Evans,,Darrynton,Evans,RB,21.0,70,203.0,1998-07-09,6,Appalachian State,BUF,ACT,exact_name_position,1.0
+00-0036306,D.Thomas,Daniel Thomas,SS,DB,15a6249f-f4cf-47c2-8251-8a3a802b3db0,Daniel Thomas,,Daniel,Thomas,SAF,20.0,70,215.0,1998-07-01,6,Auburn,JAC,ACT,fuzzy_name_position,1.0
+00-0036309,D.Mooney,Darnell Mooney,WR,WR,bafe8df1-66b5-4200-8fb3-ff188c25a4e2,Darnell Mooney,,Darnell,Mooney,WR,1.0,71,180.0,1997-10-29,6,Tulane,ATL,ACT,exact_name_position,1.0
+00-0036313,B.Mann,Braden Mann,P,SPEC,85eaaf9f-59cf-4150-943c-c1abdaa78eb1,Braden Mann,,Braden,Mann,P,10.0,71,198.0,1997-11-24,6,Texas A&M,PHI,ACT,exact_name_position,1.0
+00-0036322,J.Jefferson,Justin Jefferson,WR,WR,4131d4ee-0318-4bb5-832a-4dec80668a4f,Justin Jefferson,,Justin,Jefferson,WR,18.0,73,195.0,1999-06-16,6,LSU,MIN,ACT,exact_name_position,1.0
+00-0036328,A.Gibson,Antonio Gibson,RB,RB,c0a8a5d0-583f-457a-9d96-70027d3f69e7,Antonio Gibson,,Antonio,Gibson,RB,4.0,72,228.0,1998-06-23,6,Memphis,NE,ACT,exact_name_position,1.0
+00-0036329,A.Davis,Ashtyn Davis,SS,DB,7d491979-7d1b-4b55-9f3a-f68db22d8bb1,Ashtyn Davis,,Ashtyn,Davis,SAF,21.0,73,205.0,1996-10-10,6,California,MIA,ACT,fuzzy_name_position,1.0
+00-0036331,D.Duvernay,Devin Duvernay,WR,WR,d93dbc83-e604-4823-a24e-d162cbd8d4d9,Devin Duvernay,,Devin,Duvernay,WR,12.0,71,202.0,1997-09-12,6,Texas,CHI,ACT,exact_name_position,1.0
+00-0036332,J.Deguara,Josiah Deguara,TE,TE,7874d188-0fcd-4af9-9289-27c27e2bbd16,Josiah Deguara,,Josiah,Deguara,TE,47.0,74,240.0,1997-02-14,5,Cincinnati,ARI,ACT,exact_name_position,1.0
+00-0036345,K.Osborn,K.J. Osborn,WR,WR,3bf5c049-9daa-43ba-9758-c6c895a9d462,K.J. Osborn,,K.J.,Osborn,WR,13.0,71,203.0,1997-06-10,6,Miami (FL),WAS,ACT,exact_name_position,1.0
+00-0036355,J.Herbert,Justin Herbert,QB,QB,f0a8f8e3-b9e9-46ed-85e4-eec6452a8a44,Justin Herbert,,Justin,Herbert,QB,10.0,78,236.0,1998-03-10,6,Oregon,LAC,ACT,exact_name_position,1.0
+00-0036358,C.Lamb,CeeDee Lamb,WR,WR,a72ea15b-5199-4101-a300-846e1c655add,CeeDee Lamb,,CeeDee,Lamb,WR,88.0,74,200.0,1999-04-08,6,Oklahoma,DAL,ACT,exact_name_position,1.0
+00-0036360,C.Edwards-Helaire,Clyde Edwards-Helaire,RB,RB,8aa01565-4481-443a-9951-642c98ded113,Clyde Edwards-Helaire,,Clyde,Edwards-Helaire,RB,23.0,67,207.0,1999-04-11,6,LSU,NO,ACT,exact_name_position,1.0
+00-0036386,A.Thomas,Andrew Thomas,T,OL,b493daf9-e550-497c-b382-4ffda2e47260,Andrew Thomas,,Andrew,Thomas,T,78.0,77,315.0,1999-01-22,6,Georgia,NYG,PUP,exact_name_position,1.0
+00-0036387,J.Reagor,Jalen Reagor,WR,WR,06ff7f42-5fe7-4899-84a5-9ba5349d17e8,Jalen Reagor,,Jalen,Reagor,WR,88.0,71,197.0,1999-01-02,6,TCU,LAC,ACT,exact_name_position,1.0
+00-0036389,J.Hurts,Jalen Hurts,QB,QB,64bd0f02-6a5d-407e-98f1-fd02048ea21d,Jalen Hurts,,Jalen,Hurts,QB,1.0,73,223.0,1998-08-07,6,Oklahoma,PHI,ACT,exact_name_position,1.0
+00-0036407,J.Jeudy,Jerry Jeudy,WR,WR,eaaa4a61-c2a7-4926-8e9b-3ec71be2f991,Jerry Jeudy,,Jerry,Jeudy,WR,3.0,73,195.0,1999-04-24,6,Alabama,CLE,ACT,exact_name_position,1.0
+00-0036410,T.Higgins,Tee Higgins,WR,WR,7963b029-5de4-4541-b00a-44eefe4349af,Tee Higgins,,Tee,Higgins,WR,5.0,76,220.0,1999-01-18,6,Clemson,CIN,ACT,exact_name_position,1.0
+00-0036412,K.Hamler,K.J. Hamler,WR,WR,89338a12-65a8-4670-ac99-97281732ff79,KJ Hamler,,KJ,Hamler,WR,19.0,69,178.0,1999-07-08,4,Penn State,BUF,ACT,fuzzy_name_position,0.9
+00-0036414,C.Akers,Cam Akers,RB,RB,74980532-8158-4b56-91db-5053878737b4,Cam Akers,,Cam,Akers,RB,38.0,70,217.0,1999-06-22,5,Florida State,NO,ACT,exact_name_position,1.0
+00-0036415,V.Jefferson,Van Jefferson,WR,WR,8e1285f7-6e4c-41e4-aac9-92e09f9f32b2,Van Jefferson,,Van,Jefferson,WR,11.0,73,200.0,1996-07-26,6,Florida,TEN,ACT,exact_name_position,1.0
+00-0036422,A.Trautman,Adam Trautman,TE,TE,4e14183b-f974-4745-9d7f-8f5eb2a92a7d,Adam Trautman,,Adam,Trautman,TE,82.0,77,253.0,1997-02-05,6,Dayton,DEN,ACT,exact_name_position,1.0
+00-0036423,A.Okwuegbunam,Albert Okwuegbunam,TE,TE,617aee8a-70be-4bdf-9a71-2e2b74e647e6,Albert Okwuegbunam,,Albert,Okwuegbunam,TE,86.0,77,258.0,1998-04-25,6,Missouri,LV,ACT,exact_name_position,1.0
+00-0036425,D.Dallas,DeeJay Dallas,RB,RB,48ef5bfa-7b91-4ed1-ad12-e94c0bc101c2,DeeJay Dallas,,DeeJay,Dallas,RB,20.0,70,225.0,1998-09-16,6,Miami (FL),ARI,ACT,exact_name_position,1.0
+00-0036427,T.Johnson,Tyler Johnson,WR,WR,93c17735-5275-45cf-b3ef-620351c62313,Tyler Johnson,,Tyler,Johnson,WR,16.0,73,208.0,1998-08-25,5,Minnesota,NYJ,ACT,exact_name_position,1.0
+00-0036429,C.Woerner,Charlie Woerner,TE,TE,527dfee0-a242-4dc7-830a-ab7028308259,Charlie Woerner,,Charlie,Woerner,TE,89.0,77,250.0,1997-10-16,6,Georgia,ATL,ACT,exact_name_position,1.0
+00-0036442,J.Burrow,Joe Burrow,QB,QB,3023ac10-4e7f-425f-9fc5-2b8e6332c92e,Joe Burrow,,Joe,Burrow,QB,9.0,76,215.0,1996-12-10,6,LSU,CIN,ACT,exact_name_position,1.0
+00-0036456,D.Dafney,Dominique Dafney,TE,TE,921d49c2-64d1-4108-a3a3-0c237e17748a,Dominique Dafney,,Dominique,Dafney,TE,46.0,75,235.0,1997-06-03,2,Indiana State,CAR,ACT,exact_name_position,1.0
+00-0036463,C.Blair,Chris Blair,WR,WR,9281d541-8bcb-4785-a02e-76150910898e,Chris Blair,,Chris,Blair,WR,19.0,74,215.0,1997-10-06,2,Alcorn State,ATL,ACT,exact_name_position,1.0
+00-0036491,T.Black,Tarik Black,WR,WR,89de9ce0-3b8e-424a-b9b5-d747692ea5f7,Tarik Black,,Tarik,Black,WR,86.0,75,213.0,1998-02-10,1,Texas,MIA,ACT,exact_name_position,1.0
+00-0036497,T.Jones,Tim Jones,WR,WR,b4dadef6-a938-4b34-b83c-b64d4a297e02,Tim Jones,,Tim,Jones,WR,14.0,73,200.0,1998-05-15,4,Southern Miss,MIN,ACT,exact_name_position,1.0
+00-0036504,B.Echols,Brandin Echols,CB,DB,7c023589-734d-489f-ac09-577d48f772f3,Brandin Echols,,Brandin,Echols,CB,26.0,70,179.0,1997-10-16,5,Kentucky,PIT,ACT,exact_name_position,1.0
+00-0036510,K.Yeboah,Kenny Yeboah,TE,TE,990c2825-ca25-4da9-9966-269363a9bb91,Kenny Yeboah,,Kenny,Yeboah,TE,88.0,76,250.0,1998-10-30,5,Ole Miss,DET,ACT,exact_name_position,1.0
+00-0036534,S.Zylstra,Shane Zylstra,TE,TE,0cafaac9-20fb-4e5a-9362-158d8a4e7904,Shane Zylstra,,Shane,Zylstra,TE,84.0,76,244.0,1996-11-16,4,Minnesota State,DET,ACT,exact_name_position,1.0
+00-0036550,R.Bateman,Rashod Bateman,WR,WR,d9f8b92b-69d4-4d83-9bf2-106ee523efed,Rashod Bateman,,Rashod,Bateman,WR,7.0,73,193.0,1999-11-29,5,Minnesota,BAL,ACT,exact_name_position,1.0
+00-0036554,N.Collins,Nico Collins,WR,WR,bd56a50c-5fae-4ee2-8363-f74ae07b6887,Nico Collins,,Nico,Collins,WR,12.0,76,222.0,1999-03-19,5,Michigan,HOU,ACT,exact_name_position,1.0
+00-0036555,C.Hubbard,Chuba Hubbard,RB,RB,32205e74-b23f-420a-b312-465b29260745,Chuba Hubbard,,Chuba,Hubbard,RB,30.0,73,210.0,1999-06-11,5,Oklahoma State,CAR,ACT,exact_name_position,1.0
+00-0036556,B.Jordan,Brevin Jordan,TE,TE,8ffb5c07-4aa1-4796-b1ab-30c1ab0ccc4c,Brevin Jordan,,Brevin,Jordan,TE,9.0,75,245.0,2000-07-16,5,Miami (FL),HOU,ACT,exact_name_position,1.0
+00-0036563,D.Lenoir,Deommodore Lenoir,CB,DB,d24bbe70-baba-4337-822e-c166a156f92e,Deommodore Lenoir,,Deommodore,Lenoir,DB,2.0,70,200.0,1999-10-06,5,Oregon,SF,ACT,fuzzy_name_position,1.0
+00-0036564,T.Hufanga,Talanoa Hufanga,SS,DB,a1a2f797-77ac-4f13-8456-50a10a7fd61a,Talanoa Hufanga,,Talanoa,Hufanga,SAF,9.0,72,200.0,2000-02-01,5,USC,DEN,ACT,fuzzy_name_position,1.0
+00-0036567,E.Mitchell,Elijah Mitchell,RB,RB,8ba68abf-e9d2-4927-bf8d-476f271d840c,Elijah Mitchell,,Elijah,Mitchell,RB,25.0,70,200.0,1998-05-02,5,Louisiana,KC,ACT,exact_name_position,1.0
+00-0036569,G.Brightwell,Gary Brightwell,RB,RB,94bde2c7-7229-4bf0-a545-5950cf3c7927,Gary Brightwell,,Gary,Brightwell,RB,32.0,73,218.0,1998-02-28,4,Arizona,CIN,ACT,exact_name_position,1.0
+00-0036590,Q.Morris,Quintin Morris,TE,TE,eab74cbc-ed11-46b3-bd16-1d4c997adc22,Quintin Morris,,Quintin,Morris,TE,45.0,74,243.0,1999-01-21,4,Bowling Green,JAC,ACT,exact_name_position,1.0
+00-0036613,J.Waddle,Jaylen Waddle,WR,WR,0ff9a975-669d-4851-a95d-ab28d9fc29c4,Jaylen Waddle,,Jaylen,Waddle,WR,17.0,70,185.0,1998-11-25,5,Alabama,MIA,ACT,exact_name_position,1.0
+00-0036626,D.Brown,Dyami Brown,WR,WR,0fb60ada-bdd3-4d74-8c98-058303a1649a,Dyami Brown,,Dyami,Brown,WR,5.0,72,195.0,1999-11-01,5,North Carolina,JAC,ACT,exact_name_position,1.0
+00-0036627,D.Fitzpatrick,Dez Fitzpatrick,WR,WR,e1d69406-4bcf-46d3-b35f-5ef170e5258b,Dez Fitzpatrick,,Dez,Fitzpatrick,WR,87.0,74,208.0,1997-12-17,2,Louisville,LAC,ACT,exact_name_position,1.0
+00-0036628,J.Bates,John Bates,TE,TE,3208880b-949f-4926-85eb-1940770550ea,John Bates,,John,Bates,TE,87.0,78,259.0,1997-11-06,5,Boise State,WAS,ACT,exact_name_position,1.0
+00-0036630,T.Wallace,Tylan Wallace,WR,WR,29269863-13cf-4c66-ac3c-5d9a47e2040a,Tylan Wallace,,Tylan,Wallace,WR,16.0,71,200.0,1999-05-13,5,Oklahoma State,BAL,ACT,exact_name_position,1.0
+00-0036635,I.Smith-Marsette,Ihmir Smith-Marsette,WR,WR,39156891-0d05-470b-8b64-751602820bb1,Ihmir Smith-Marsette,,Ihmir,Smith-Marsette,WR,87.0,73,185.0,1999-08-29,5,Iowa,NYG,ACT,exact_name_position,1.0
+00-0036637,N.Gray,Noah Gray,TE,TE,c97dfcb6-b999-476f-8487-f3848e92df17,Noah Gray,,Noah,Gray,TE,83.0,75,240.0,1999-04-30,5,Duke,KC,ACT,exact_name_position,1.0
+00-0036640,Z.Davidson,Zach Davidson,TE,TE,cb5e14e8-87a7-4bad-9fd4-abdd50628abb,Zach Davidson,,Zach,Davidson,TE,84.0,79,251.0,1998-07-15,2,Central Missouri,BUF,ACT,exact_name_position,1.0
+00-0036646,S.Fehoko,Simi Fehoko,WR,WR,3860693c-99a2-4484-99db-1d43e3ff7fd4,Simi Fehoko,,Simi,Fehoko,WR,80.0,76,225.0,1997-11-05,5,Stanford,ARI,ACT,exact_name_position,1.0
+00-0036648,N.Niemann,Nick Niemann,ILB,LB,30bfd566-e867-4ee7-bf19-d36794ed39f1,Nick Niemann,,Nick,Niemann,LB,32.0,75,234.0,1997-12-02,5,Iowa,HOU,ACT,fuzzy_name_position,1.0
+00-0036654,D.Felton,Demetric Felton,RB,RB,0752f1c9-fc3e-44bc-b6ad-03f8f7f4191c,Demetric Felton,,Demetric,Felton,RB,25.0,69,190.0,1998-07-16,3,UCLA,WAS,ACT,exact_name_position,1.0
+00-0036657,S.Williams,Seth Williams,WR,WR,f3debe3e-27e4-4c4a-867a-ec537b5a7826,Seth Williams,,Seth,Williams,WR,83.0,76,211.0,2000-04-10,1,Auburn,LV,ACT,exact_name_position,1.0
+00-0036672,G.Stuard,Grant Stuard,MLB,LB,f9dbd390-b1c7-41a2-9e96-6f5de2848efc,Grant Stuard,,Grant,Stuard,LB,15.0,71,225.0,1998-10-15,5,Houston,DET,ACT,fuzzy_name_position,1.0
+00-0036741,J.Stoll,Jack Stoll,TE,TE,0560d134-d316-4cda-9d48-34d32267af68,Jack Stoll,,Jack,Stoll,TE,88.0,76,247.0,1998-01-28,5,Nebraska,NO,ACT,exact_name_position,1.0
+00-0036754,B.Wright,Brock Wright,TE,TE,8f182089-7730-499e-8f2e-87bda32debfb,Brock Wright,,Brock,Wright,TE,89.0,77,254.0,1998-11-27,5,Notre Dame,DET,ACT,exact_name_position,1.0
+00-0036755,J.Patterson,Jaret Patterson,RB,RB,82996e3b-b72d-41ca-8eb1-91e462ceff85,Jaret Patterson,,Jaret,Patterson,RB,34.0,68,195.0,1999-12-23,2,Buffalo,LAC,ACT,exact_name_position,1.0
+00-0036825,F.Franks,Feleipe Franks,TE,TE,79a849be-0552-4da9-89ff-11d20a7a764a,Feleipe Franks,,Feleipe,Franks,TE,84.0,78,241.0,1997-12-22,3,Arkansas,ATL,ACT,exact_name_position,1.0
+00-0036841,A.Trammell,Austin Trammell,WR,WR,c1d52f55-4c65-4b37-8457-f0dc028c85bc,Austin Trammell,,Austin,Trammell,WR,81.0,70,185.0,1998-07-04,3,Rice,JAC,ACT,exact_name_position,1.0
+00-0036842,K.Nwangwu,Kene Nwangwu,RB,RB,482c1032-765a-48d3-b46e-b47a809dbee4,Kene Nwangwu,,Kene,Nwangwu,RB,34.0,73,210.0,1998-02-09,5,Iowa State,NYJ,ACT,exact_name_position,1.0
+00-0036849,T.Atwell,Tutu Atwell,WR,WR,7dc49535-f9dd-44b0-94f2-08ac6470130b,Tutu Atwell,,Tutu,Atwell,WR,5.0,69,165.0,1999-10-07,5,Louisville,LA,ACT,exact_name_position,1.0
+00-0036862,B.Skowronek,Ben Skowronek,WR,WR,5521ba64-e615-4d50-b9bf-490498571ac7,Ben Skowronek,,Ben,Skowronek,WR,15.0,75,224.0,1997-06-27,5,Notre Dame,PIT,ACT,exact_name_position,1.0
+00-0036875,R.Stevenson,Rhamondre Stevenson,RB,RB,6260e78a-64e2-4f7e-9bf8-39948a17a370,Rhamondre Stevenson,,Rhamondre,Stevenson,RB,38.0,72,227.0,1998-02-23,5,Oklahoma,NE,ACT,exact_name_position,1.0
+00-0036876,K.Granson,Kylen Granson,TE,TE,bcc0167c-05fd-4b23-981e-60b8784ceb33,Kylen Granson,,Kylen,Granson,TE,83.0,75,242.0,1998-03-27,5,SMU,PHI,ACT,exact_name_position,1.0
+00-0036879,S.Ehlinger,Sam Ehlinger,QB,QB,59f4acd0-971a-4470-ab8d-17900a4b128a,Sam Ehlinger,,Sam,Ehlinger,QB,4.0,73,222.0,1998-09-30,5,Texas,DEN,ACT,exact_name_position,1.0
+00-0036880,P.Sewell,Penei Sewell,T,OL,ad15f429-2d3a-4fad-b378-2ae972a474c6,Penei Sewell,,Penei,Sewell,T,58.0,77,335.0,2000-10-09,5,Oregon,DET,ACT,exact_name_position,1.0
+00-0036887,L.Farrell,Luke Farrell,TE,TE,8a1f0e8e-6521-4a94-9934-ad4f76a25fd9,Luke Farrell,,Luke,Farrell,TE,89.0,77,250.0,1997-10-14,5,Ohio State,SF,ACT,exact_name_position,1.0
+00-0036888,D.Hamlin,Damar Hamlin,SS,DB,3a6b8eac-9a76-47e0-b791-b6ee245ae924,Damar Hamlin,,Damar,Hamlin,SAF,3.0,72,200.0,1998-03-24,5,Pittsburgh,BUF,ACT,fuzzy_name_position,1.0
+00-0036893,N.Harris,Najee Harris,RB,RB,48ec58c3-ec26-4434-b005-8d34035e6667,Najee Harris,,Najee,Harris,RB,22.0,73,242.0,1998-03-09,5,Alabama,LAC,NON,exact_name_position,1.0
+00-0036894,P.Freiermuth,Pat Freiermuth,TE,TE,04f0fefe-9d9d-44f5-94ea-6df2a42df3c6,Pat Freiermuth,,Pat,Freiermuth,TE,88.0,77,258.0,1998-10-25,5,Penn State,PIT,ACT,exact_name_position,1.0
+00-0036898,D.Mills,Davis Mills,QB,QB,7d51fab7-2d52-4d19-a021-19a123af0d10,Davis Mills,,Davis,Mills,QB,10.0,76,225.0,1998-10-21,5,Stanford,HOU,ACT,exact_name_position,1.0
+00-0036900,J.Chase,Ja'Marr Chase,WR,WR,fa99e984-d63b-4ef4-a164-407f68a7eeaf,Ja'Marr Chase,,Ja'Marr,Chase,WR,1.0,72,205.0,2000-03-01,5,LSU,CIN,ACT,exact_name_position,1.0
+00-0036906,K.Herbert,Khalil Herbert,RB,RB,02af99e0-3c84-4d4e-937a-a9f29a02323b,Khalil Herbert,,Khalil,Herbert,RB,26.0,69,212.0,1998-04-21,5,Virginia Tech,IND,ACT,exact_name_position,1.0
+00-0036912,D.Smith,DeVonta Smith,WR,WR,3555d07e-57ae-43de-97d5-b1b5bf055f17,DeVonta Smith,,DeVonta,Smith,WR,6.0,72,170.0,1998-11-14,5,Alabama,PHI,ACT,exact_name_position,1.0
+00-0036918,J.Harris,Jacob Harris,WR,WR,bdbb1693-3509-494c-8308-ae26a415fc96,Jacob Harris,,Jacob,Harris,WR,30.0,77,211.0,1997-04-16,3,UCF,TB,ACT,exact_name_position,1.0
+00-0036919,K.Gainwell,Kenneth Gainwell,RB,RB,e2a5882a-dcc1-4800-889f-3b957b21834f,Kenneth Gainwell,,Kenneth,Gainwell,RB,14.0,69,200.0,1999-03-14,5,Memphis,PIT,ACT,exact_name_position,1.0
+00-0036924,M.Carter,Michael Carter,RB,RB,7f119181-4c9f-4a9f-bccc-357277b64a8d,Michael Carter,,Michael,Carter,RB,22.0,68,201.0,1999-05-07,4,North Carolina,ARI,ACT,exact_name_position,1.0
+00-0036928,K.Trask,Kyle Trask,QB,QB,13038760-a019-4e2a-9aea-f13d7dce5bda,Kyle Trask,,Kyle,Trask,QB,2.0,77,236.0,1998-03-06,5,Florida,TB,ACT,exact_name_position,1.0
+00-0036936,R.Moore,Rondale Moore,WR,WR,975555d0-fe82-4e88-90f4-d690f5000671,Rondale Moore,,Rondale,Moore,WR,4.0,67,181.0,2000-06-09,5,Purdue,MIN,ACT,exact_name_position,1.0
+00-0036945,J.Fields,Justin Fields,QB,QB,cf15be8f-9117-4531-a517-2b9c7cb3e9e1,Justin Fields,,Justin,Fields,QB,7.0,75,227.0,1999-03-05,5,Ohio State,NYJ,ACT,exact_name_position,1.0
+00-0036955,T.Marshall,Terrace Marshall,WR,WR,69388223-d1e7-46c3-9106-e10edb7073e9,Terrace Marshall,,Terrace,Marshall,WR,46.0,74,200.0,2000-06-09,5,LSU,PHI,ACT,exact_name_position,1.0
+00-0036959,M.Bandy,Michael Bandy,WR,WR,ec7af934-a7f3-40f5-9fc0-210022dd6180,Michael Bandy,,Michael,Bandy,WR,83.0,70,190.0,1997-12-05,3,San Diego,DEN,ACT,exact_name_position,1.0
+00-0036963,A.St. Brown,Amon-Ra St. Brown,WR,WR,26ef0447-29b8-4dd1-9831-dcbf8132bb74,Amon-Ra St. Brown,,Amon-Ra,St. Brown,WR,14.0,72,202.0,1999-10-24,5,USC,DET,ACT,exact_name_position,1.0
+00-0036970,K.Pitts,Kyle Pitts,TE,TE,1f3deb24-9ff8-4769-8f42-825eff7742f6,Kyle Pitts Sr.,,Kyle,Pitts,TE,8.0,78,250.0,2000-10-06,5,Florida,ATL,ACT,fuzzy_name_position,1.0
+00-0036971,T.Lawrence,Trevor Lawrence,QB,QB,aaa8b42c-4d87-45f6-bfd2-e31cfed9a736,Trevor Lawrence,,Trevor,Lawrence,QB,16.0,78,220.0,1999-10-06,5,Clemson,JAC,ACT,exact_name_position,1.0
+00-0036972,M.Jones,Mac Jones,QB,QB,1fd00ec3-b758-46d2-a2c1-cca521ea8a54,Mac Jones,,Mac,Jones,QB,10.0,75,220.0,1998-09-05,5,Alabama,SF,ACT,exact_name_position,1.0
+00-0036973,T.Etienne,Travis Etienne,RB,RB,970693f0-0af4-4627-ac0c-bf519f7433ee,Travis Etienne Jr.,,Travis,Etienne,RB,1.0,70,215.0,1999-01-26,5,Clemson,JAC,ACT,fuzzy_name_position,1.0
+00-0036980,E.Moore,Elijah Moore,WR,WR,b1935e20-6bd6-4863-8d7e-702ec403491f,Elijah Moore,,Elijah,Moore,WR,18.0,70,178.0,2000-03-27,5,Ole Miss,BUF,ACT,exact_name_position,1.0
+00-0036982,C.Golston,Chauncey Golston,DT,DL,b7f8bf4e-a1e5-443e-8deb-3916c817a1a8,Chauncey Golston,,Chauncey,Golston,DL,57.0,77,277.0,1998-02-10,5,Iowa,NYG,ACT,fuzzy_name_position,1.0
+00-0036984,T.Sermon,Trey Sermon,RB,RB,b7146193-fcd1-4b02-a6da-625fe467f60e,Trey Sermon,,Trey,Sermon,RB,27.0,72,215.0,1999-01-30,5,Ohio State,PIT,ACT,exact_name_position,1.0
+00-0036986,N.Wright,Nahshon Wright,CB,DB,884b6094-1ebd-4b72-b957-ad33a3ab984f,Nahshon Wright,,Nahshon,Wright,CB,25.0,76,199.0,1998-09-23,5,Oregon State,CHI,ACT,exact_name_position,1.0
+00-0036988,J.Palmer,Josh Palmer,WR,WR,857fcc59-10e8-4194-bd7d-41bc5f72a47f,Joshua Palmer,,Joshua,Palmer,WR,5.0,73,210.0,1999-09-22,5,Tennessee,BUF,ACT,fuzzy_name_position,0.9166666666666666
+00-0036990,D.Deablo,Divine Deablo,MLB,LB,f50ae8f1-aebd-4e3d-bbf9-f92921044e72,Divine Deablo,,Divine,Deablo,LB,0.0,75,223.0,1998-08-17,5,Virginia Tech,ATL,ACT,fuzzy_name_position,1.0
+00-0036997,J.Williams,Javonte Williams,RB,RB,889dcdc5-3d88-45df-9677-5ad7ff87c011,Javonte Williams,,Javonte,Williams,RB,33.0,70,220.0,2000-04-25,5,North Carolina,DAL,ACT,exact_name_position,1.0
+00-0037004,H.Long,Hunter Long,TE,TE,ebc576d0-a98b-4f82-aaf9-901a3911487d,Hunter Long,,Hunter,Long,TE,84.0,77,243.0,1998-08-19,5,Boston College,JAC,ACT,exact_name_position,1.0
+00-0037005,T.Tremble,Tommy Tremble,TE,TE,cbee2fd3-e5f2-4316-bffd-531f1873f032,Tommy Tremble,,Tommy,Tremble,TE,82.0,76,250.0,2000-06-02,5,Notre Dame,CAR,PUP,exact_name_position,1.0
+00-0037012,T.Lance,Trey Lance,QB,QB,676a508c-c65f-404a-a2b0-f861a4bfd072,Trey Lance,,Trey,Lance,QB,5.0,76,226.0,2000-05-09,5,North Dakota State,LAC,ACT,exact_name_position,1.0
+00-0037013,Z.Wilson,Zach Wilson,QB,QB,17bb63b1-1b0e-48e1-baf7-55cd314d0e62,Zach Wilson,,Zach,Wilson,QB,0.0,74,214.0,1999-08-03,5,BYU,MIA,ACT,exact_name_position,1.0
+00-0037055,L.McCutcheon,Lance McCutcheon,WR,WR,fb2a4c20-d207-11ec-ab20-b37737d70cc4,Lance McCutcheon,,Lance,McCutcheon,WR,82.0,75,202.0,1999-02-28,2,Montana State,PIT,ACT,exact_name_position,1.0
+00-0037077,S.Howell,Sam Howell,QB,QB,7d85e9c2-f464-4654-9200-acfcffd7dfaf,Sam Howell,,Sam,Howell,QB,8.0,73,225.0,2000-09-16,4,North Carolina,MIN,ACT,exact_name_position,1.0
+00-0037078,C.Turner,Cole Turner,TE,TE,fc78ba73-7ef3-4dda-9a06-b5101f7ff7b1,Cole Turner,,Cole,Turner,TE,88.0,78,240.0,2000-03-16,3,Nevada,WAS,ACT,exact_name_position,1.0
+00-0037085,T.Badie,Tyler Badie,RB,RB,e62678b9-9816-420f-bf86-398e7fea7063,Tyler Badie,,Tyler,Badie,RB,28.0,68,197.0,2000-02-07,2,Missouri,DEN,ACT,exact_name_position,1.0
+00-0037086,G.Calcaterra,Grant Calcaterra,TE,TE,f6988cfa-2dcf-490b-ac80-9af8e4292efa,Grant Calcaterra,,Grant,Calcaterra,TE,81.0,76,240.0,1998-12-04,4,SMU,PHI,ACT,exact_name_position,1.0
+00-0037093,D.Young,Dareke Young,WR,WR,2da144c9-7845-4199-bcc1-48405c14d436,Dareke Young,,Dareke,Young,WR,83.0,74,224.0,1999-06-04,4,Lenoir-Rhyne,SEA,ACT,exact_name_position,1.0
+00-0037098,S.Toure,Samori Toure,WR,WR,02c808d8-6074-43db-b0d9-f69fab78f6d9,Samori Toure,,Samori,Toure,WR,83.0,73,196.0,1998-03-24,3,Nebraska,CHI,ACT,exact_name_position,1.0
+00-0037112,J.Tonges,Jake Tonges,TE,TE,8d9236c0-ce09-11ec-9598-03840dd5f387,Jake Tonges,,Jake,Tonges,TE,88.0,76,240.0,1999-07-08,3,California,SF,ACT,exact_name_position,1.0
+00-0037120,T.Goodson,Tyler Goodson,RB,RB,3fec8370-ca72-11ec-a83a-8732d3d5a7e3,Tyler Goodson,,Tyler,Goodson,RB,31.0,69,197.0,2000-11-10,3,Iowa,IND,ACT,exact_name_position,1.0
+00-0037129,J.Blackwell,Josh Blackwell,CB,DB,c218af10-ce17-11ec-bebb-4fec1e38b0e5,Josh Blackwell,,Josh,Blackwell,DB,39.0,71,179.0,1999-04-05,4,Duke,CHI,ACT,fuzzy_name_position,1.0
+00-0037132,B.Covey,Britain Covey,WR,WR,75774350-ce18-11ec-bebb-4fec1e38b0e5,Britain Covey,,Britain,Covey,WR,10.0,68,173.0,1997-03-18,4,Utah,LA,ACT,exact_name_position,1.0
+00-0037156,I.Charles,Irvin Charles,WR,WR,f8578e10-d3bd-11ec-96a0-c3471a31202c,Irvin Charles,,Irvin,Charles,WR,19.0,76,219.0,1997-04-13,3,Indiana (PA),NYJ,PUP,exact_name_position,1.0
+00-0037157,Z.Knight,Zonovan Knight,RB,RB,53df5e30-d3bd-11ec-96a0-c3471a31202c,Zonovan Knight,,Bam,Knight,RB,35.0,71,210.0,2001-04-11,3,North Carolina State,ARI,ACT,exact_name_position,1.0
+00-0037197,I.Pacheco,Isiah Pacheco,RB,RB,3a25c037-fa30-4740-b742-ec8e4f1a2a25,Isiah Pacheco,,Isiah,Pacheco,RB,10.0,70,216.0,1999-03-02,4,Rutgers,KC,ACT,exact_name_position,1.0
+00-0037207,M.Caliendo,Mike Caliendo,G,OL,5e40ece0-ce0e-11ec-8f7c-f5226825ea6a,Mike Caliendo,,Mike,Caliendo,OL,66.0,76,301.0,1997-10-21,3,Western Michigan,KC,ACT,fuzzy_name_position,1.0
+00-0037228,J.Warren,Jaylen Warren,RB,RB,7e397190-ca24-11ec-9f1c-b7114d38a85b,Jaylen Warren,,Jaylen,Warren,RB,30.0,68,215.0,1998-11-01,4,Oklahoma State,PIT,ACT,exact_name_position,1.0
+00-0037231,K.Austin,Kevin Austin,WR,WR,3173c5c0-cbb6-11ec-88c8-199e5defa0d2,Kevin Austin Jr.,,Kevin,Austin,WR,81.0,74,200.0,2000-03-30,2,Notre Dame,NO,ACT,fuzzy_name_position,1.0
+00-0037238,D.London,Drake London,WR,WR,5053f9ae-15d9-4730-833d-484886b6f890,Drake London,,Drake,London,WR,5.0,76,215.0,2001-07-24,4,USC,ATL,ACT,exact_name_position,1.0
+00-0037239,C.Olave,Chris Olave,WR,WR,2375d572-a36c-4365-bb3f-87e156526e2f,Chris Olave,,Chris,Olave,WR,12.0,72,187.0,2000-06-27,4,Ohio State,NO,ACT,exact_name_position,1.0
+00-0037240,J.Williams,Jameson Williams,WR,WR,590adb00-5598-47ad-b6d4-16a6c5519847,Jameson Williams,,Jameson,Williams,WR,1.0,73,182.0,2001-03-26,4,Alabama,DET,ACT,exact_name_position,1.0
+00-0037243,T.Smith,Tyler Smith,G,OL,23390ab5-2b55-4d8e-851c-01f9cf338ede,Tyler Smith,,Tyler,Smith,OL,73.0,78,332.0,2001-04-03,4,Tulsa,DAL,ACT,fuzzy_name_position,1.0
+00-0037247,G.Pickens,George Pickens,WR,WR,018e8f25-54e5-44f1-967a-7ff237f1c52f,George Pickens,,George,Pickens,WR,3.0,75,200.0,2001-03-04,4,Georgia,DAL,ACT,exact_name_position,1.0
+00-0037248,J.Cook,James Cook,RB,RB,ce5de0e5-9f76-42ee-b93a-3ef88af9b0a7,James Cook,,James,Cook,RB,4.0,71,190.0,1999-09-25,4,Georgia,BUF,ACT,exact_name_position,1.0
+00-0037252,G.Dulcich,Greg Dulcich,TE,TE,b9e4a022-d15c-4cef-9879-170277f17207,Greg Dulcich,,Greg,Dulcich,TE,89.0,76,245.0,2000-03-26,4,UCLA,NYG,ACT,exact_name_position,1.0
+00-0037253,M.Jones,Marcus Jones,CB,DB,aec385c3-426d-41ff-927e-450ef2b23f04,Marcus Jones,,Marcus,Jones,CB,25.0,68,188.0,1998-10-22,4,Houston,NE,ACT,exact_name_position,1.0
+00-0037256,R.White,Rachaad White,RB,RB,4d3f2f57-215c-4cb4-bf75-a7ecdcdded70,Rachaad White,,Rachaad,White,RB,1.0,72,214.0,1999-01-12,4,Arizona State,TB,ACT,exact_name_position,1.0
+00-0037257,D.Bell,David Bell,WR,WR,169faab3-b52b-40ab-93ea-a08139f3fadb,David Bell,,David,Bell,WR,18.0,73,212.0,2000-12-14,4,Purdue,CLE,NON,exact_name_position,1.0
+00-0037258,D.Pierce,Dameon Pierce,RB,RB,5d4ef6da-a6b5-4d9c-adc0-28dfdbe9315e,Dameon Pierce,,Dameon,Pierce,RB,31.0,70,215.0,2000-02-19,4,Florida,HOU,ACT,exact_name_position,1.0
+00-0037261,K.Shakir,Khalil Shakir,WR,WR,0ce9ddce-bdf6-469c-8a32-9cf0ed3714a4,Khalil Shakir,,Khalil,Shakir,WR,10.0,72,190.0,2000-02-03,4,Boise State,BUF,ACT,exact_name_position,1.0
+00-0037263,T.Allgeier,Tyler Allgeier,RB,RB,f4529909-1a02-4f4b-a1f3-315cad100683,Tyler Allgeier,,Tyler,Allgeier,RB,25.0,70,225.0,2000-04-15,4,BYU,ATL,ACT,exact_name_position,1.0
+00-0037267,J.Ford,Jerome Ford,RB,RB,cdc61676-6592-43f9-a4a6-d29ce52ac8f4,Jerome Ford,,Jerome,Ford,RB,34.0,70,210.0,1999-09-12,4,Cincinnati,CLE,ACT,exact_name_position,1.0
+00-0037272,M.Washington,Montrell Washington,WR,WR,90785e41-84ca-41b8-a7f8-47f20086275b,Montrell Washington,,Montrell,Washington,WR,80.0,70,170.0,1999-03-14,3,Samford,NYG,ACT,exact_name_position,1.0
+00-0037276,T.Chandler,Ty Chandler,RB,RB,a0833a94-60ce-4a3a-a32a-d067fe7b253d,Ty Chandler,,Ty,Chandler,RB,32.0,71,204.0,1998-05-12,4,North Carolina,MIN,ACT,exact_name_position,1.0
+00-0037277,T.Quitoriano,Teagan Quitoriano,TE,TE,06cb6aff-c81e-4553-95ba-467187f408d4,Teagan Quitoriano,,Teagan,Quitoriano,TE,85.0,78,259.0,2000-03-15,4,Oregon State,ATL,ACT,exact_name_position,1.0
+00-0037282,J.Mitchell,James Mitchell,TE,TE,f461da0c-f764-414c-9e0d-2f02e22a68d8,James Mitchell,,James,Mitchell,TE,85.0,76,249.0,1999-08-11,3,Virginia Tech,CAR,ACT,exact_name_position,1.0
+00-0037284,M.Araiza,Matt Araiza,P,SPEC,55c491d6-7721-45b4-968c-284448bf8c12,Matt Araiza,,Matt,Araiza,P,14.0,73,200.0,2000-05-16,2,San Diego State,KC,ACT,exact_name_position,1.0
+00-0037287,V.Lowe,Vederian Lowe,T,OL,5937f6b6-707c-4ec8-8829-8fffde62092e,Vederian Lowe,,Vederian,Lowe,T,59.0,77,315.0,1999-04-17,4,Illinois,NE,ACT,exact_name_position,1.0
+00-0037289,M.Rodriguez,Malcolm Rodriguez,ILB,LB,654b6b85-44e3-4a6e-a7ff-ebcdaa49fe51,Malcolm Rodriguez,,Malcolm,Rodriguez,LB,44.0,71,230.0,1999-03-29,4,Oklahoma State,DET,PUP,fuzzy_name_position,1.0
+00-0037291,J.Nailor,Jalen Nailor,WR,WR,3f9e3634-54d7-46a4-bf26-67274500c907,Jalen Nailor,,Jalen,Nailor,WR,1.0,71,190.0,1999-03-02,4,Michigan State,MIN,ACT,exact_name_position,1.0
+00-0037292,A.Ogletree,Andrew Ogletree,TE,TE,59f460a8-b5af-40e6-840c-429762b278b3,Drew Ogletree,,Drew,Ogletree,TE,85.0,77,260.0,1998-07-28,4,Youngstown State,IND,ACT,fuzzy_name_position,0.9285714285714286
+00-0037299,K.Ingram,Keaontay Ingram,RB,RB,9b212b70-ccc3-4c77-ba73-09afeb929225,Keaontay Ingram,,Keaontay,Ingram,RB,38.0,72,220.0,1999-10-26,3,USC,KC,IR,exact_name_position,1.0
+00-0037304,C.Heyward,Connor Heyward,TE,TE,62e96d7c-e4dd-4a90-8c3a-8017eb69120d,Connor Heyward,,Connor,Heyward,TE,83.0,72,230.0,1999-01-22,4,Michigan State,PIT,ACT,exact_name_position,1.0
+00-0037306,J.FitzPatrick,John FitzPatrick,TE,TE,b221f4da-3c7c-4f51-b3f0-d2c68d5d9369,John FitzPatrick,,John,FitzPatrick,TE,86.0,79,262.0,2000-03-09,4,Georgia,GB,ACT,exact_name_position,1.0
+00-0037311,K.Kieft,Ko Kieft,TE,TE,f96b8338-4ffb-4612-8c29-58dc3b12db69,Ko Kieft,,Ko,Kieft,TE,41.0,77,265.0,1998-01-20,4,Minnesota,TB,ACT,exact_name_position,1.0
+00-0037317,N.Muse,Nick Muse,TE,TE,6b5dd4bc-9959-4e0f-94f6-74e2577a022a,Nick Muse,,Nick,Muse,TE,87.0,77,252.0,1998-11-25,4,South Carolina,PHI,ACT,exact_name_position,1.0
+00-0037324,C.Oladokun,Chris Oladokun,QB,QB,7078cdfc-032b-4f85-8b4b-720f926ba1cb,Chris Oladokun,,Chris,Oladokun,QB,19.0,73,213.0,1997-09-03,1,South Dakota State,KC,ACT,exact_name_position,1.0
+00-0037327,S.Thompson,Skylar Thompson,QB,QB,5ba2c367-a293-4d83-9268-a0e392ebca1a,Skylar Thompson,,Skylar,Thompson,QB,17.0,74,219.0,1997-06-04,4,Kansas State,PIT,ACT,exact_name_position,1.0
+00-0037355,B.Sanders,Braylon Sanders,WR,WR,011ab650-d3b2-11ec-96a0-c3471a31202c,Braylon Sanders,,Braylon,Sanders,WR,80.0,73,194.0,1999-01-21,1,Ole Miss,WAS,ACT,exact_name_position,1.0
+00-0037382,B.Johnson,Brandon Johnson,WR,WR,d90f8660-d251-11ec-b16e-cf7159baf83d,Brandon Johnson,,Brandon,Johnson,WR,11.0,74,195.0,1998-07-26,3,UCF,PIT,ACT,exact_name_position,1.0
+00-0037387,J.Virgil,Jalen Virgil,WR,WR,aa8d3730-d254-11ec-b16e-cf7159baf83d,Jalen Virgil,,Jalen,Virgil,WR,13.0,73,210.0,1998-07-13,4,Appalachian State,BUF,ACT,exact_name_position,1.0
+00-0037410,J.Corbin,Jashaun Corbin,RB,RB,f75439c0-d3bb-11ec-96a0-c3471a31202c,Jashaun Corbin,,Jashaun,Corbin,RB,30.0,71,200.0,2000-08-20,2,Florida State,ATL,ACT,exact_name_position,1.0
+00-0037422,K.Pryor,Kendric Pryor,WR,WR,73f7ecc0-d2ee-11ec-96a0-c3471a31202c,Kendric Pryor,,Kendric,Pryor,WR,19.0,71,189.0,1998-01-06,2,Wisconsin,CIN,ACT,exact_name_position,1.0
+00-0037429,R.Blackshear,Raheem Blackshear,RB,RB,f64a23e0-d457-11ec-9026-65785f74dc2a,Raheem Blackshear,,Raheem,Blackshear,RB,3.0,69,190.0,1998-06-05,4,Virginia Tech,CAR,ACT,exact_name_position,1.0
+00-0037475,S.Smartt,Stone Smartt,TE,TE,6ee105f0-ca2e-11ec-be96-e90abdfa0fef,Stone Smartt,,Stone,Smartt,TE,84.0,76,226.0,1998-10-04,4,Old Dominion,NYJ,ACT,exact_name_position,1.0
+00-0037491,J.Russell,J.J. Russell,ILB,LB,5396bba0-d3ed-11ec-8afa-57d9afd0ecba,J.J. Russell,,J.J.,Russell,LB,51.0,73,225.0,1998-10-12,4,Memphis,ARI,ACT,fuzzy_name_position,1.0
+00-0037500,R.Wright,Ryan Wright,P,SPEC,4800e2e0-c95a-11ec-b1d2-d334745b4f4f,Ryan Wright,,Ryan,Wright,P,17.0,75,245.0,2000-06-01,4,Tulane,MIN,ACT,exact_name_position,1.0
+00-0037506,C.Fotheringham,Cole Fotheringham,TE,TE,320bc720-d3a5-11ec-96a0-c3471a31202c,Cole Fotheringham,,Cole,Fotheringham,TE,49.0,76,245.0,1997-10-11,3,Utah,NE,ACT,exact_name_position,1.0
+00-0037509,S.McCormick,Sincere McCormick,RB,RB,2e808f70-d3a3-11ec-96a0-c3471a31202c,Sincere McCormick,,Sincere,McCormick,RB,28.0,68,204.0,2000-09-10,3,UTSA,LV,ACT,exact_name_position,1.0
+00-0037524,T.Martin,Tay Martin,WR,WR,8d74f600-ca80-11ec-97ae-e1573849d1a6,Tay Martin,,Tay,Martin,WR,6.0,75,186.0,1997-12-14,1,Oklahoma State,WAS,ACT,exact_name_position,1.0
+00-0037525,J.Mason,Jordan Mason,RB,RB,af9f7390-ca80-11ec-97ae-e1573849d1a6,Jordan Mason,,Jordan,Mason,RB,27.0,71,223.0,1999-05-24,4,Georgia Tech,MIN,ACT,exact_name_position,1.0
+00-0037539,L.Krull,Lucas Krull,TE,TE,767b4820-cc9f-11ec-952e-a10f2c98fc4d,Lucas Krull,,Lucas,Krull,TE,85.0,78,260.0,1998-07-11,3,Pittsburgh,DEN,ACT,exact_name_position,1.0
+00-0037545,R.Shaheed,Rashid Shaheed,WR,WR,e1ecc660-cc9f-11ec-952e-a10f2c98fc4d,Rashid Shaheed,,Rashid,Shaheed,WR,22.0,72,180.0,1998-08-31,4,Weber State,NO,ACT,exact_name_position,1.0
+00-0037557,R.Rivers,Ronnie Rivers,RB,RB,246db560-cb4e-11ec-a667-6354702e3fca,Ronnie Rivers,,Ronnie,Rivers,RB,20.0,69,192.0,1999-01-31,4,Fresno State,LA,ACT,exact_name_position,1.0
+00-0037570,D.Houston,Dennis Houston,WR,WR,2fb00370-d30e-11ec-8b77-45b1765fd110,Dennis Houston,,Dennis,Houston,WR,89.0,73,190.0,1999-04-24,1,Western Illinois,TB,ACT,exact_name_position,1.0
+00-0037578,J.Thomas,Juanyeh Thomas,FS,DB,8a8dfad0-d314-11ec-8b77-45b1765fd110,Juanyeh Thomas,,Juanyeh,Thomas,SAF,2.0,75,217.0,2000-06-24,3,Georgia Tech,DAL,ACT,fuzzy_name_position,1.0
+00-0037594,J.Chestnut,Julius Chestnut,RB,RB,873860f0-cca2-11ec-9e80-cff885fdbae7,Julius Chestnut,,Julius,Chestnut,RB,36.0,71,228.0,2000-10-26,4,Sacred Heart,TEN,ACT,exact_name_position,1.0
+00-0037607,R.Stonehouse,Ryan Stonehouse,P,SPEC,e0c8b6a0-c95b-11ec-b1d2-d334745b4f4f,Ryan Stonehouse,,Ryan,Stonehouse,P,49.0,70,200.0,1999-05-11,4,Colorado State,MIA,ACT,exact_name_position,1.0
+00-0037614,J.Metchie,John Metchie III,WR,WR,2995df34-ee81-4320-be1e-1c497b83c927,John Metchie III,,John,Metchie,WR,8.0,72,195.0,2000-07-18,3,Alabama,HOU,ACT,exact_name_position,1.0
+00-0037617,H.Haskins,Hassan Haskins,RB,RB,f3a50b5d-0197-4ae8-b5a5-bb54484b8941,Hassan Haskins,,Hassan,Haskins,RB,28.0,74,228.0,1999-11-26,4,Michigan,LAC,ACT,exact_name_position,1.0
+00-0037654,T.Fisk,Tucker Fisk,TE,TE,5d01b190-d51e-11ec-8f44-c7121c9cec59,Tucker Fisk,,Tucker,Fisk,TE,42.0,76,285.0,1999-01-19,2,Stanford,LAC,ACT,exact_name_position,1.0
+00-0037664,A.Pierce,Alec Pierce,WR,WR,a67ee8f8-e9de-4fb9-90b6-edca2f83f6d8,Alec Pierce,,Alec,Pierce,WR,14.0,75,211.0,2000-05-02,4,Cincinnati,IND,ACT,exact_name_position,1.0
+00-0037666,J.Tolbert,Jalen Tolbert,WR,WR,c6fb9f3a-f8ff-4224-a5f6-4d2d09501c9c,Jalen Tolbert,,Jalen,Tolbert,WR,1.0,73,195.0,1999-02-27,4,South Alabama,DAL,ACT,exact_name_position,1.0
+00-0037708,M.Alexander,Maurice Alexander,WR,WR,8261c380-132b-11ed-86b5-f9dfd114f830,Maurice Alexander,,Maurice,Alexander,WR,13.0,70,173.0,1997-01-10,1,Florida International,CHI,ACT,exact_name_position,1.0
+00-0037740,G.Wilson,Garrett Wilson,WR,WR,68d72fe0-79b2-4fdb-afd5-6c79676e77f3,Garrett Wilson,,Garrett,Wilson,WR,5.0,72,183.0,2000-07-22,4,Ohio State,NYJ,ACT,exact_name_position,1.0
+00-0037741,J.Dotson,Jahan Dotson,WR,WR,d4a7917d-f327-431b-9b87-83af341c3e21,Jahan Dotson,,Jahan,Dotson,WR,2.0,71,184.0,2000-03-22,4,Penn State,PHI,ACT,exact_name_position,1.0
+00-0037742,T.Burks,Treylon Burks,WR,WR,45763342-0208-46ab-a5d2-6c6e4ff66b66,Treylon Burks,,Treylon,Burks,WR,16.0,74,225.0,2000-03-23,4,Arkansas,TEN,IR,exact_name_position,1.0
+00-0037744,T.McBride,Trey McBride,TE,TE,734d54cc-c869-4e2f-a60f-c59c493f5110,Trey McBride,,Trey,McBride,TE,85.0,76,246.0,1999-11-22,4,Colorado State,ARI,ACT,exact_name_position,1.0
+00-0037746,B.Robinson,Brian Robinson,RB,RB,795f636e-6f7f-4bc7-a346-2862272abead,Brian Robinson Jr.,,Brian,Robinson,RB,8.0,73,228.0,1999-03-22,4,Alabama,WAS,ACT,fuzzy_name_position,1.0
+00-0037755,J.Woods,Jelani Woods,TE,TE,321af8f8-b4de-4ed2-a86f-7f97a85a13d4,Jelani Woods,,Jelani,Woods,TE,80.0,79,253.0,1998-10-09,4,Virginia,IND,ACT,exact_name_position,1.0
+00-0037801,K.Turpin,Kavontae Turpin,WR,WR,2dfd63d0-0e8a-11ed-a8f4-191ad3c6932a,KaVontae Turpin,,KaVontae,Turpin,WR,9.0,69,153.0,1996-08-02,4,TCU,DAL,ACT,fuzzy_name_position,1.0
+00-0037805,J.Ruckert,Jeremy Ruckert,TE,TE,28f3732b-0910-4d09-9fd4-e43b821dc5bb,Jeremy Ruckert,,Jeremy,Ruckert,TE,89.0,77,250.0,2000-08-11,4,Ohio State,NYJ,ACT,exact_name_position,1.0
+00-0037816,R.Doubs,Romeo Doubs,WR,WR,5f559fde-3a5f-4df6-99a2-cd1a4b103c68,Romeo Doubs,,Romeo,Doubs,WR,87.0,74,204.0,2000-04-13,4,Nevada,GB,ACT,exact_name_position,1.0
+00-0037834,B.Purdy,Brock Purdy,QB,QB,d5aef708-ad61-4ab8-a637-62ff96e92040,Brock Purdy,,Brock,Purdy,QB,13.0,73,220.0,1999-12-27,4,Iowa State,SF,ACT,exact_name_position,1.0
+00-0037837,C.Austin,Calvin Austin III,WR,WR,a95271f7-6dae-4b43-94fd-3ff04b15d4c4,Calvin Austin III,,Calvin,Austin,WR,19.0,69,162.0,1999-03-24,4,Memphis,PIT,ACT,exact_name_position,1.0
+00-0037838,I.Likely,Isaiah Likely,TE,TE,f9279edb-cfa7-4f7d-91df-b81cbf3e133e,Isaiah Likely,,Isaiah,Likely,TE,80.0,76,245.0,2000-04-18,4,Coastal Carolina,BAL,ACT,exact_name_position,1.0
+00-0037840,K.Williams,Kyren Williams,RB,RB,19d44771-8f1d-4127-9b7d-230da137f15d,Kyren Williams,,Kyren,Williams,RB,23.0,69,202.0,2000-08-26,4,Notre Dame,LA,ACT,exact_name_position,1.0
+00-0038040,Z.White,Zamir White,RB,RB,440d7750-672e-4293-8eb0-89b241a498eb,Zamir White,,Zamir,White,RB,3.0,71,227.0,1999-09-18,4,Georgia,LV,ACT,exact_name_position,1.0
+00-0038041,J.Ferguson,Jake Ferguson,TE,TE,f46eab3d-d7dd-4420-b3f9-6da9ac1308ab,Jake Ferguson,,Jake,Ferguson,TE,87.0,77,244.0,1999-01-18,4,Wisconsin,DAL,ACT,exact_name_position,1.0
+00-0038046,C.Kolar,Charlie Kolar,TE,TE,3c048ac9-2c0f-4bf0-9ddc-ce99c9387ac8,Charlie Kolar,,Charlie,Kolar,TE,88.0,78,265.0,1999-02-10,4,Iowa State,BAL,ACT,exact_name_position,1.0
+00-0038090,S.Moore,Skyy Moore,WR,WR,1c8a4510-786c-4bc2-a9e9-e491b688206f,Skyy Moore,,Skyy,Moore,WR,24.0,70,195.0,2000-09-10,4,Western Michigan,KC,ACT,exact_name_position,1.0
+00-0038092,E.Ezukanma,Erik Ezukanma,WR,WR,7934c2db-a5f1-404c-a313-74a8aacd5946,Erik Ezukanma,,Erik,Ezukanma,WR,84.0,74,210.0,2000-01-25,3,Texas Tech,MIA,ACT,exact_name_position,1.0
+00-0038098,P.Strong,Pierre Strong,RB,RB,8a9a3c7f-57a1-4064-9bda-2c7fad7b5c01,Pierre Strong Jr.,,Pierre,Strong,RB,20.0,71,215.0,1998-12-10,4,South Dakota State,CLE,ACT,fuzzy_name_position,1.0
+00-0038102,K.Pickett,Kenny Pickett,QB,QB,ef7ae1f1-4ebe-4759-bbb3-32bd177ace08,Kenny Pickett,,Kenny,Pickett,QB,8.0,75,220.0,1998-06-06,4,Pittsburgh,CLE,ACT,exact_name_position,1.0
+00-0038104,T.Thornton,Tyquan Thornton,WR,WR,74cda487-2026-42e0-ae32-77f3502cfb11,Tyquan Thornton,,Tyquan,Thornton,WR,2.0,74,185.0,2000-08-07,4,Baylor,KC,ACT,exact_name_position,1.0
+00-0038108,B.Zappe,Bailey Zappe,QB,QB,14926860-abef-45a9-b8f6-e66103ca6029,Bailey Zappe,,Bailey,Zappe,QB,14.0,73,215.0,1999-04-26,4,Western Kentucky,KC,ACT,exact_name_position,1.0
+00-0038115,D.Bellinger,Daniel Bellinger,TE,TE,42a1c03e-790e-46ba-b0d5-d304e44c02c7,Daniel Bellinger,,Daniel,Bellinger,TE,82.0,78,255.0,2000-09-22,4,San Diego State,NYG,ACT,exact_name_position,1.0
+00-0038117,W.Robinson,Wan'Dale Robinson,WR,WR,582dfe0e-98f3-48a5-8a2d-a52baa926b05,Wan'Dale Robinson,,Wan'Dale,Robinson,WR,17.0,68,185.0,2001-01-05,4,Kentucky,NYG,ACT,exact_name_position,1.0
+00-0038120,B.Hall,Breece Hall,RB,RB,db1053d7-3343-43a3-9aab-8353f10f1221,Breece Hall,,Breece,Hall,RB,20.0,71,217.0,2001-05-31,4,Iowa State,NYJ,ACT,exact_name_position,1.0
+00-0038122,D.Ridder,Desmond Ridder,QB,QB,6bf35760-217c-401d-b80b-2ae7cc5d7564,Desmond Ridder,,Desmond,Ridder,QB,4.0,76,215.0,1999-08-31,4,Cincinnati,CIN,ACT,exact_name_position,1.0
+00-0038123,D.Belton,Dane Belton,SS,DB,08696187-da1c-41d4-b156-9a9f844e4167,Dane Belton,,Dane,Belton,SAF,24.0,73,190.0,2000-12-07,4,Iowa,NYG,ACT,fuzzy_name_position,1.0
+00-0038124,C.Watson,Christian Watson,WR,WR,47d97f44-b4aa-46d2-816c-5b5a1fe48d46,Christian Watson,,Christian,Watson,WR,9.0,76,208.0,1999-05-12,4,North Dakota State,GB,PUP,exact_name_position,1.0
+00-0038128,M.Willis,Malik Willis,QB,QB,55aefcf9-4dfb-4994-883f-4d537a6f1ddb,Malik Willis,,Malik,Willis,QB,2.0,73,225.0,1999-05-25,4,Liberty,GB,ACT,exact_name_position,1.0
+00-0038129,C.Otton,Cade Otton,TE,TE,f23517bd-ae85-484a-8ecb-1f7a2d851e48,Cade Otton,,Cade,Otton,TE,88.0,77,247.0,1999-04-15,4,Washington,TB,ACT,exact_name_position,1.0
+00-0038359,X.Smith,Xavier Smith,WR,WR,98b88de0-e8e5-11ed-ad77-290d92d9e505,Xavier Smith,,Xavier,Smith,WR,19.0,69,176.0,1997-09-21,2,Florida A&M,LA,ACT,exact_name_position,1.0
+00-0038389,I.Abanikanda,Israel Abanikanda,RB,RB,07802728-2d68-4aac-8e1f-ee306977495d,Israel Abanikanda,,Israel,Abanikanda,RB,23.0,70,217.0,2002-10-05,3,Pittsburgh,GB,ACT,exact_name_position,1.0
+00-0038391,S.Clifford,Sean Clifford,QB,QB,332b31ed-37a0-4172-acde-f7377c5bdff1,Sean Clifford,,Sean,Clifford,QB,16.0,74,218.0,1998-07-14,2,Penn State,GB,ACT,exact_name_position,1.0
+00-0038393,D.Wicks,Dontayvion Wicks,WR,WR,ea3d1393-8c3b-4e81-a519-f636d28d692e,Dontayvion Wicks,,Dontayvion,Wicks,WR,13.0,73,206.0,2001-06-16,3,Virginia,GB,ACT,exact_name_position,1.0
+00-0038394,W.Mallory,Will Mallory,TE,TE,5d4a5e4f-7c74-4b4c-b8e5-33bb831e3057,Will Mallory,,Will,Mallory,TE,86.0,76,239.0,1999-06-22,3,Miami (FL),IND,ACT,exact_name_position,1.0
+00-0038396,E.Gray,Eric Gray,RB,RB,dcc536c1-36f2-4e34-8028-ccf32d930018,Eric Gray,,Eric,Gray,RB,20.0,70,211.0,1999-11-04,3,Oklahoma,NYG,PUP,exact_name_position,1.0
+00-0038397,E.Hull,Evan Hull,RB,RB,20d82a85-0128-499a-9330-2906af3cbb09,Evan Hull,,Evan,Hull,RB,38.0,70,209.0,2000-10-26,2,Northwestern,PIT,ACT,exact_name_position,1.0
+00-0038400,T.McKee,Tanner McKee,QB,QB,93147c90-09c8-471d-a6b2-0b9d19739ba1,Tanner McKee,,Tanner,McKee,QB,16.0,78,231.0,2000-04-27,3,Stanford,PHI,ACT,exact_name_position,1.0
+00-0038416,T.Bagent,Tyson Bagent,QB,QB,9bdeb910-ead2-11ed-999e-03b49558b5db,Tyson Bagent,,Tyson,Bagent,QB,17.0,75,212.0,2000-06-08,3,Shepherd (WV),CHI,ACT,exact_name_position,1.0
+00-0038454,K.Mitchell,Keaton Mitchell,RB,RB,16341d80-f01f-11ed-97df-a94b89ac5704,Keaton Mitchell,,Keaton,Mitchell,RB,34.0,68,190.0,2002-01-17,3,East Carolina,BAL,ACT,exact_name_position,1.0
+00-0038465,M.Heath,Malik Heath,WR,WR,c0fccfb0-e907-11ed-8194-c7505aa5766b,Malik Heath,,Malik,Heath,WR,18.0,74,213.0,2000-03-31,3,Ole Miss,GB,ACT,exact_name_position,1.0
+00-0038476,T.DeVito,Tommy DeVito,QB,QB,a1ae8db0-eb91-11ed-a4cb-cd397e2b413c,Tommy DeVito,,Tommy,DeVito,QB,15.0,74,210.0,1998-08-07,3,Illinois,NYG,ACT,exact_name_position,1.0
+00-0038477,B.Ford-Wheaton,Bryce Ford-Wheaton,WR,WR,eb139db0-eb91-11ed-bf4f-cdefdf74a897,Bryce Ford-Wheaton,,Bryce,Ford-Wheaton,WR,88.0,75,220.0,2000-03-09,3,West Virginia,NYG,IR,exact_name_position,1.0
+00-0038489,B.VanSumeren,Ben VanSumeren,FB,RB,1377e940-eb75-11ed-aecd-85bc826ed43e,Ben VanSumeren,,Ben,VanSumeren,FB,43.0,74,231.0,2000-05-05,3,Michigan State,PHI,ACT,exact_name_position,1.0
+00-0038492,J.Brownlee,Jason Brownlee,WR,WR,f286b160-eba8-11ed-87ba-cb97497fad29,Jason Brownlee,,Jason,Brownlee,WR,89.0,75,202.0,1999-01-30,2,Southern Miss,KC,ACT,exact_name_position,1.0
+00-0038496,X.Gipson,Xavier Gipson,WR,WR,840a7940-ebaa-11ed-a11b-41cbcb1c4445,Xavier Gipson,,Xavier,Gipson,WR,3.0,69,189.0,2001-03-08,3,Stephen F. Austin,NYJ,ACT,exact_name_position,1.0
+00-0038498,E.Jenkins,E.J. Jenkins,TE,TE,626a1dd0-ebab-11ed-bb4c-e536974648f2,E.J. Jenkins,,E.J.,Jenkins,TE,84.0,78,245.0,1998-11-03,2,Georgia Tech,PHI,ACT,exact_name_position,1.0
+00-0038519,N.Remigio,Nikko Remigio,WR,WR,52b850b0-ec3b-11ed-aeaf-cb0dc6206dc5,Nikko Remigio,,Nikko,Remigio,WR,81.0,69,187.0,1999-11-04,1,Fresno State,KC,ACT,exact_name_position,1.0
+00-0038542,B.Robinson,Bijan Robinson,RB,RB,f78d68c2-f9da-48e7-b954-26b69efd828d,Bijan Robinson,,Bijan,Robinson,RB,7.0,71,215.0,2002-01-30,3,Texas,ATL,ACT,exact_name_position,1.0
+00-0038543,J.Smith-Njigba,Jaxon Smith-Njigba,WR,WR,6215db71-1e13-4c62-8f14-2005d33dee47,Jaxon Smith-Njigba,,Jaxon,Smith-Njigba,WR,11.0,72,197.0,2002-02-14,3,Ohio State,SEA,ACT,exact_name_position,1.0
+00-0038544,Q.Johnston,Quentin Johnston,WR,WR,e648bc98-bc81-44d0-8d4b-b9223c497ff4,Quentin Johnston,,Quentin,Johnston,WR,1.0,74,208.0,2001-09-06,3,TCU,LAC,ACT,exact_name_position,1.0
+00-0038547,L.Schoonmaker,Luke Schoonmaker,TE,TE,143957a7-4649-4a19-b351-e606edc75ebd,Luke Schoonmaker,,Luke,Schoonmaker,TE,86.0,77,250.0,1998-09-28,3,Michigan,DAL,ACT,exact_name_position,1.0
+00-0038550,H.Hooker,Hendon Hooker,QB,QB,25b10007-802d-4ebb-8314-3eb7b24ddc37,Hendon Hooker,,Hendon,Hooker,QB,2.0,75,220.0,1998-01-13,3,Tennessee,DET,ACT,exact_name_position,1.0
+00-0038551,K.Miller,Kendre Miller,RB,RB,66627686-34fe-4599-84ac-e436fd7d798a,Kendre Miller,,Kendre,Miller,RB,5.0,72,220.0,2002-06-11,3,TCU,NO,ACT,exact_name_position,1.0
+00-0038555,T.Bigsby,Tank Bigsby,RB,RB,2034916c-8062-46e3-8d0c-d0dec694e2d1,Tank Bigsby,,Tank,Bigsby,RB,4.0,71,215.0,2002-08-30,3,Auburn,JAC,ACT,exact_name_position,1.0
+00-0038558,D.Washington,Darnell Washington,TE,TE,1984b8b5-d206-4d6a-8204-c5dd0160e9f5,Darnell Washington,,Darnell,Washington,TE,80.0,79,264.0,2001-08-17,3,Georgia,PIT,ACT,exact_name_position,1.0
+00-0038559,M.Wilson,Michael Wilson,WR,WR,b91be982-fccd-448e-869b-e9b5148a1730,Michael Wilson,,Michael,Wilson,WR,14.0,74,213.0,2000-02-23,3,Stanford,ARI,ACT,exact_name_position,1.0
+00-0038563,T.Tucker,Tre Tucker,WR,WR,9beb72c5-5a81-413c-ada3-ff4854c95cf4,Tre Tucker,,Tre,Tucker,WR,1.0,68,182.0,2001-03-08,3,Cincinnati,LV,ACT,exact_name_position,1.0
+00-0038573,D.Davis,Derius Davis,WR,WR,21bf2521-3382-4e62-8249-a083435595b3,Derius Davis,,Derius,Davis,WR,12.0,68,165.0,2000-09-11,3,TCU,LAC,ACT,exact_name_position,1.0
+00-0038576,C.Jones,Charlie Jones,WR,WR,c634c231-61fb-4725-8533-2cce14bfebbf,Charlie Jones,,Charlie,Jones,WR,15.0,72,190.0,1998-10-29,3,Purdue,CIN,ACT,exact_name_position,1.0
+00-0038579,A.O'Connell,Aidan O'Connell,QB,QB,5891a917-9071-4bc2-a652-7f702c44cbd2,Aidan O'Connell,,Aidan,O'Connell,QB,12.0,75,206.0,1998-09-01,3,Purdue,LV,ACT,exact_name_position,1.0
+00-0038582,C.Tune,Clayton Tune,QB,QB,b2810d1e-3ea7-4907-bb34-93b40e893c08,Clayton Tune,,Clayton,Tune,QB,15.0,75,220.0,1999-03-23,3,Houston,ARI,ACT,exact_name_position,1.0
+00-0038583,D.Thompson-Robinson,Dorian Thompson-Robinson,QB,QB,d66ae3ad-8a60-47e7-a3b2-18a1e8377e1b,Dorian Thompson-Robinson,,Dorian,Thompson-Robinson,QB,14.0,74,203.0,1999-11-14,3,UCLA,PHI,ACT,exact_name_position,1.0
+00-0038589,J.Whyle,Josh Whyle,TE,TE,601467c7-b593-472d-a147-b8e7bfdbe990,Josh Whyle,,Josh,Whyle,TE,81.0,79,248.0,1999-09-08,3,Cincinnati,TEN,ACT,exact_name_position,1.0
+00-0038597,C.Brown,Chase Brown,RB,RB,d74ff06d-905d-4fed-8f98-b5f6d4549333,Chase Brown,,Chase,Brown,RB,30.0,70,210.0,2000-03-21,3,Illinois,CIN,ACT,exact_name_position,1.0
+00-0038606,P.Washington,Parker Washington,WR,WR,c05863ec-3414-4ae6-a8d2-830aed99b6d3,Parker Washington,,Parker,Washington,WR,11.0,70,204.0,2002-03-21,3,Penn State,JAC,ACT,exact_name_position,1.0
+00-0038608,K.Boutte,Kayshon Boutte,WR,WR,9c054866-5e6c-460b-9af3-ebf91e7d0a3e,Kayshon Boutte,,Kayshon,Boutte,WR,9.0,71,197.0,2002-05-07,3,LSU,NE,ACT,exact_name_position,1.0
+00-0038611,C.Rodriguez,Chris Rodriguez Jr.,RB,RB,ae5c4758-cb53-4f17-8763-b91381036af3,Chris Rodriguez Jr.,,Chris,Rodriguez,RB,36.0,71,224.0,1999-09-26,3,Kentucky,WAS,ACT,exact_name_position,1.0
+00-0038612,A.Perry,A.T. Perry,WR,WR,f6986d22-e3bb-4509-9309-90d92c01437a,A.T. Perry,,A.T.,Perry,WR,87.0,77,205.0,1999-10-26,2,Wake Forest,DEN,PUP,exact_name_position,1.0
+00-0038618,X.Hutchinson,Xavier Hutchinson,WR,WR,aed98af2-b228-4b74-a804-2d210bd11122,Xavier Hutchinson,,Xavier,Hutchinson,WR,19.0,75,210.0,2000-06-01,3,Iowa State,HOU,ACT,exact_name_position,1.0
+00-0038619,A.Iosivas,Andrei Iosivas,WR,WR,30c0df5e-bb77-4eee-8390-8fc13844e1c3,Andrei Iosivas,,Andrei,Iosivas,WR,80.0,75,210.0,1999-10-15,3,Princeton,CIN,ACT,exact_name_position,1.0
+00-0038621,D.Douglas,Demario Douglas,WR,WR,962496d4-9ffa-471b-8dd2-fc5e60fee84b,DeMario Douglas,,DeMario,Douglas,WR,3.0,68,192.0,2000-12-08,3,Liberty,NE,ACT,fuzzy_name_position,1.0
+00-0038622,D.Vaughn,Deuce Vaughn,RB,RB,e444229e-c262-40a7-bb89-61d4b774da55,Deuce Vaughn,,Deuce,Vaughn,RB,42.0,66,176.0,2001-11-02,3,Kansas State,DAL,ACT,exact_name_position,1.0
+00-0038636,K.McIntosh,Kenny McIntosh,RB,RB,9956eabc-16da-4a1c-ab80-fe0910bcaa12,Kenny McIntosh,,Kenny,McIntosh,RB,25.0,72,204.0,2000-03-03,3,Georgia,SEA,IR,exact_name_position,1.0
+00-0038640,J.Brooks,Jalen Brooks,WR,WR,66f7bbe1-eb89-4b48-83db-d947b04ff1fd,Jalen Brooks,,Jalen,Brooks,WR,83.0,74,205.0,2000-05-07,3,South Carolina,DAL,ACT,exact_name_position,1.0
+00-0038643,B.Willis,Brayden Willis,TE,TE,733cc366-53e3-4703-a2fc-2aa860272cf3,Brayden Willis,,Brayden,Willis,TE,9.0,76,240.0,1999-11-11,3,Oklahoma,SF,ACT,exact_name_position,1.0
+00-0038647,R.Bell,Ronnie Bell,WR,WR,ba06804a-b84c-408a-8ef6-5226d8424479,Ronnie Bell,,Ronnie,Bell,WR,10.0,72,195.0,2000-01-28,3,Michigan,DET,ACT,exact_name_position,1.0
+00-0038667,E.Cooks,Elijah Cooks,WR,WR,c2cce6c0-e841-11ed-9d79-63f6ad42423a,Elijah Cooks,,Elijah,Cooks,WR,86.0,76,215.0,1998-10-13,2,San Jose State,PHI,ACT,exact_name_position,1.0
+00-0038678,J.Mims,Jordan Mims,RB,RB,6d91ccf0-f013-11ed-88ef-07b7f7d6320c,Jordan Mims,,Jordan,Mims,RB,24.0,72,205.0,1999-06-16,2,Fresno State,TEN,ACT,exact_name_position,1.0
+00-0038679,T.Shavers,Tyrell Shavers,WR,WR,07eb12f0-f011-11ed-ac82-d7e41925e5ba,Tyrell Shavers,,Tyrell,Shavers,WR,80.0,76,211.0,1999-08-18,1,San Diego State,BUF,ACT,exact_name_position,1.0
+00-0038685,C.Brooks,Chris Brooks,RB,RB,35a0d440-f017-11ed-bedb-53f19b227cc3,Chris Brooks,,Chris,Brooks,RB,30.0,73,219.0,2000-01-11,3,BYU,GB,ACT,exact_name_position,1.0
+00-0038705,E.Demercado,Emari Demercado,RB,RB,44b4cbf0-e8fe-11ed-bc6e-a5c4d3ccbdd1,Emari Demercado,,Emari,Demercado,RB,31.0,69,215.0,1999-01-20,3,TCU,ARI,ACT,exact_name_position,1.0
+00-0038710,B.Whiteheart,Blake Whiteheart,TE,TE,9a8395a0-e900-11ed-9cad-a989770811a8,Blake Whiteheart,,Blake,Whiteheart,TE,86.0,76,250.0,2000-03-22,3,Wake Forest,CLE,ACT,exact_name_position,1.0
+00-0038720,J.Hill,Julian Hill,TE,TE,516da3c0-f016-11ed-a518-572ef5cb73b6,Julian Hill,,Julian,Hill,TE,89.0,76,251.0,2000-07-09,3,Campbell,MIA,ACT,exact_name_position,1.0
+00-0038738,H.Luepke,Hunter Luepke,FB,RB,58f425d0-f677-11ed-978f-0975e9cb7dba,Hunter Luepke,,Hunter,Luepke,RB,40.0,73,238.0,2000-02-28,3,North Dakota State,DAL,ACT,fuzzy_name_position,1.0
+00-0038752,J.Bobo,Jake Bobo,WR,WR,7d80dd50-e9f5-11ed-9c34-3f26f2e7ed88,Jake Bobo,,Jake,Bobo,WR,19.0,76,207.0,1998-08-04,3,UCLA,SEA,ACT,exact_name_position,1.0
+00-0038783,N.Adkins,Nate Adkins,TE,TE,bcd0ae60-f31c-11ed-819c-fd03d0cc2698,Nate Adkins,,Nate,Adkins,TE,45.0,75,252.0,1999-07-09,3,South Carolina,DEN,ACT,exact_name_position,1.0
+00-0038794,J.McLaughlin,Jaleel McLaughlin,RB,RB,60b4ded0-f321-11ed-ab27-e38fa04fd6c0,Jaleel McLaughlin,,Jaleel,McLaughlin,RB,38.0,67,187.0,2000-09-13,3,Youngstown State,DEN,ACT,exact_name_position,1.0
+00-0038797,E.Wilson,Emanuel Wilson,RB,RB,05266280-f323-11ed-bd27-0bcbcaae8d67,Emanuel Wilson,,Emanuel,Wilson,RB,31.0,70,226.0,1999-05-08,3,Fort Valley State,GB,ACT,exact_name_position,1.0
+00-0038809,B.Sims,Ben Sims,TE,TE,cef32a80-e761-11ed-ac46-e3b4ebd723e5,Ben Sims,,Ben,Sims,TE,89.0,77,250.0,2000-05-16,3,Baylor,GB,ACT,exact_name_position,1.0
+00-0038821,R.Jarrett,Rakim Jarrett,WR,WR,39428290-f1b8-11ed-9bf1-7fd77a26dc1f,Rakim Jarrett,,Rakim,Jarrett,WR,18.0,72,192.0,2001-01-24,3,Maryland,TB,ACT,exact_name_position,1.0
+00-0038824,R.Miller,Ryan Miller,WR,WR,edb7de00-f1b8-11ed-9bf1-7fd77a26dc1f,Ryan Miller,,Ryan,Miller,WR,81.0,74,221.0,2000-02-20,2,Furman,TB,ACT,exact_name_position,1.0
+00-0038840,B.Tremayne,Brycen Tremayne,WR,WR,2a3cbc30-e8ed-11ed-bd02-25f41a9e059e,Brycen Tremayne,,Brycen,Tremayne,WR,87.0,76,212.0,1999-11-18,1,Stanford,CAR,ACT,exact_name_position,1.0
+00-0038862,E.Dotson,Elijah Dotson,RB,RB,1df86850-e78c-11ed-8c85-33e7cdbd0a45,Elijah Dotson,,Elijah,Dotson,RB,41.0,69,202.0,1999-01-19,2,Northern Colorado,ATL,ACT,exact_name_position,1.0
+00-0038891,S.Jackson,Shedrick Jackson,WR,WR,4ee53be0-eacb-11ed-bff4-2305d99deffc,Shedrick Jackson,,Shedrick,Jackson,WR,4.0,73,198.0,1999-10-20,1,Auburn,LV,ACT,exact_name_position,1.0
+00-0038911,M.Cunningham,Malik Cunningham,WR,WR,2bf2f410-e6f2-11ed-abca-c7a3a205e21d,Malik Cunningham,,Malik,Cunningham,WR,12.0,73,190.0,1998-10-06,2,Louisville,BAL,ACT,exact_name_position,1.0
+00-0038933,D.Kincaid,Dalton Kincaid,TE,TE,b961fa15-0676-4948-b95f-56d06319d40e,Dalton Kincaid,,Dalton,Kincaid,TE,86.0,76,240.0,1999-10-18,3,Utah,BUF,ACT,exact_name_position,1.0
+00-0038935,B.Strange,Brenton Strange,TE,TE,94f135f7-9d54-4cbd-b560-fcaf83d414b0,Brenton Strange,,Brenton,Strange,TE,85.0,76,253.0,2000-12-27,3,Penn State,JAC,ACT,exact_name_position,1.0
+00-0038938,J.Hyatt,Jalin Hyatt,WR,WR,e5f9d339-a89f-4e47-9a84-b89f14550c05,Jalin Hyatt,,Jalin,Hyatt,WR,13.0,72,185.0,2001-09-25,3,Tennessee,NYG,ACT,exact_name_position,1.0
+00-0038941,T.Scott,Tyler Scott,WR,WR,6833ad69-9f24-4780-989c-83bdb090ec5e,Tyler Scott,,Tyler,Scott,WR,10.0,70,182.0,2001-10-12,3,Cincinnati,CHI,ACT,exact_name_position,1.0
+00-0038951,S.Tucker,Sean Tucker,RB,RB,6d616c10-f35e-11ed-b721-9b68b08a2e09,Sean Tucker,,Sean,Tucker,RB,44.0,70,205.0,2001-10-25,3,Syracuse,TB,ACT,exact_name_position,1.0
+00-0038976,M.Mims,Marvin Mims Jr.,WR,WR,fcd780e6-6d43-4c2e-b740-59ae09911345,Marvin Mims Jr.,,Marvin,Mims,WR,19.0,71,182.0,2002-03-19,3,Oklahoma,DEN,ACT,exact_name_position,1.0
+00-0038977,T.Dell,Tank Dell,WR,WR,25e7b423-f716-4d1a-9623-cee3e7d822ab,Tank Dell,,Tank,Dell,WR,3.0,70,165.0,1999-10-29,3,Houston,HOU,PUP,exact_name_position,1.0
+00-0038979,C.Tillman,Cedric Tillman,WR,WR,148330d9-5182-4b58-b695-8067aaba4731,Cedric Tillman,,Cedric,Tillman,WR,19.0,75,215.0,2000-04-19,3,Tennessee,CLE,ACT,exact_name_position,1.0
+00-0038981,W.Morris,Wanya Morris,T,OL,b8192dc2-d5a9-4ff6-a0f3-eeb9fc6d9aa6,Wanya Morris,,Wanya,Morris,OL,64.0,78,307.0,2000-10-10,3,Oklahoma,KC,ACT,fuzzy_name_position,1.0
+00-0038994,J.Addison,Jordan Addison,WR,WR,63fdd64e-1a23-4b77-9536-b1609f3a708c,Jordan Addison,,Jordan,Addison,WR,3.0,71,175.0,2002-01-27,3,USC,MIN,ACT,exact_name_position,1.0
+00-0038996,T.Kraft,Tucker Kraft,TE,TE,3a084c5f-6b9f-4703-a0c7-1566bc4b1129,Tucker Kraft,,Tucker,Kraft,TE,85.0,77,259.0,2000-11-03,3,South Dakota State,GB,ACT,exact_name_position,1.0
+00-0038997,J.Downs,Josh Downs,WR,WR,dd227f4a-0785-482d-a28b-f231c7f3b73f,Josh Downs,,Josh,Downs,WR,1.0,69,171.0,2001-08-12,3,North Carolina,IND,ACT,exact_name_position,1.0
+00-0038998,J.Haener,Jake Haener,QB,QB,70376919-8220-4128-a089-72d5b10f2346,Jake Haener,,Jake,Haener,QB,3.0,73,200.0,1999-03-10,3,Fresno State,NO,ACT,exact_name_position,1.0
+00-0039021,R.Johnson,Roschon Johnson,RB,RB,e3c414c0-be8c-4807-af9c-f91d89c83e60,Roschon Johnson,,Roschon,Johnson,RB,23.0,72,227.0,2001-01-31,3,Texas,CHI,ACT,exact_name_position,1.0
+00-0039032,T.Spears,Tyjae Spears,RB,RB,af71f149-7758-40b7-973a-9fe6320cf4f5,Tyjae Spears,,Tyjae,Spears,RB,2.0,71,195.0,2001-06-15,3,Tulane,TEN,ACT,exact_name_position,1.0
+00-0039040,D.Achane,De'Von Achane,RB,RB,a4ef921b-8767-4b4f-a651-7675c00f9af0,De'Von Achane,,De'Von,Achane,RB,28.0,69,191.0,2001-10-13,3,Texas A&M,MIA,ACT,exact_name_position,1.0
+00-0039041,E.Higgins,Elijah Higgins,TE,TE,a01b7698-d67f-4b60-b2fb-4c667336b718,Elijah Higgins,,Elijah,Higgins,TE,84.0,75,245.0,2000-10-27,3,Stanford,ARI,ACT,exact_name_position,1.0
+00-0039050,P.Durham,Payne Durham,TE,TE,c4a8b4c9-5db8-4187-852b-9557bef8724e,Payne Durham,,Payne,Durham,TE,87.0,77,255.0,2000-06-15,3,Purdue,TB,ACT,exact_name_position,1.0
+00-0039052,T.Palmer,Trey Palmer,WR,WR,9a011241-f4b3-403a-af70-c9cdfd177054,Trey Palmer,,Trey,Palmer,WR,10.0,73,190.0,2001-04-02,3,Nebraska,TB,ACT,exact_name_position,1.0
+00-0039062,J.Mingo,Jonathan Mingo,WR,WR,6cf0c82d-87e4-4cfc-8475-77667ed92796,Jonathan Mingo,,Jonathan,Mingo,WR,81.0,74,220.0,2001-04-20,3,Ole Miss,DAL,ACT,exact_name_position,1.0
+00-0039064,Z.Flowers,Zay Flowers,WR,WR,2b6d74b7-10fb-4f17-99c8-9bb557fb475b,Zay Flowers,,Zay,Flowers,WR,4.0,69,183.0,2000-09-11,3,Boston College,BAL,ACT,exact_name_position,1.0
+00-0039065,S.LaPorta,Sam LaPorta,TE,TE,3059f1e5-1871-4458-9e90-9b9917874c61,Sam LaPorta,,Sam,LaPorta,TE,87.0,75,245.0,2001-01-12,3,Iowa,DET,ACT,exact_name_position,1.0
+00-0039066,M.Mayer,Michael Mayer,TE,TE,31f4645a-7ccb-4633-8580-2fca361beb4f,Michael Mayer,,Michael,Mayer,TE,87.0,76,256.0,2001-07-06,3,Notre Dame,LV,ACT,exact_name_position,1.0
+00-0039067,R.Rice,Rashee Rice,WR,WR,cbd73c09-da07-48b0-a0d6-f248dfa631b6,Rashee Rice,,Rashee,Rice,WR,4.0,73,204.0,2000-04-22,3,SMU,KC,ACT,exact_name_position,1.0
+00-0039074,D.Allen,Davis Allen,TE,TE,02a77d8c-3b89-4a61-86a2-0c005c1e589a,Davis Allen,,Davis,Allen,TE,87.0,78,251.0,2001-02-03,3,Clemson,LA,ACT,exact_name_position,1.0
+00-0039075,P.Nacua,Puka Nacua,WR,WR,111be44d-7bc2-4cad-934d-c9e946293b2f,Puka Nacua,,Puka,Nacua,WR,12.0,74,212.0,2001-05-29,3,BYU,LA,ACT,exact_name_position,1.0
+00-0039139,J.Gibbs,Jahmyr Gibbs,RB,RB,fef9457e-6497-47de-9bf2-cc3b95929375,Jahmyr Gibbs,,Jahmyr,Gibbs,RB,0.0,69,202.0,2002-03-20,3,Alabama,DET,ACT,exact_name_position,1.0
+00-0039144,L.Musgrave,Luke Musgrave,TE,TE,77a4fb49-3c6c-4aa1-8a21-20956e2d2240,Luke Musgrave,,Luke,Musgrave,TE,88.0,78,253.0,2000-09-02,3,Oregon State,GB,ACT,exact_name_position,1.0
+00-0039146,J.Reed,Jayden Reed,WR,WR,23a306bc-5f77-4574-a575-bd599f243185,Jayden Reed,,Jayden,Reed,WR,11.0,71,187.0,2000-04-28,3,Michigan State,GB,ACT,exact_name_position,1.0
+00-0039150,B.Young,Bryce Young,QB,QB,38475bfa-9773-4c3b-9157-a0dbd576fa22,Bryce Young,,Bryce,Young,QB,9.0,70,204.0,2001-07-25,3,Alabama,CAR,ACT,exact_name_position,1.0
+00-0039152,W.Levis,Will Levis,QB,QB,4c8a2f7e-f982-4eca-9d52-cf53df6985a4,Will Levis,,Will,Levis,QB,8.0,76,229.0,1999-06-27,3,Kentucky,TEN,IR,exact_name_position,1.0
+00-0039163,C.Stroud,C.J. Stroud,QB,QB,7e91086f-9ca4-4bd9-a099-b88b2f37e6c6,C.J. Stroud,,C.J.,Stroud,QB,7.0,75,218.0,2001-10-03,3,Ohio State,HOU,ACT,exact_name_position,1.0
+00-0039164,A.Richardson,Anthony Richardson,QB,QB,5fc5b4a6-a583-4345-a810-4f982204ea5e,Anthony Richardson Sr.,,Anthony,Richardson,QB,5.0,76,244.0,2002-05-22,3,Florida,IND,ACT,fuzzy_name_position,1.0
+00-0039165,Z.Charbonnet,Zach Charbonnet,RB,RB,7d7f1628-85a7-4633-9ffe-d82fc2761b00,Zach Charbonnet,,Zach,Charbonnet,RB,26.0,73,214.0,2001-01-08,3,UCLA,SEA,ACT,exact_name_position,1.0
+00-0039236,J.Wilson,Johnny Wilson,WR,WR,e8d389b5-56c8-4276-9983-0dbcc1663507,Johnny Wilson,,Johnny,Wilson,WR,89.0,78,228.0,2001-04-03,2,Florida State,PHI,ACT,exact_name_position,1.0
+00-0039244,C.Collier,Chris Collier,RB,RB,7fcfe130-06fc-11ef-9592-67ed152bdb91,Chris Collier,,Chris,Collier,RB,35.0,70,203.0,2000-03-24,2,Lock Haven,LV,ACT,exact_name_position,1.0
+00-0039299,G.Holani,George Holani,RB,RB,971a3930-0724-11ef-a47d-6f7fe8c7bc97,George Holani,,George,Holani,RB,36.0,71,210.0,1999-12-16,2,Boise State,SEA,ACT,exact_name_position,1.0
+00-0039316,B.Cupp,Baylor Cupp,TE,TE,e23e66a0-0a4b-11ef-81ea-4d1e02cb9588,Baylor Cupp,,Baylor,Cupp,TE,17.0,78,243.0,2000-05-10,1,Texas Tech,BAL,ACT,exact_name_position,1.0
+00-0039325,C.Steele,Carson Steele,RB,RB,56312980-07cc-11ef-ae1a-ef16ff05bbda,Carson Steele,,Carson,Steele,FB,42.0,72,228.0,2002-10-21,2,UCLA,KC,ACT,fuzzy_name_position,1.0
+00-0039337,M.Nabers,Malik Nabers,WR,WR,55ef2022-50c2-465b-839e-c0f4c9e7c55c,Malik Nabers,,Malik,Nabers,WR,1.0,72,200.0,2003-07-28,2,LSU,NYG,ACT,exact_name_position,1.0
+00-0039338,B.Bowers,Brock Bowers,TE,TE,ad9fc7e3-0a6d-4e41-84c2-cf43b71aee13,Brock Bowers,,Brock,Bowers,TE,89.0,76,235.0,2002-12-13,2,Georgia,LV,ACT,exact_name_position,1.0
+00-0039342,X.Legette,Xavier Legette,WR,WR,0bb0c37c-e76b-4529-92b0-b026be4f7d6c,Xavier Legette,,Xavier,Legette,WR,17.0,75,227.0,2001-01-29,2,South Carolina,CAR,ACT,exact_name_position,1.0
+00-0039344,J.Brooks,Jonathon Brooks,RB,RB,5c842941-844b-4f6a-bce4-26b377146674,Jonathon Brooks,,Jonathon,Brooks,RB,24.0,72,207.0,2003-07-21,2,Texas,CAR,PUP,exact_name_position,1.0
+00-0039355,L.McCaffrey,Luke McCaffrey,WR,WR,5cfd82f8-9e73-48d7-914e-9051ff52d67d,Luke McCaffrey,,Luke,McCaffrey,WR,11.0,74,198.0,2001-04-02,2,Rice,WAS,ACT,exact_name_position,1.0
+00-0039356,J.Sanders,Ja'Tavion Sanders,TE,TE,ffd2ff3f-4b56-4232-be8e-bf163c29f406,Ja'Tavion Sanders,,Ja'Tavion,Sanders,TE,0.0,76,252.0,2003-03-27,2,Texas,CAR,ACT,exact_name_position,1.0
+00-0039359,C.Stover,Cade Stover,TE,TE,559d5222-0403-4a14-94c7-c7bd5072c939,Cade Stover,,Cade,Stover,TE,87.0,76,251.0,2000-06-12,2,Ohio State,HOU,ACT,exact_name_position,1.0
+00-0039361,B.Irving,Bucky Irving,RB,RB,c5249c6f-bd1b-4352-8228-de2bd499ca0d,Bucky Irving,,Bucky,Irving,RB,7.0,70,195.0,2002-08-19,2,Oregon,TB,ACT,exact_name_position,1.0
+00-0039363,I.Guerendo,Isaac Guerendo,RB,RB,eac64b21-6e9e-447a-bf18-8a00b5c12871,Isaac Guerendo,,Isaac,Guerendo,RB,31.0,72,221.0,2000-06-28,2,Louisville,SF,ACT,exact_name_position,1.0
+00-0039364,S.Vaki,Sione Vaki,RB,RB,f5e0334b-b5f1-422f-a437-199c36cc108d,Sione Vaki,,Sione,Vaki,RB,33.0,71,216.0,2001-07-30,2,Utah,DET,ACT,exact_name_position,1.0
+00-0039365,J.Cowing,Jacob Cowing,WR,WR,9c145f4f-c9b1-4c2c-b011-8dc40167d0f1,Jacob Cowing,,Jacob,Cowing,WR,19.0,69,171.0,2001-02-04,2,Arizona,SF,ACT,exact_name_position,1.0
+00-0039373,A.Estime,Audric Estime,RB,RB,3b86dd7c-0b21-448d-a662-5675e87fd0da,Audric Estime,,Audric,Estime,RB,23.0,71,227.0,2003-09-06,2,Notre Dame,DEN,ACT,exact_name_position,1.0
+00-0039376,S.Rattler,Spencer Rattler,QB,QB,e0eecf78-86b2-4ee8-8ac9-d7713a138765,Spencer Rattler,,Spencer,Rattler,QB,2.0,72,211.0,2000-09-28,2,South Carolina,NO,ACT,exact_name_position,1.0
+00-0039379,J.Thrash,Jamari Thrash,WR,WR,1472d4aa-ffbf-4683-aa91-86bc4795b34e,Jamari Thrash,,Jamari,Thrash,WR,80.0,72,190.0,2000-12-19,2,Louisville,CLE,ACT,exact_name_position,1.0
+00-0039384,T.Tracy,Tyrone Tracy,RB,RB,fc6c7973-79a9-4974-855e-bc13400fe641,Tyrone Tracy Jr.,,Tyrone,Tracy,RB,29.0,71,210.0,1999-11-23,2,Purdue,NYG,ACT,fuzzy_name_position,1.0
+00-0039386,B.Means,Bub Means,WR,WR,ef0feb13-57b8-474c-a723-cf03f57a321a,Bub Means,,Bub,Means,WR,16.0,74,215.0,2001-01-10,2,Pittsburgh,NO,ACT,exact_name_position,1.0
+00-0039391,K.Vidal,Kimani Vidal,RB,RB,ed923635-f021-4b76-9dbb-9f1901eeaab9,Kimani Vidal,,Kimani,Vidal,RB,30.0,68,215.0,2001-08-28,2,Troy,LAC,ACT,exact_name_position,1.0
+00-0039392,J.Jackson,Jha'Quan Jackson,WR,WR,bcb054df-47e9-411c-8c9d-eef1a9a25487,Jha'Quan Jackson,,Jha'Quan,Jackson,WR,19.0,69,188.0,2000-05-15,2,Tulane,TEN,ACT,exact_name_position,1.0
+00-0039394,C.Washington,Casey Washington,WR,WR,98b9b952-b31f-47c4-9fac-9d7516af34df,Casey Washington,,Casey,Washington,WR,82.0,72,205.0,2001-03-06,2,Illinois,ATL,ACT,exact_name_position,1.0
+00-0039407,D.Laube,Dylan Laube,RB,RB,de5b56bd-33f0-48bc-b1e3-9523bd6bba64,Dylan Laube,,Dylan,Laube,RB,23.0,69,204.0,1999-12-14,2,New Hampshire,LV,ACT,exact_name_position,1.0
+00-0039410,R.Flournoy,Ryan Flournoy,WR,WR,ebf6bc25-5e74-4588-86d6-5dadba3f9bcd,Ryan Flournoy,,Ryan,Flournoy,WR,19.0,73,200.0,1999-10-27,2,Southeast Missouri State,DAL,ACT,exact_name_position,1.0
+00-0039420,J.Bell,Jaheim Bell,TE,TE,c9b2f6f5-b8bc-48ca-ac33-fa18883c2f6b,Jaheim Bell,,Jaheim,Bell,TE,88.0,74,241.0,2001-06-14,2,Florida State,NE,ACT,exact_name_position,1.0
+00-0039424,D.Vele,Devaughn Vele,WR,WR,2a638f35-a80a-46db-9722-12b49d45ab52,Devaughn Vele,,Devaughn,Vele,WR,17.0,77,210.0,1997-12-12,2,Utah,DEN,ACT,exact_name_position,1.0
+00-0039451,I.Williams,Isaiah Williams,WR,WR,2ddb2f40-07bc-11ef-82d9-5f86367458d3,Isaiah Williams,,Isaiah,Williams,WR,18.0,70,185.0,2001-01-29,2,Illinois,CIN,ACT,exact_name_position,1.0
+00-0039458,B.Bates,Brenden Bates,TE,TE,eb055af0-0e1a-11ef-aa6c-9183e6948e0f,Brenden Bates,,Brenden,Bates,TE,82.0,77,255.0,1999-10-17,2,Kentucky,CLE,ACT,exact_name_position,1.0
+00-0039491,J.Coker,Jalen Coker,WR,WR,67977ab0-070b-11ef-978d-05d80704d329,Jalen Coker,,Jalen,Coker,WR,18.0,75,213.0,2001-10-30,2,Holy Cross,CAR,ACT,exact_name_position,1.0
+00-0039521,X.Weaver,Xavier Weaver,WR,WR,ffd59710-0582-11ef-823c-c3942ac17525,Xavier Weaver,,Xavier,Weaver,WR,89.0,73,185.0,2000-10-12,2,Colorado,ARI,ACT,exact_name_position,1.0
+00-0039530,B.Spann-Ford,Brevyn Spann-Ford,TE,TE,efc8d800-072b-11ef-892f-5b772aae3c25,Brevyn Spann-Ford,,Brevyn,Spann-Ford,TE,89.0,79,270.0,1999-12-27,2,Minnesota,DAL,ACT,exact_name_position,1.0
+00-0039573,B.Watson,Blake Watson,RB,RB,51f21920-0730-11ef-9a3c-99c1643e1512,Blake Watson,,Blake,Watson,RB,25.0,69,195.0,1999-10-14,2,Memphis,DEN,ACT,exact_name_position,1.0
+00-0039589,K.Johnson,Kameron Johnson,WR,WR,94c41960-0712-11ef-b01e-875e1e5d6ffb,Kameron Johnson,,Kameron,Johnson,WR,19.0,70,170.0,2002-03-17,2,Barton,TB,ACT,exact_name_position,1.0
+00-0039603,B.Brooks,British Brooks,RB,RB,2ef88b80-07cf-11ef-96cf-876a6c13e638,British Brooks,,British,Brooks,RB,44.0,71,225.0,1999-11-18,2,North Carolina,HOU,ACT,exact_name_position,1.0
+00-0039623,M.Tipton,Mason Tipton,WR,WR,91918b20-0572-11ef-96c1-f73e6ad39631,Mason Tipton,,Mason,Tipton,WR,15.0,71,187.0,2000-09-27,2,Yale,NO,ACT,exact_name_position,1.0
+00-0039631,C.Grandy,Cam Grandy,TE,TE,8e6c6eb0-0725-11ef-b490-715b3492492e,Cam Grandy,,Cam,Grandy,TE,85.0,77,253.0,1999-11-19,2,Illinois State,CIN,ACT,exact_name_position,1.0
+00-0039648,D.Martin-Robinson,David Martin-Robinson,TE,TE,dad0d560-0c9e-11ef-b2f4-ab1e3a869265,David Martin-Robinson,,David,Martin-Robinson,TE,88.0,75,247.0,1999-12-26,2,Temple,TEN,ACT,exact_name_position,1.0
+00-0039650,B.Oliver,Bryce Oliver,WR,WR,e88c3c70-06fa-11ef-92ba-0de371d8ef1a,Bryce Oliver,,Bryce,Oliver,WR,80.0,73,214.0,2000-05-19,2,Youngstown State,TEN,ACT,exact_name_position,1.0
+00-0039692,D.Pettus,Dell Pettus,FS,DB,48abbb80-075a-11ef-a2f5-8dc558cf6193,Dell Pettus,,Dell,Pettus,SAF,24.0,71,200.0,2001-06-02,2,Troy,NE,ACT,fuzzy_name_position,1.0
+00-0039703,C.Schrader,Cody Schrader,RB,RB,70c949c0-057f-11ef-ae83-716cc96c95b8,Cody Schrader,,Cody,Schrader,RB,32.0,69,214.0,1999-09-08,2,Missouri,LA,ACT,exact_name_position,1.0
+00-0039731,J.Latham,J.C. Latham,T,OL,f610a744-8d29-4bc3-99d6-595aae0ace8f,JC Latham,,JC,Latham,OT,55.0,78,342.0,2003-02-08,2,Alabama,TEN,ACT,fuzzy_name_position,0.9
+00-0039732,B.Nix,Bo Nix,QB,QB,f056c8ed-6ee5-492c-af11-3f7e3d97195c,Bo Nix,,Bo,Nix,QB,10.0,74,217.0,2000-02-25,2,Oregon,DEN,ACT,exact_name_position,1.0
+00-0039737,T.Reiman,Tip Reiman,TE,TE,44767e85-080f-4212-b2f2-cba160c81a9f,Tip Reiman,,Tip,Reiman,TE,87.0,77,271.0,2001-09-17,2,Illinois,ARI,ACT,exact_name_position,1.0
+00-0039738,B.Corum,Blake Corum,RB,RB,93ba1da2-3679-4ddc-9687-0802349f9ee2,Blake Corum,,Blake,Corum,RB,22.0,68,210.0,2000-11-25,2,Michigan,LA,ACT,exact_name_position,1.0
+00-0039746,W.Shipley,Will Shipley,RB,RB,796e223d-e8d5-42ab-afb4-557fa6183357,Will Shipley,,Will,Shipley,RB,28.0,71,209.0,2002-08-29,2,Clemson,PHI,ACT,exact_name_position,1.0
+00-0039747,A.Smith,Ainias Smith,WR,WR,83a78cfb-5e71-4131-b706-3661bb6396e1,Ainias Smith,,Ainias,Smith,WR,82.0,69,176.0,2001-05-31,2,Texas A&M,PHI,ACT,exact_name_position,1.0
+00-0039751,J.Whittington,Jordan Whittington,WR,WR,7cc58a3b-157a-4f43-a7de-5bc403f9ce6b,Jordan Whittington,,Jordan,Whittington,WR,88.0,73,202.0,2000-10-01,2,Texas,LA,ACT,exact_name_position,1.0
+00-0039754,D.Culp,Devin Culp,TE,TE,c62dcaf1-79e3-4e15-8fb0-e7cb30a18fe4,Devin Culp,,Devin,Culp,TE,82.0,76,237.0,2000-02-02,2,Washington,TB,ACT,exact_name_position,1.0
+00-0039757,T.Jennings,Terrell Jennings,RB,RB,e6fc9a80-1168-11ef-8e6a-d7d3a1fb0861,Terrell Jennings,,Terrell,Jennings,RB,26.0,72,217.0,2001-03-01,1,Florida A&M,NE,ACT,exact_name_position,1.0
+00-0039792,D.Walker,Devontez Walker,WR,WR,b5d1ed29-c72a-45ff-ae60-337e13728b2f,Devontez Walker,,Devontez,Walker,WR,81.0,73,198.0,2001-06-19,2,North Carolina,BAL,ACT,exact_name_position,1.0
+00-0039793,A.Barner,A.J. Barner,TE,TE,e96127b4-d381-43d4-b0ae-8790c706756f,AJ Barner,,AJ,Barner,TE,88.0,78,251.0,2002-05-03,2,Michigan,SEA,ACT,fuzzy_name_position,0.9
+00-0039794,B.Allen,Braelon Allen,RB,RB,d7f72deb-c1e2-47a2-b651-887f0e33dc44,Braelon Allen,,Braelon,Allen,RB,0.0,73,235.0,2004-01-20,2,Wisconsin,NYJ,ACT,exact_name_position,1.0
+00-0039796,R.Ali,Rasheen Ali,RB,RB,9aeb79b0-e55b-4341-8c6b-233971b667a7,Rasheen Ali,,Rasheen,Ali,RB,26.0,71,210.0,2001-02-16,2,Marshall,BAL,ACT,exact_name_position,1.0
+00-0039798,I.Davis,Isaiah Davis,RB,RB,849789be-b8f0-4d97-a777-2fcf336efa6a,Isaiah Davis,,Isaiah,Davis,RB,32.0,73,220.0,2002-02-21,2,South Dakota State,NYJ,ACT,exact_name_position,1.0
+00-0039810,J.Burton,Jermaine Burton,WR,WR,dc363b05-4551-4cb0-9bfc-ba462cb1cd5b,Jermaine Burton,,Jermaine,Burton,WR,81.0,72,204.0,2001-06-28,2,Alabama,CIN,ACT,exact_name_position,1.0
+00-0039811,M.Lloyd,MarShawn Lloyd,RB,RB,7b8967bc-a3a5-4aa4-bd1f-2846663ca831,MarShawn Lloyd,,MarShawn,Lloyd,RB,32.0,69,220.0,2001-01-05,2,USC,GB,ACT,exact_name_position,1.0
+00-0039814,E.All,Erick All,TE,TE,5523779b-db60-4158-b232-8391bc7db65b,Erick All Jr.,,Erick,All,TE,83.0,77,255.0,2000-09-13,2,Iowa,CIN,PUP,fuzzy_name_position,1.0
+00-0039816,A.Gould,Anthony Gould,WR,WR,f1f3f15f-f4a5-4d6e-b075-95f4815a384e,Anthony Gould,,Anthony,Gould,WR,6.0,68,174.0,2001-04-06,2,Oregon State,IND,ACT,exact_name_position,1.0
+00-0039824,J.Wiley,Jared Wiley,TE,TE,a952a370-a43f-45ec-8371-0665f0b9551e,Jared Wiley,,Jared,Wiley,TE,12.0,78,249.0,2000-11-02,2,TCU,KC,ACT,exact_name_position,1.0
+00-0039825,J.Hicks,Jaden Hicks,SS,DB,3e4f799d-5567-4239-9513-86a16a674073,Jaden Hicks,,Jaden,Hicks,DB,21.0,73,215.0,2002-08-16,2,Washington State,KC,ACT,fuzzy_name_position,1.0
+00-0039847,T.Johnson,Theo Johnson,TE,TE,a5d4bb1d-c130-47c2-808a-2dd1f85005fb,Theo Johnson,,Theo,Johnson,TE,84.0,78,264.0,2001-02-26,2,Penn State,NYG,ACT,exact_name_position,1.0
+00-0039849,M.Harrison,Marvin Harrison,WR,WR,e8da21a8-796d-48a2-b644-57d08983ae01,Marvin Harrison Jr.,,Marvin,Harrison,WR,18.0,75,220.0,2002-08-11,2,Ohio State,ARI,ACT,fuzzy_name_position,1.0
+00-0039851,D.Maye,Drake Maye,QB,QB,d0c0630e-8925-4b81-a32b-e4146d95f01f,Drake Maye,,Drake,Maye,QB,10.0,76,225.0,2002-08-30,2,North Carolina,NE,ACT,exact_name_position,1.0
+00-0039853,J.Baker,Javon Baker,WR,WR,901992cc-f4b7-45e8-800e-c2dce6ae5199,Javon Baker,,Javon,Baker,WR,6.0,73,202.0,2002-02-18,2,UCF,NE,ACT,exact_name_position,1.0
+00-0039855,J.McMillan,Jalen McMillan,WR,WR,c2b25795-8c63-425a-8790-f6d626dbf0d3,Jalen McMillan,,Jalen,McMillan,WR,15.0,73,192.0,2001-12-07,2,Washington,TB,ACT,exact_name_position,1.0
+00-0039868,T.Franklin,Troy Franklin,WR,WR,765dffd8-8112-4078-86a1-924ccebf1069,Troy Franklin,,Troy,Franklin,WR,11.0,75,180.0,2003-02-06,2,Oregon,DEN,ACT,exact_name_position,1.0
+00-0039874,J.Wright,Jaylen Wright,RB,RB,ba9e1390-028b-47c9-8710-84cee3fa25de,Jaylen Wright,,Jaylen,Wright,RB,5.0,70,208.0,2003-04-01,2,Tennessee,MIA,ACT,exact_name_position,1.0
+00-0039875,R.Davis,Ray Davis,RB,RB,a856dd59-ed95-471a-bfb9-fbd0566bd1a9,Ray Davis,,Ray,Davis,RB,22.0,68,220.0,1999-11-11,2,Kentucky,BUF,ACT,exact_name_position,1.0
+00-0039880,M.Washington,Malik Washington,WR,WR,d7f4fd2c-ba4f-49ca-bd92-443a506e9eb4,Malik Washington,,Malik,Washington,WR,6.0,68,195.0,2001-01-04,2,Virginia,MIA,ACT,exact_name_position,1.0
+00-0039890,A.Mitchell,Adonai Mitchell,WR,WR,190dbc97-2b7c-4023-b6b0-5729b854b60b,Adonai Mitchell,,Adonai,Mitchell,WR,10.0,74,205.0,2002-10-08,2,Texas,IND,ACT,exact_name_position,1.0
+00-0039893,B.Thomas,Brian Thomas,WR,WR,271a233e-68b3-4261-a3aa-7667eaf9d3cc,Brian Thomas Jr.,,Brian,Thomas,WR,7.0,74,209.0,2002-10-08,2,LSU,JAC,ACT,fuzzy_name_position,1.0
+00-0039894,X.Worthy,Xavier Worthy,WR,WR,52e049b1-0a7a-4e7f-9866-d2848e9cc478,Xavier Worthy,,Xavier,Worthy,WR,1.0,71,165.0,2003-04-27,2,Texas,KC,ACT,exact_name_position,1.0
+00-0039901,K.Coleman,Keon Coleman,WR,WR,6752915f-efe5-473d-a520-78cadfab6dda,Keon Coleman,,Keon,Coleman,WR,0.0,76,215.0,2003-05-17,2,Florida State,BUF,ACT,exact_name_position,1.0
+00-0039907,J.Polk,Ja'Lynn Polk,WR,WR,446ecdc5-470d-4cb6-9a77-b54c108e3d3a,Ja'Lynn Polk,,Ja'Lynn,Polk,WR,1.0,73,203.0,2002-04-11,2,Washington,NE,ACT,exact_name_position,1.0
+00-0039910,J.Daniels,Jayden Daniels,QB,QB,bab8c65a-9fff-410d-8e34-dc2f636d890e,Jayden Daniels,,Jayden,Daniels,QB,5.0,76,210.0,2000-12-18,2,LSU,WAS,ACT,exact_name_position,1.0
+00-0039912,B.Sinnott,Ben Sinnott,TE,TE,b5c717af-9116-483c-9ab3-c9db0a988ab8,Ben Sinnott,,Ben,Sinnott,TE,82.0,76,247.0,2002-06-14,2,Kansas State,WAS,ACT,exact_name_position,1.0
+00-0039915,L.McConkey,Ladd McConkey,WR,WR,473bc7e5-c393-4f21-9e49-3ffc16711238,Ladd McConkey,,Ladd,McConkey,WR,15.0,72,185.0,2001-11-11,2,Georgia,LAC,ACT,exact_name_position,1.0
+00-0039916,R.Pearsall,Ricky Pearsall,WR,WR,aca4c1b8-915f-4295-92e4-05b51feee6b1,Ricky Pearsall,,Ricky,Pearsall,WR,1.0,73,189.0,2000-09-09,2,Florida,SF,ACT,exact_name_position,1.0
+00-0039917,M.Penix,Michael Penix,QB,QB,6499a161-b221-4591-b122-d99ece1be64b,Michael Penix Jr.,,Michael,Penix,QB,9.0,75,220.0,2000-05-08,2,Washington,ATL,ACT,fuzzy_name_position,1.0
+00-0039918,C.Williams,Caleb Williams,QB,QB,49d4b627-3f19-49a8-ae33-f539e0fb1f88,Caleb Williams,,Caleb,Williams,QB,18.0,73,226.0,2001-11-18,2,USC,CHI,ACT,exact_name_position,1.0
+00-0039919,R.Odunze,Rome Odunze,WR,WR,f64694e0-0381-11ef-973d-5176a0ecbee4,Rome Odunze,,Rome,Odunze,WR,15.0,75,214.0,2002-06-03,2,Washington,CHI,ACT,exact_name_position,1.0
+00-0039920,M.Corley,Malachi Corley,WR,WR,bae59933-8b94-4837-990e-f0a4ced3cdbb,Malachi Corley,,Malachi,Corley,WR,6.0,71,215.0,2002-03-21,2,Western Kentucky,NYJ,ACT,exact_name_position,1.0
+00-0039921,T.Benson,Trey Benson,RB,RB,0c1253f2-1822-445d-8590-fea6fd32703f,Trey Benson,,Trey,Benson,RB,33.0,72,220.0,2002-07-23,2,Florida State,ARI,ACT,exact_name_position,1.0

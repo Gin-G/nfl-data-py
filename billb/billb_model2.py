@@ -29,10 +29,10 @@ logging.info("Loading data from CSV...")
 df = pd.read_csv('data/nfl_dataset.csv')
 logging.info(f"Data loaded. Shape: {df.shape}")
 logging.debug(f"Columns: {df.columns.tolist()}")
-
-seasons = list(range(2018, 2025))
-latest_rosters = import_weekly_rosters([2024])
-schedule_2024 = import_schedules([2024])
+year = 2025
+seasons = list(range(2018, 2026))
+latest_rosters = import_weekly_rosters([year])
+schedule = import_schedules([year])
 
 # Create target variables
 target_cols = [
@@ -184,7 +184,7 @@ plt.savefig('predictions/learning_curves/learning_curves.png')
 plt.close()
 
 # Update prediction function with error handling and logging
-def predict_2024_week(player_name, week):
+def predict_week(player_name, week):
     try:
         player_matches = latest_rosters[latest_rosters['player_name'].str.contains(player_name, case=False, na=False)]
         
@@ -195,12 +195,12 @@ def predict_2024_week(player_name, week):
         player_info = player_matches.iloc[0]
         
         # Get the player's stats from the previous week
-        player_stats = df[(df['player_id'] == player_info['player_id']) & (df['season'] == 2024) & (df['week'] == week - 1)]
+        player_stats = df[(df['player_id'] == player_info['player_id']) & (df['season'] == 2024) & (df['week'] == 16)]
         
         if player_stats.empty:
             logging.info(f"No stats for previous week. Using last available stats from 2023 for {player_name}")
             # If no stats for the previous week, use the last available stats from 2023
-            player_stats = df[(df['player_id'] == player_info['player_id']) & (df['season'] == max(seasons))]
+            player_stats = df[(df['player_id'] == player_info['player_id']) & (df['season'] == max(seasons)-1)]
             if player_stats.empty:
                 logging.warning(f"No historical stats found for player: {player_name}")
                 return None
@@ -238,7 +238,7 @@ def get_all_predictions(position, week):
     active_players = latest_rosters[(latest_rosters['position'] == position) & (latest_rosters['status'] == 'ACT')]
 
     for _, player in tqdm(active_players.iterrows(), total=len(active_players), desc=f"Predicting {position}"):
-        pred = predict_2024_week(player['player_name'], week)
+        pred = predict_week(player['player_name'], week)
         if pred:
             pred['player_name'] = player['player_name']
             predictions.append(pred)
@@ -257,17 +257,15 @@ def get_all_predictions(position, week):
     os.makedirs('predictions', exist_ok=True)
 
     # Save to CSV
-    csv_filename = f'predictions/{position}_predictions_week{week}_season2024.csv'
+    csv_filename = f'predictions/{position}_predictions_week{week}_season{year}.csv'
     predictions_df.to_csv(csv_filename, index=False)
     logging.info(f"Predictions saved to {csv_filename}")
 
     return predictions_df
 
-#print(predict_2024_week('Marvin Harrison',3))
-
 # Main execution
 positions = ['QB', 'RB', 'WR', 'TE']
-week_to_predict = 13  # Set this to the week you want to predict
+week_to_predict = 1  # Set this to the week you want to predict
 
 start_time = time.time()
 
