@@ -217,14 +217,14 @@ def predict_player_week(player_name, season, week):
         else:
             last_stats = player_stats.iloc[0]
         
-        # Prepare input data with new features
-        input_data = pd.DataFrame({col: [last_stats[col]] for col in numerical_features})
+        # Prepare input data with averaged features
+        input_data = pd.DataFrame({col: [avg_stats[col]] for col in numerical_features})
         input_data['position_x'] = [player_info['position']]
         input_data['recent_team'] = [player_info['team']]
         
-        # Add depth_tier from the last_stats (required for preprocessing)
-        if 'depth_tier' in last_stats.index:
-            input_data['depth_tier'] = [last_stats['depth_tier']]
+        # Add depth_tier from recent data if available
+        if len(player_stats_list) > 0 and 'depth_tier' in player_stats_list[0].index:
+            input_data['depth_tier'] = [player_stats_list[0]['depth_tier']]
         else:
             # Default to 'deep_bench' if no depth chart data available
             input_data['depth_tier'] = ['deep_bench']
