@@ -1,0 +1,113 @@
+id,sportradar_player_id,player_name,name,position,price,salary,projected_points,avg_fppg,team,recent_team,opponent_team,opponent_display,home_away,game_time,gameday,stadium,game_id,headshot_url,jersey_number,roster_status,rank,prediction_rank,confidence
+lamar_jackson_ATL_2025,,Lamar Jackson,Lamar Jackson,QB,14300,14300,28.6,28.6,ATL,ATL,TB,vs TB,home,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Stadium,2025_01_TB_ATL,,,ACT,1,1,0
+patrick_mahomes_KC_2025,,Patrick Mahomes,Patrick Mahomes,QB,13800,13800,27.6,27.6,KC,KC,LAC,@ LAC,away,Fri 09/05 20:00,2025-09-05,SoFi Stadium,2025_01_KC_LAC,,,ACT,2,2,0
+joe_burrow_CIN_2025,,Joe Burrow,Joe Burrow,QB,13400,13400,26.9,26.9,CIN,CIN,CLE,@ CLE,away,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,3,3,0
+josh_allen_BUF_2025,,Josh Allen,Josh Allen,QB,12800,12800,25.6,25.6,BUF,BUF,BAL,vs BAL,home,Sun 09/07 20:20,2025-09-07,New Era Field,2025_01_BAL_BUF,,,ACT,4,4,0
+jalen_hurts_PHI_2025,,Jalen Hurts,Jalen Hurts,QB,11100,11100,22.2,22.2,PHI,PHI,DAL,vs DAL,home,Thu 09/04 20:20,2025-09-04,Lincoln Financial Field,2025_01_DAL_PHI,,,ACT,5,5,0
+tyler_shough_NO_2025,,Tyler Shough,Tyler Shough,QB,11000,11000,22.0,22.0,NO,NO,ARI,vs ARI,home,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Superdome,2025_01_ARI_NO,,,ACT,6,6,0
+tua_tagovailoa_MIA_2025,,Tua Tagovailoa,Tua Tagovailoa,QB,10500,10500,21.0,21.0,MIA,MIA,IND,@ IND,away,Sun 09/07 13:00,2025-09-07,Lucas Oil Stadium,2025_01_MIA_IND,,,ACT,7,7,0
+dak_prescott_DAL_2025,,Dak Prescott,Dak Prescott,QB,10200,10200,20.4,20.4,DAL,DAL,PHI,@ PHI,away,Thu 09/04 20:20,2025-09-04,Lincoln Financial Field,2025_01_DAL_PHI,,,ACT,8,8,0
+c.j._stroud_HOU_2025,,C.J. Stroud,C.J. Stroud,QB,10100,10100,20.2,20.2,HOU,HOU,LA,@ LA,away,Sun 09/07 16:25,2025-09-07,SoFi Stadium,2025_01_HOU_LA,,,ACT,9,9,0
+jayden_daniels_WAS_2025,,Jayden Daniels,Jayden Daniels,QB,9300,9300,18.6,18.6,WAS,WAS,NYG,vs NYG,home,Sun 09/07 13:00,2025-09-07,FedExField,2025_01_NYG_WAS,,,ACT,10,10,0
+jared_goff_DET_2025,,Jared Goff,Jared Goff,QB,8900,8900,17.8,17.8,DET,DET,GB,@ GB,away,Sun 09/07 16:25,2025-09-07,Lambeau Field,2025_01_DET_GB,,,ACT,11,11,0
+baker_mayfield_TB_2025,,Baker Mayfield,Baker Mayfield,QB,8800,8800,17.5,17.5,TB,TB,ATL,@ ATL,away,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Stadium,2025_01_TB_ATL,,,ACT,12,12,0
+bryce_young_CAR_2025,,Bryce Young,Bryce Young,QB,8600,8600,17.2,17.2,CAR,CAR,JAX,@ JAX,away,Sun 09/07 13:00,2025-09-07,TIAA Bank Stadium,2025_01_CAR_JAX,,,ACT,13,13,0
+joe_flacco_CLE_2025,,Joe Flacco,Joe Flacco,QB,8300,8300,16.6,16.6,CLE,CLE,CIN,vs CIN,home,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,14,14,0
+russell_wilson_NYG_2025,,Russell Wilson,Russell Wilson,QB,8200,8200,16.4,16.4,NYG,NYG,WAS,@ WAS,away,Sun 09/07 13:00,2025-09-07,FedExField,2025_01_NYG_WAS,,,ACT,15,15,0
+matthew_stafford_LA_2025,,Matthew Stafford,Matthew Stafford,QB,8100,8100,16.2,16.2,LA,LA,HOU,vs HOU,home,Sun 09/07 16:25,2025-09-07,SoFi Stadium,2025_01_HOU_LA,,,ACT,16,16,0
+geno_smith_LV_2025,,Geno Smith,Geno Smith,QB,8100,8100,16.2,16.2,LV,LV,NE,@ NE,away,Sun 09/07 13:00,2025-09-07,Gillette Stadium,2025_01_LV_NE,,,ACT,17,17,0
+kyler_murray_ARI_2025,,Kyler Murray,Kyler Murray,QB,7900,7900,15.9,15.9,ARI,ARI,NO,@ NO,away,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Superdome,2025_01_ARI_NO,,,ACT,18,18,0
+bo_nix_DEN_2025,,Bo Nix,Bo Nix,QB,7900,7900,15.8,15.8,DEN,DEN,TEN,vs TEN,home,Sun 09/07 16:05,2025-09-07,Empower Field at Mile High,2025_01_TEN_DEN,,,ACT,19,19,0
+brock_purdy_SF_2025,,Brock Purdy,Brock Purdy,QB,7400,7400,14.8,14.8,SF,SF,SEA,@ SEA,away,Sun 09/07 16:05,2025-09-07,Lumen Field,2025_01_SF_SEA,,,ACT,20,20,0
+jordan_love_GB_2025,,Jordan Love,Jordan Love,QB,7400,7400,14.8,14.8,GB,GB,DET,vs DET,home,Sun 09/07 16:25,2025-09-07,Lambeau Field,2025_01_DET_GB,,,ACT,21,21,0
+sam_darnold_SEA_2025,,Sam Darnold,Sam Darnold,QB,7200,7200,14.4,14.4,SEA,SEA,SF,vs SF,home,Sun 09/07 16:05,2025-09-07,Lumen Field,2025_01_SF_SEA,,,ACT,22,22,0
+aaron_rodgers_PIT_2025,,Aaron Rodgers,Aaron Rodgers,QB,7200,7200,14.4,14.4,PIT,PIT,NYJ,@ NYJ,away,Sun 09/07 13:00,2025-09-07,MetLife Stadium,2025_01_PIT_NYJ,,,ACT,23,23,0
+trevor_lawrence_JAX_2025,,Trevor Lawrence,Trevor Lawrence,QB,7200,7200,14.3,14.3,JAX,JAX,CAR,vs CAR,home,Sun 09/07 13:00,2025-09-07,TIAA Bank Stadium,2025_01_CAR_JAX,,,ACT,24,24,0
+justin_herbert_LAC_2025,,Justin Herbert,Justin Herbert,QB,7100,7100,14.2,14.2,LAC,LAC,KC,vs KC,home,Fri 09/05 20:00,2025-09-05,SoFi Stadium,2025_01_KC_LAC,,,ACT,25,25,0
+caleb_williams_CHI_2025,,Caleb Williams,Caleb Williams,QB,6900,6900,13.9,13.9,CHI,CHI,MIN,vs MIN,home,Mon 09/08 20:15,2025-09-08,Soldier Field,2025_01_MIN_CHI,,,ACT,26,26,0
+drake_maye_NE_2025,,Drake Maye,Drake Maye,QB,6700,6700,13.4,13.4,NE,NE,LV,vs LV,home,Sun 09/07 13:00,2025-09-07,Gillette Stadium,2025_01_LV_NE,,,ACT,27,27,0
+justin_fields_NYJ_2025,,Justin Fields,Justin Fields,QB,4800,4800,9.6,9.6,NYJ,NYJ,PIT,vs PIT,home,Sun 09/07 13:00,2025-09-07,MetLife Stadium,2025_01_PIT_NYJ,,,ACT,28,28,0
+j.j._mccarthy_MIN_2025,,J.J. McCarthy,J.J. McCarthy,QB,4400,4400,8.8,8.8,MIN,MIN,CHI,@ CHI,away,Mon 09/08 20:15,2025-09-08,Soldier Field,2025_01_MIN_CHI,,,ACT,29,29,0
+cameron_ward_TEN_2025,,Cameron Ward,Cameron Ward,QB,4400,4400,8.8,8.8,TEN,TEN,DEN,@ DEN,away,Sun 09/07 16:05,2025-09-07,Empower Field at Mile High,2025_01_TEN_DEN,,,ACT,30,30,0
+daniel_jones_IND_2025,,Daniel Jones,Daniel Jones,QB,4000,4000,2.1,2.1,IND,IND,MIA,vs MIA,home,Sun 09/07 13:00,2025-09-07,Lucas Oil Stadium,2025_01_MIA_IND,,,ACT,31,31,0
+mac_jones_SF_2025,,Mac Jones,Mac Jones,QB,4000,4000,2.0,2.0,SF,SF,SEA,@ SEA,away,Sun 09/07 16:05,2025-09-07,Lumen Field,2025_01_SF_SEA,,,ACT,32,32,0
+tyler_huntley_CLE_2025,,Tyler Huntley,Tyler Huntley,QB,4000,4000,2.0,2.0,CLE,CLE,CIN,vs CIN,home,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,33,33,0
+easton_stick_ATL_2025,,Easton Stick,Easton Stick,QB,4000,4000,1.9,1.9,ATL,ATL,TB,vs TB,home,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Stadium,2025_01_TB_ATL,,,ACT,34,34,0
+aidan_o'connell_LV_2025,,Aidan O'Connell,Aidan O'Connell,QB,4000,4000,1.9,1.9,LV,LV,NE,@ NE,away,Sun 09/07 13:00,2025-09-07,Gillette Stadium,2025_01_LV_NE,,,ACT,35,35,0
+gardner_minshew_KC_2025,,Gardner Minshew,Gardner Minshew,QB,4000,4000,1.9,1.9,KC,KC,LAC,@ LAC,away,Fri 09/05 20:00,2025-09-05,SoFi Stadium,2025_01_KC_LAC,,,ACT,36,36,0
+sam_howell_MIN_2025,,Sam Howell,Sam Howell,QB,4000,4000,1.9,1.9,MIN,MIN,CHI,@ CHI,away,Mon 09/08 20:15,2025-09-08,Soldier Field,2025_01_MIN_CHI,,,ACT,37,37,0
+cooper_rush_BAL_2025,,Cooper Rush,Cooper Rush,QB,4000,4000,1.9,1.9,BAL,BAL,BUF,@ BUF,away,Sun 09/07 20:20,2025-09-07,New Era Field,2025_01_BAL_BUF,,,ACT,38,38,0
+kirk_cousins_ATL_2025,,Kirk Cousins,Kirk Cousins,QB,4000,4000,1.8,1.8,ATL,ATL,TB,vs TB,home,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Stadium,2025_01_TB_ATL,,,ACT,39,39,0
+andy_dalton_CAR_2025,,Andy Dalton,Andy Dalton,QB,4000,4000,1.8,1.8,CAR,CAR,JAX,@ JAX,away,Sun 09/07 13:00,2025-09-07,TIAA Bank Stadium,2025_01_CAR_JAX,,,ACT,40,40,0
+jameis_winston_NYG_2025,,Jameis Winston,Jameis Winston,QB,4000,4000,1.8,1.8,NYG,NYG,WAS,@ WAS,away,Sun 09/07 13:00,2025-09-07,FedExField,2025_01_NYG_WAS,,,ACT,41,41,0
+bailey_zappe_KC_2025,,Bailey Zappe,Bailey Zappe,QB,4000,4000,1.8,1.8,KC,KC,LAC,@ LAC,away,Fri 09/05 20:00,2025-09-05,SoFi Stadium,2025_01_KC_LAC,,,ACT,42,42,0
+trevor_siemian_TEN_2025,,Trevor Siemian,Trevor Siemian,QB,4000,4000,1.7,1.7,TEN,TEN,DEN,@ DEN,away,Sun 09/07 16:05,2025-09-07,Empower Field at Mile High,2025_01_TEN_DEN,,,ACT,43,43,0
+drew_lock_SEA_2025,,Drew Lock,Drew Lock,QB,4000,4000,1.7,1.7,SEA,SEA,SF,vs SF,home,Sun 09/07 16:05,2025-09-07,Lumen Field,2025_01_SF_SEA,,,ACT,44,44,0
+tommy_devito_NYG_2025,,Tommy DeVito,Tommy DeVito,QB,4000,4000,1.7,1.7,NYG,NYG,WAS,@ WAS,away,Sun 09/07 13:00,2025-09-07,FedExField,2025_01_NYG_WAS,,,ACT,45,45,0
+mason_rudolph_PIT_2025,,Mason Rudolph,Mason Rudolph,QB,4000,4000,1.7,1.7,PIT,PIT,NYJ,@ NYJ,away,Sun 09/07 13:00,2025-09-07,MetLife Stadium,2025_01_PIT_NYJ,,,ACT,46,46,0
+spencer_rattler_NO_2025,,Spencer Rattler,Spencer Rattler,QB,4000,4000,1.7,1.7,NO,NO,ARI,vs ARI,home,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Superdome,2025_01_ARI_NO,,,ACT,47,47,0
+desmond_ridder_CIN_2025,,Desmond Ridder,Desmond Ridder,QB,4000,4000,1.7,1.7,CIN,CIN,CLE,@ CLE,away,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,48,48,0
+jacoby_brissett_ARI_2025,,Jacoby Brissett,Jacoby Brissett,QB,4000,4000,1.6,1.6,ARI,ARI,NO,@ NO,away,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Superdome,2025_01_ARI_NO,,,ACT,49,49,0
+dorian_thompson-robinson_PHI_2025,,Dorian Thompson-Robinson,Dorian Thompson-Robinson,QB,4000,4000,1.6,1.6,PHI,PHI,DAL,vs DAL,home,Thu 09/04 20:20,2025-09-04,Lincoln Financial Field,2025_01_DAL_PHI,,,ACT,50,50,0
+kenny_pickett_CLE_2025,,Kenny Pickett,Kenny Pickett,QB,4000,4000,1.6,1.6,CLE,CLE,CIN,vs CIN,home,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,51,51,0
+case_keenum_CHI_2025,,Case Keenum,Case Keenum,QB,4000,4000,1.6,1.6,CHI,CHI,MIN,vs MIN,home,Mon 09/08 20:15,2025-09-08,Soldier Field,2025_01_MIN_CHI,,,ACT,52,52,0
+jimmy_garoppolo_LA_2025,,Jimmy Garoppolo,Jimmy Garoppolo,QB,4000,4000,1.5,1.5,LA,LA,HOU,vs HOU,home,Sun 09/07 16:25,2025-09-07,SoFi Stadium,2025_01_HOU_LA,,,ACT,53,53,0
+zach_wilson_MIA_2025,,Zach Wilson,Zach Wilson,QB,4000,4000,1.5,1.5,MIA,MIA,IND,@ IND,away,Sun 09/07 13:00,2025-09-07,Lucas Oil Stadium,2025_01_MIA_IND,,,ACT,54,54,0
+joshua_dobbs_NE_2025,,Joshua Dobbs,Joshua Dobbs,QB,4000,4000,1.5,1.5,NE,NE,LV,vs LV,home,Sun 09/07 13:00,2025-09-07,Gillette Stadium,2025_01_LV_NE,,,ACT,55,55,0
+skylar_thompson_PIT_2025,,Skylar Thompson,Skylar Thompson,QB,4000,4000,1.4,1.4,PIT,PIT,NYJ,@ NYJ,away,Sun 09/07 13:00,2025-09-07,MetLife Stadium,2025_01_PIT_NYJ,,,ACT,56,56,0
+tyrod_taylor_NYJ_2025,,Tyrod Taylor,Tyrod Taylor,QB,4000,4000,1.2,1.2,NYJ,NYJ,PIT,vs PIT,home,Sun 09/07 13:00,2025-09-07,MetLife Stadium,2025_01_PIT_NYJ,,,ACT,57,57,0
+brett_rypien_MIN_2025,,Brett Rypien,Brett Rypien,QB,4000,4000,1.2,1.2,MIN,MIN,CHI,@ CHI,away,Mon 09/08 20:15,2025-09-08,Soldier Field,2025_01_MIN_CHI,,,ACT,58,58,0
+chris_oladokun_KC_2025,,Chris Oladokun,Chris Oladokun,QB,4000,4000,1.0,1.0,KC,KC,LAC,@ LAC,away,Fri 09/05 20:00,2025-09-05,SoFi Stadium,2025_01_KC_LAC,,,ACT,59,59,0
+austin_reed_CHI_2025,,Austin Reed,Austin Reed,QB,4000,4000,1.0,1.0,CHI,CHI,MIN,vs MIN,home,Mon 09/08 20:15,2025-09-08,Soldier Field,2025_01_MIN_CHI,,,ACT,60,60,0
+dillon_gabriel_CLE_2025,,Dillon Gabriel,Dillon Gabriel,QB,4000,4000,1.0,1.0,CLE,CLE,CIN,vs CIN,home,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,61,61,0
+kedon_slovis_HOU_2025,,Kedon Slovis,Kedon Slovis,QB,4000,4000,1.0,1.0,HOU,HOU,LA,@ LA,away,Sun 09/07 16:25,2025-09-07,SoFi Stadium,2025_01_HOU_LA,,,ACT,62,62,0
+sam_hartman_WAS_2025,,Sam Hartman,Sam Hartman,QB,4000,4000,1.0,1.0,WAS,WAS,NYG,vs NYG,home,Sun 09/07 13:00,2025-09-07,FedExField,2025_01_NYG_WAS,,,ACT,63,63,0
+carter_bradley_SF_2025,,Carter Bradley,Carter Bradley,QB,4000,4000,1.0,1.0,SF,SF,SEA,@ SEA,away,Sun 09/07 16:05,2025-09-07,Lumen Field,2025_01_SF_SEA,,,ACT,64,64,0
+adrian_martinez_NYJ_2025,,Adrian Martinez,Adrian Martinez,QB,4000,4000,1.0,1.0,NYJ,NYJ,PIT,vs PIT,home,Sun 09/07 13:00,2025-09-07,MetLife Stadium,2025_01_PIT_NYJ,,,ACT,65,65,0
+jason_bean_IND_2025,,Jason Bean,Jason Bean,QB,4000,4000,1.0,1.0,IND,IND,MIA,vs MIA,home,Sun 09/07 13:00,2025-09-07,Lucas Oil Stadium,2025_01_MIA_IND,,,ACT,66,66,0
+jack_plummer_CAR_2025,,Jack Plummer,Jack Plummer,QB,4000,4000,1.0,1.0,CAR,CAR,JAX,@ JAX,away,Sun 09/07 13:00,2025-09-07,TIAA Bank Stadium,2025_01_CAR_JAX,,,ACT,67,67,0
+dresser_winn_LA_2025,,Dresser Winn,Dresser Winn,QB,4000,4000,1.0,1.0,LA,LA,HOU,vs HOU,home,Sun 09/07 16:25,2025-09-07,SoFi Stadium,2025_01_HOU_LA,,,ACT,68,68,0
+jalen_milroe_SEA_2025,,Jalen Milroe,Jalen Milroe,QB,4000,4000,1.0,1.0,SEA,SEA,SF,vs SF,home,Sun 09/07 16:05,2025-09-07,Lumen Field,2025_01_SF_SEA,,,ACT,69,69,0
+sean_clifford_GB_2025,,Sean Clifford,Sean Clifford,QB,4000,4000,1.0,1.0,GB,GB,DET,vs DET,home,Sun 09/07 16:25,2025-09-07,Lambeau Field,2025_01_DET_GB,,,ACT,70,70,0
+joe_milton_iii_DAL_2025,,Joe Milton III,Joe Milton III,QB,4000,4000,1.0,1.0,DAL,DAL,PHI,@ PHI,away,Thu 09/04 20:20,2025-09-04,Lincoln Financial Field,2025_01_DAL_PHI,,,ACT,71,71,0
+tanner_mckee_PHI_2025,,Tanner McKee,Tanner McKee,QB,4000,4000,1.0,1.0,PHI,PHI,DAL,vs DAL,home,Thu 09/04 20:20,2025-09-04,Lincoln Financial Field,2025_01_DAL_PHI,,,ACT,72,72,0
+emory_jones_ATL_2025,,Emory Jones,Emory Jones,QB,4000,4000,1.0,1.0,ATL,ATL,TB,vs TB,home,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Stadium,2025_01_TB_ATL,,,ACT,73,73,0
+will_grier_DAL_2025,,Will Grier,Will Grier,QB,4000,4000,1.0,1.0,DAL,DAL,PHI,@ PHI,away,Thu 09/04 20:20,2025-09-04,Lincoln Financial Field,2025_01_DAL_PHI,,,ACT,74,74,0
+stetson_bennett_LA_2025,,Stetson Bennett,Stetson Bennett,QB,4000,4000,1.0,1.0,LA,LA,HOU,vs HOU,home,Sun 09/07 16:25,2025-09-07,SoFi Stadium,2025_01_HOU_LA,,,ACT,75,75,0
+jake_haener_NO_2025,,Jake Haener,Jake Haener,QB,4000,4000,1.0,1.0,NO,NO,ARI,vs ARI,home,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Superdome,2025_01_ARI_NO,,,ACT,76,76,0
+jaxson_dart_NYG_2025,,Jaxson Dart,Jaxson Dart,QB,4000,4000,1.0,1.0,NYG,NYG,WAS,@ WAS,away,Sun 09/07 13:00,2025-09-07,FedExField,2025_01_NYG_WAS,,,ACT,77,77,0
+shane_buechele_BUF_2025,,Shane Buechele,Shane Buechele,QB,4000,4000,1.0,1.0,BUF,BUF,BAL,vs BAL,home,Sun 09/07 20:20,2025-09-07,New Era Field,2025_01_BAL_BUF,,,ACT,78,78,0
+shedeur_sanders_CLE_2025,,Shedeur Sanders,Shedeur Sanders,QB,4000,4000,1.0,1.0,CLE,CLE,CIN,vs CIN,home,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,79,79,0
+quinn_ewers_MIA_2025,,Quinn Ewers,Quinn Ewers,QB,4000,4000,1.0,1.0,MIA,MIA,IND,@ IND,away,Sun 09/07 13:00,2025-09-07,Lucas Oil Stadium,2025_01_MIA_IND,,,ACT,80,80,0
+hunter_dekkers__2025,,Hunter Dekkers,Hunter Dekkers,QB,4000,4000,1.0,1.0,,,,TBD,,TBD,,,,,,ACT,81,81,0
+mitchell_trubisky_BUF_2025,,Mitchell Trubisky,Mitchell Trubisky,QB,4000,4000,1.0,1.0,BUF,BUF,BAL,vs BAL,home,Sun 09/07 20:20,2025-09-07,New Era Field,2025_01_BAL_BUF,,,ACT,82,82,0
+kyle_mccord_PHI_2025,,Kyle McCord,Kyle McCord,QB,4000,4000,1.0,1.0,PHI,PHI,DAL,vs DAL,home,Thu 09/04 20:20,2025-09-04,Lincoln Financial Field,2025_01_DAL_PHI,,,ACT,83,83,0
+will_howard_PIT_2025,,Will Howard,Will Howard,QB,4000,4000,1.0,1.0,PIT,PIT,NYJ,@ NYJ,away,Sun 09/07 13:00,2025-09-07,MetLife Stadium,2025_01_PIT_NYJ,,,ACT,84,84,0
+riley_leonard_IND_2025,,Riley Leonard,Riley Leonard,QB,4000,4000,1.0,1.0,IND,IND,MIA,vs MIA,home,Sun 09/07 13:00,2025-09-07,Lucas Oil Stadium,2025_01_MIA_IND,,,ACT,85,85,0
+graham_mertz_HOU_2025,,Graham Mertz,Graham Mertz,QB,4000,4000,1.0,1.0,HOU,HOU,LA,@ LA,away,Sun 09/07 16:25,2025-09-07,SoFi Stadium,2025_01_HOU_LA,,,ACT,86,86,0
+cam_miller_LV_2025,,Cam Miller,Cam Miller,QB,4000,4000,1.0,1.0,LV,LV,NE,@ NE,away,Sun 09/07 13:00,2025-09-07,Gillette Stadium,2025_01_LV_NE,,,ACT,87,87,0
+devin_leary_BAL_2025,,Devin Leary,Devin Leary,QB,4000,4000,1.0,1.0,BAL,BAL,BUF,@ BUF,away,Sun 09/07 20:20,2025-09-07,New Era Field,2025_01_BAL_BUF,,,ACT,88,88,0
+seth_henigan_JAX_2025,,Seth Henigan,Seth Henigan,QB,4000,4000,1.0,1.0,JAX,JAX,CAR,vs CAR,home,Sun 09/07 13:00,2025-09-07,TIAA Bank Stadium,2025_01_CAR_JAX,,,ACT,89,89,0
+brady_cook_NYJ_2025,,Brady Cook,Brady Cook,QB,4000,4000,1.0,1.0,NYJ,NYJ,PIT,vs PIT,home,Sun 09/07 13:00,2025-09-07,MetLife Stadium,2025_01_PIT_NYJ,,,ACT,90,90,0
+connor_bazelak_TB_2025,,Connor Bazelak,Connor Bazelak,QB,4000,4000,1.0,1.0,TB,TB,ATL,@ ATL,away,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Stadium,2025_01_TB_ATL,,,ACT,91,91,0
+dj_uiagalelei_LAC_2025,,DJ Uiagalelei,DJ Uiagalelei,QB,4000,4000,1.0,1.0,LAC,LAC,KC,vs KC,home,Fri 09/05 20:00,2025-09-05,SoFi Stadium,2025_01_KC_LAC,,,ACT,92,92,0
+max_brosmer_MIN_2025,,Max Brosmer,Max Brosmer,QB,4000,4000,1.0,1.0,MIN,MIN,CHI,@ CHI,away,Mon 09/08 20:15,2025-09-08,Soldier Field,2025_01_MIN_CHI,,,ACT,93,93,0
+ben_wooldridge_NE_2025,,Ben Wooldridge,Ben Wooldridge,QB,4000,4000,1.0,1.0,NE,NE,LV,vs LV,home,Sun 09/07 13:00,2025-09-07,Gillette Stadium,2025_01_LV_NE,,,ACT,94,94,0
+taylor_elgersma_GB_2025,,Taylor Elgersma,Taylor Elgersma,QB,4000,4000,1.0,1.0,GB,GB,DET,vs DET,home,Sun 09/07 16:25,2025-09-07,Lambeau Field,2025_01_DET_GB,,,ACT,95,95,0
+payton_thorne_CIN_2025,,Payton Thorne,Payton Thorne,QB,4000,4000,1.0,1.0,CIN,CIN,CLE,@ CLE,away,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,96,96,0
+jarrett_stidham_DEN_2025,,Jarrett Stidham,Jarrett Stidham,QB,4000,4000,0.6,0.6,DEN,DEN,TEN,vs TEN,home,Sun 09/07 16:05,2025-09-07,Empower Field at Mile High,2025_01_TEN_DEN,,,ACT,97,97,0
+josh_johnson_WAS_2025,,Josh Johnson,Josh Johnson,QB,4000,4000,0.6,0.6,WAS,WAS,NYG,vs NYG,home,Sun 09/07 13:00,2025-09-07,FedExField,2025_01_NYG_WAS,,,ACT,98,98,0
+jake_browning_CIN_2025,,Jake Browning,Jake Browning,QB,4000,4000,0.5,0.5,CIN,CIN,CLE,@ CLE,away,Sun 09/07 13:00,2025-09-07,FirstEnergy Stadium,2025_01_CIN_CLE,,,ACT,99,99,0
+hendon_hooker_DET_2025,,Hendon Hooker,Hendon Hooker,QB,4000,4000,0.5,0.5,DET,DET,GB,@ GB,away,Sun 09/07 16:25,2025-09-07,Lambeau Field,2025_01_DET_GB,,,ACT,100,100,0
+marcus_mariota_WAS_2025,,Marcus Mariota,Marcus Mariota,QB,4000,4000,0.5,0.5,WAS,WAS,NYG,vs NYG,home,Sun 09/07 13:00,2025-09-07,FedExField,2025_01_NYG_WAS,,,ACT,101,101,0
+tyson_bagent_CHI_2025,,Tyson Bagent,Tyson Bagent,QB,4000,4000,0.4,0.4,CHI,CHI,MIN,vs MIN,home,Mon 09/08 20:15,2025-09-08,Soldier Field,2025_01_MIN_CHI,,,ACT,102,102,0
+malik_willis_GB_2025,,Malik Willis,Malik Willis,QB,4000,4000,0.4,0.4,GB,GB,DET,vs DET,home,Sun 09/07 16:25,2025-09-07,Lambeau Field,2025_01_DET_GB,,,ACT,103,103,0
+brandon_allen_TEN_2025,,Brandon Allen,Brandon Allen,QB,4000,4000,0.3,0.3,TEN,TEN,DEN,@ DEN,away,Sun 09/07 16:05,2025-09-07,Empower Field at Mile High,2025_01_TEN_DEN,,,ACT,104,104,0
+clayton_tune_ARI_2025,,Clayton Tune,Clayton Tune,QB,4000,4000,0.2,0.2,ARI,ARI,NO,@ NO,away,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Superdome,2025_01_ARI_NO,,,ACT,105,105,0
+mike_white_BUF_2025,,Mike White,Mike White,QB,4000,4000,0.2,0.2,BUF,BUF,BAL,vs BAL,home,Sun 09/07 20:20,2025-09-07,New Era Field,2025_01_BAL_BUF,,,ACT,106,106,0
+taylor_heinicke_LAC_2025,,Taylor Heinicke,Taylor Heinicke,QB,4000,4000,0.2,0.2,LAC,LAC,KC,vs KC,home,Fri 09/05 20:00,2025-09-05,SoFi Stadium,2025_01_KC_LAC,,,ACT,107,107,0
+nick_mullens_JAX_2025,,Nick Mullens,Nick Mullens,QB,4000,4000,0.2,0.2,JAX,JAX,CAR,vs CAR,home,Sun 09/07 13:00,2025-09-07,TIAA Bank Stadium,2025_01_CAR_JAX,,,ACT,108,108,0
+kyle_allen_DET_2025,,Kyle Allen,Kyle Allen,QB,4000,4000,0.2,0.2,DET,DET,GB,@ GB,away,Sun 09/07 16:25,2025-09-07,Lambeau Field,2025_01_DET_GB,,,ACT,109,109,0
+trey_lance_LAC_2025,,Trey Lance,Trey Lance,QB,4000,4000,0.1,0.1,LAC,LAC,KC,vs KC,home,Fri 09/05 20:00,2025-09-05,SoFi Stadium,2025_01_KC_LAC,,,ACT,110,110,0
+davis_mills_HOU_2025,,Davis Mills,Davis Mills,QB,4000,4000,0.1,0.1,HOU,HOU,LA,@ LA,away,Sun 09/07 16:25,2025-09-07,SoFi Stadium,2025_01_HOU_LA,,,ACT,111,111,0
+kyle_trask_TB_2025,,Kyle Trask,Kyle Trask,QB,4000,4000,0.1,0.1,TB,TB,ATL,@ ATL,away,Sun 09/07 13:00,2025-09-07,Mercedes-Benz Stadium,2025_01_TB_ATL,,,ACT,112,112,0

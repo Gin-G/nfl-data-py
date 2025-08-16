@@ -4,7 +4,7 @@ Enhanced NFL Data Processing Script
 Run with: python data.py
 
 This script processes NFL data and creates an enhanced dataset with:
-- All original player stats and snap counts
+- All original player stats and snap counts (using nfl_data_py.import_snap_counts)
 - Season averages for each player (rows with week='AVG')  
 - Rolling weekly averages (avg_fppg column)
 - FanDuel fantasy points calculations
@@ -16,119 +16,7 @@ import pandas as pd
 import numpy as np
 import os
 from collections import defaultdict
-from nfl_data_py import import_weekly_data, import_players, import_weekly_rosters, import_schedules, import_pbp_data, import_depth_charts
-
-def parse_players(player_string):
-    """Parse player string into list of player IDs"""
-    if isinstance(player_string, str):
-        return player_string.split(';')
-    elif isinstance(player_string, list):
-        return player_string
-    else:
-        return []
-
-def categorize_play(play_type):
-    """Categorize play types for snap count calculations"""
-    if play_type in {'run', 'pass', 'no_play'}:
-        return 'scrimmage'
-    elif play_type in {'kickoff', 'punt', 'field_goal', 'extra_point'}:
-        return 'special_teams'
-    else:
-        return 'other'
-
-def calculate_player_snap_counts(pbp_data):
-    """Calculate snap counts for players from play-by-play data"""
-    snap_counts = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
-    team_snap_counts = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
-    
-    # Create a copy of the DataFrame to avoid the SettingWithCopyWarning
-    pbp_data = pbp_data.copy()
-    
-    # Pre-compute play categories
-    pbp_data['play_category'] = pbp_data['play_type'].map(categorize_play)
-    
-    # Group by game_id for faster processing
-    for game_id, game_data in pbp_data.groupby('game_id'):
-        for _, play in game_data.iterrows():
-            posteam = play['posteam']
-            defteam = play['defteam']
-            play_category = play['play_category']
-            
-            if posteam is None and defteam is None:
-                if play_category == 'special_teams':
-                    posteam = defteam = 'UNKNOWN_TEAM'
-                else:
-                    continue
-            elif posteam is None:
-                posteam = defteam
-            elif defteam is None:
-                defteam = posteam
-            
-            # Count team snaps
-            if play_category == 'special_teams':
-                team_snap_counts[game_id]['special_teams'][posteam] += 1
-                team_snap_counts[game_id]['special_teams'][defteam] += 1
-            elif play_category == 'scrimmage':
-                team_snap_counts[game_id]['offense'][posteam] += 1
-                team_snap_counts[game_id]['defense'][defteam] += 1
-            
-            # Count player snaps
-            offense_players = parse_players(play['offense_players'])
-            defense_players = parse_players(play['defense_players'])
-            
-            if play_category == 'special_teams':
-                for player in set(offense_players + defense_players):
-                    if player:
-                        snap_counts[player][game_id]['special_teams'] += 1
-            elif play_category == 'scrimmage':
-                for player in offense_players:
-                    if player:
-                        snap_counts[player][game_id]['offense'] += 1
-                for player in defense_players:
-                    if player:
-                        snap_counts[player][game_id]['defense'] += 1
-    
-    # Calculate percentages and create final dataframe
-    snap_count_list = []
-    for player_id, games in snap_counts.items():
-        for game_id, counts in games.items():
-            off_snaps = counts['offense']
-            def_snaps = counts['defense']
-            st_snaps = counts['special_teams']
-            total_snaps = off_snaps + def_snaps + st_snaps
-            
-            # Find player team
-            player_team_mask = (
-                (pbp_data['game_id'] == game_id) & 
-                ((pbp_data['offense_players'].apply(lambda x: player_id in x if isinstance(x, list) else player_id in str(x))) | 
-                 (pbp_data['defense_players'].apply(lambda x: player_id in x if isinstance(x, list) else player_id in str(x))))
-            )
-            
-            if player_team_mask.any():
-                player_team = pbp_data[player_team_mask]['posteam'].iloc[0]
-            else:
-                player_team = 'UNKNOWN'
-            
-            team_off_snaps = team_snap_counts[game_id]['offense'].get(player_team, 0)
-            team_def_snaps = team_snap_counts[game_id]['defense'].get(player_team, 0)
-            team_st_snaps = team_snap_counts[game_id]['special_teams'].get(player_team, 0)
-            
-            snap_count_list.append({
-                'player_id': player_id,
-                'game_id': game_id,
-                'week': pbp_data[pbp_data['game_id'] == game_id]['week'].iloc[0],
-                'season': pbp_data[pbp_data['game_id'] == game_id]['season'].iloc[0],
-                'offensive_snaps': off_snaps,
-                'defensive_snaps': def_snaps,
-                'special_teams_snaps': st_snaps,
-                'total_snaps': total_snaps,
-                'offensive_snap_pct': (off_snaps / team_off_snaps * 100) if team_off_snaps > 0 else 0,
-                'defensive_snap_pct': (def_snaps / team_def_snaps * 100) if team_def_snaps > 0 else 0,
-                'special_teams_snap_pct': (st_snaps / team_st_snaps * 100) if team_st_snaps > 0 else 0
-            })
-    
-    result_df = pd.DataFrame(snap_count_list)
-    return result_df
+from nfl_data_py import import_weekly_data, import_players, import_weekly_rosters, import_schedules, import_snap_counts, import_depth_charts
 
 @np.vectorize
 def calculate_fanduel_fantasy_points(
@@ -165,6 +53,91 @@ def calculate_fanduel_fantasy_points(
         safe_value(extra_points) * 1
     )
     return points
+
+def process_snap_counts(snap_data):
+    """Process and clean snap count data from nfl_data_py"""
+    print("Processing snap count data...")
+    print(f"Available columns in snap data: {list(snap_data.columns)}")
+    
+    # Create a copy to avoid modifying original
+    processed_data = snap_data.copy()
+    
+    # Check what the actual player ID column is
+    player_id_col = None
+    possible_player_cols = ['player', 'player_id', 'player_display_name', 'gsis_id']
+    for col in possible_player_cols:
+        if col in processed_data.columns:
+            player_id_col = col
+            print(f"Found player ID column: {col}")
+            break
+    
+    if player_id_col is None:
+        print(f"Warning: Could not find player ID column in snap data")
+        print(f"Available columns: {list(processed_data.columns)}")
+        return processed_data
+    
+    # Rename columns to match existing schema
+    column_mapping = {
+        player_id_col: 'player_id',  # Use the actual player column found
+        'offense_snaps': 'offensive_snaps',
+        'offense_pct': 'offensive_snap_pct', 
+        'defense_snaps': 'defensive_snaps',
+        'defense_pct': 'defensive_snap_pct',
+        'st_snaps': 'special_teams_snaps',
+        'st_pct': 'special_teams_snap_pct'
+    }
+    
+    # Apply column renaming where columns exist
+    for old_col, new_col in column_mapping.items():
+        if old_col in processed_data.columns:
+            processed_data = processed_data.rename(columns={old_col: new_col})
+            print(f"Renamed {old_col} -> {new_col}")
+    
+    # Print sample of player IDs to debug
+    if 'player_id' in processed_data.columns:
+        print(f"Sample player IDs: {processed_data['player_id'].head().tolist()}")
+    
+    # Calculate total snaps
+    snap_cols = ['offensive_snaps', 'defensive_snaps', 'special_teams_snaps']
+    available_snap_cols = [col for col in snap_cols if col in processed_data.columns]
+    
+    if available_snap_cols:
+        processed_data['total_snaps'] = processed_data[available_snap_cols].fillna(0).sum(axis=1)
+        print(f"Calculated total_snaps using columns: {available_snap_cols}")
+    
+    # Convert percentages from decimals to percentages if needed
+    pct_cols = ['offensive_snap_pct', 'defensive_snap_pct', 'special_teams_snap_pct']
+    for col in pct_cols:
+        if col in processed_data.columns:
+            # Check if values are in decimal format (0-1) and convert to percentage
+            max_val = processed_data[col].max()
+            if max_val <= 1.0:
+                processed_data[col] = processed_data[col] * 100
+                print(f"Converted {col} from decimal to percentage")
+    
+    # Fill NaN values with 0 for snap counts and percentages
+    numeric_cols = (['offensive_snaps', 'defensive_snaps', 'special_teams_snaps', 'total_snaps'] + 
+                   pct_cols)
+    for col in numeric_cols:
+        if col in processed_data.columns:
+            processed_data[col] = processed_data[col].fillna(0)
+    
+    # Ensure percentages are within valid range
+    for col in pct_cols:
+        if col in processed_data.columns:
+            processed_data[col] = processed_data[col].clip(0, 100)
+    
+    print(f"Processed {len(processed_data)} snap count records")
+    print(f"Final snap data columns: {list(processed_data.columns)}")
+    
+    # Show sample of processed data
+    if len(processed_data) > 0:
+        print("Sample processed snap data:")
+        sample_cols = ['player_id', 'season', 'week', 'offensive_snaps', 'defensive_snaps', 'special_teams_snaps']
+        available_sample_cols = [col for col in sample_cols if col in processed_data.columns]
+        print(processed_data[available_sample_cols].head())
+    
+    return processed_data
 
 def add_season_averages(df):
     """Add season average rows for each player-season combination"""
@@ -289,37 +262,70 @@ def create_dataframe(seasons):
     latest_rosters = import_weekly_rosters([current_season])
     print("Importing schedules data...")
     schedule_2024 = import_schedules([current_season])
-    print("Importing play-by-play data...")
-    pbp_data = import_pbp_data(seasons)
     print("Importing depth charts...")
     depth_charts = import_depth_charts(seasons)
 
-    # 2. Calculate snap counts for all seasons
-    snap_counts_list = []
-    for season in seasons:
-        weeks = range(1, 19) if season >= 2021 else range(1, 18)
-        season_pbp = pbp_data[pbp_data['season'] == season]
-        for week in weeks:
-            print(f"Processing season {season}, week {week} PBP")
-            week_pbp = season_pbp[season_pbp['week'] == week]
-            if week_pbp.empty:
-                print(f"No data for season {season}, week {week} PBP")
-                continue
-            week_snap_counts = calculate_player_snap_counts(week_pbp)
-            if not week_snap_counts.empty:
-                snap_counts_list.append(week_snap_counts)
-            else:
-                print(f"No snap counts for season {season}, week {week} PBP")
-
-    # Combine snap counts
-    all_snap_counts = pd.concat(snap_counts_list, ignore_index=True)
+    # 2. Import snap counts using nfl_data_py (much faster and more reliable)
+    print("Importing snap counts...")
+    snap_data = import_snap_counts(seasons)
+    print(f"Loaded {len(snap_data)} snap count records")
+    
+    # Process snap count data to match our schema
+    snap_data_processed = process_snap_counts(snap_data)
 
     # 3. Merge player stats with players data
     df = pd.merge(player_stats, players[['gsis_id', 'position']], left_on='player_id', right_on='gsis_id', how='left')
     df = df.sort_values(['player_id', 'season', 'week'])
 
     # 4. Merge with snap count data
-    df = pd.merge(df, all_snap_counts, on=['player_id', 'season', 'week'], how='left')
+    print("Merging snap count data...")
+    
+    # Debug information before merge
+    print(f"Player stats data shape: {df.shape}")
+    print(f"Player stats columns: {list(df.columns)}")
+    
+    # Check if player_display_name exists
+    if 'player_display_name' in df.columns:
+        print(f"Found player_display_name in stats data")
+        print(f"Player stats player_display_name sample: {df['player_display_name'].head().tolist()}")
+        player_name_col = 'player_display_name'
+    else:
+        print(f"No player_display_name found, using player_name")
+        print(f"Player stats player_name sample: {df['player_name'].head().tolist()}")
+        player_name_col = 'player_name'
+    
+    print(f"Snap data player names sample: {snap_data_processed['player_id'].head().tolist()}")
+    
+    # Since snap data uses player names and stats data uses GSIS IDs,
+    # we need to merge on the appropriate name column
+    snap_data_for_merge = snap_data_processed.rename(columns={'player_id': player_name_col})
+    
+    # Check for common players between datasets by name
+    common_players = set(df[player_name_col].dropna()) & set(snap_data_for_merge[player_name_col].dropna())
+    print(f"Common players between datasets (by {player_name_col}): {len(common_players)}")
+    
+    if len(common_players) > 0:
+        print(f"Sample common players: {list(common_players)[:5]}")
+    else:
+        # Show some examples to help debug name format differences
+        print(f"Sample player names from stats: {df[player_name_col].dropna().head(10).tolist()}")
+        print(f"Sample player names from snaps: {snap_data_for_merge[player_name_col].dropna().head(10).tolist()}")
+    
+    # Check season/week overlap
+    if len(common_players) > 0:
+        df_keys = set(df[[player_name_col, 'season', 'week']].dropna().apply(tuple, axis=1))
+        snap_keys = set(snap_data_for_merge[[player_name_col, 'season', 'week']].dropna().apply(tuple, axis=1))
+        common_keys = df_keys & snap_keys
+        print(f"Common ({player_name_col}, season, week) combinations: {len(common_keys)}")
+    
+    # Merge on the appropriate name column, season, week
+    df = pd.merge(df, snap_data_for_merge, on=[player_name_col, 'season', 'week'], how='left')
+    
+    # Report snap count coverage
+    snap_coverage = df['offensive_snaps'].notna().sum()
+    total_records = len(df)
+    coverage_pct = (snap_coverage / total_records) * 100
+    print(f"Snap count coverage: {snap_coverage:,}/{total_records:,} ({coverage_pct:.1f}%)")
 
     # 5. Merge with depth chart data
     print("Merging depth chart data...")
@@ -330,17 +336,22 @@ def create_dataframe(seasons):
                   how='left', 
                   suffixes=('', '_depth_chart'))
 
-    # 6. Calculate total_snaps
-    df['total_snaps'] = df['offensive_snaps'] + df['defensive_snaps'] + df['special_teams_snaps']
+    # 6. Ensure total_snaps is calculated properly
+    if 'total_snaps' not in df.columns or df['total_snaps'].isna().all():
+        df['total_snaps'] = df['offensive_snaps'].fillna(0) + df['defensive_snaps'].fillna(0) + df['special_teams_snaps'].fillna(0)
     
     # 7. Fill NaN values in snap count columns with 0
     snap_columns = ['offensive_snaps', 'defensive_snaps', 'special_teams_snaps', 'total_snaps', 
                    'offensive_snap_pct', 'defensive_snap_pct', 'special_teams_snap_pct']
-    df[snap_columns] = df[snap_columns].fillna(0)
+    for col in snap_columns:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
 
     # 8. Ensure all percentage columns are between 0 and 100
     percentage_columns = ['offensive_snap_pct', 'defensive_snap_pct', 'special_teams_snap_pct']
-    df[percentage_columns] = df[percentage_columns].clip(0, 100)
+    for col in percentage_columns:
+        if col in df.columns:
+            df[col] = df[col].clip(0, 100)
 
     # 9. Calculate FanDuel fantasy points
     print("Calculating FanDuel fantasy points...")
@@ -384,6 +395,13 @@ def main():
         # Show summary of enhancements
         season_avg_rows = result[result['week'] == 'AVG']
         print(f"Season average rows added: {len(season_avg_rows)}")
+        
+        # Show snap count statistics
+        snap_cols = ['offensive_snaps', 'defensive_snaps', 'special_teams_snaps', 'total_snaps']
+        for col in snap_cols:
+            if col in result.columns:
+                non_zero = (result[col] > 0).sum()
+                print(f"{col}: {non_zero:,} non-zero records")
         
         rolling_avg_sample = result[result['avg_fppg'].notna() & (result['week'] != 'AVG')].head(3)
         if not rolling_avg_sample.empty:

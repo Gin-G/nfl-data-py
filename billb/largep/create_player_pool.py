@@ -20,21 +20,46 @@ def load_current_rosters(season):
         
         print(f"   ✅ Found {len(active_roster)} active players in current rosters")
         
+        # Debug: Check the column names
+        print(f"   🔍 Roster columns: {list(roster_df.columns)}")
+        
         # Create player-to-team mapping
         current_teams = {}
+        valid_names = 0
         
         for _, player in active_roster.iterrows():
-            player_name = str(player.get('display_name', player.get('full_name', ''))).strip()
+            # Try different name column variations that might exist
+            possible_name_cols = ['display_name', 'full_name', 'player_name', 'name', 'player_display_name']
+            player_name = None
+            
+            for col in possible_name_cols:
+                if col in player and pd.notna(player.get(col)) and str(player.get(col)).strip():
+                    player_name = str(player.get(col)).strip()
+                    break
+            
             team = str(player.get('team', '')).strip()
             position = str(player.get('position', '')).strip()
             
-            if player_name and team:
+            if player_name and team and len(player_name) > 2:
+                valid_names += 1
+                
                 # Store multiple name variations
-                names_to_store = [
-                    player_name.lower().strip(),
-                    str(player.get('full_name', '')).lower().strip(),
-                    str(player.get('first_name', '') + ' ' + player.get('last_name', '')).lower().strip()
-                ]
+                names_to_store = [player_name.lower().strip()]
+                
+                # Add variations if different columns exist
+                for col in possible_name_cols:
+                    if col in player and pd.notna(player.get(col)):
+                        alt_name = str(player.get(col)).lower().strip()
+                        if alt_name and alt_name not in names_to_store:
+                            names_to_store.append(alt_name)
+                
+                # Add first + last name combination if available
+                first_name = str(player.get('first_name', '')).strip()
+                last_name = str(player.get('last_name', '')).strip()
+                if first_name and last_name:
+                    full_name = f"{first_name} {last_name}".lower().strip()
+                    if full_name not in names_to_store:
+                        names_to_store.append(full_name)
                 
                 for name in names_to_store:
                     if name and len(name) > 2:
@@ -46,11 +71,21 @@ def load_current_rosters(season):
                             'roster_name': player_name
                         }
         
+        print(f"   📊 Found {valid_names} players with valid names")
         print(f"   📊 Created current team mapping for {len(current_teams)} player name variations")
+        
+        # Debug: Show a few examples
+        if current_teams:
+            print("   🔍 Sample roster entries:")
+            for i, (name, info) in enumerate(list(current_teams.items())[:3]):
+                print(f"      {name} -> {info['current_team']} ({info['position']})")
+        
         return current_teams
         
     except Exception as e:
         print(f"   ❌ Error loading current rosters: {e}")
+        import traceback
+        traceback.print_exc()
         return {}
 
 def load_schedule_data(season, week):
@@ -141,99 +176,58 @@ def create_team_mapping():
     
     return team_mapping
 
-def create_player_pools(season=2025, week=1, 
-                       dataset_path="data/complete_nfl_with_sportradar.csv",
-                       predictions_dir="predictions",
-                       output_dir="player_pools"):
-    """Create player pools with current roster data and schedule integration"""
+def find_current_team_for_player(player_name, current_teams):
+    """Find the current team for a player by checking multiple name variations"""
+    if not player_name:
+        return None
     
-    print(f"Creating player pools for {season} Week {week}")
-    print("="*60)
+    # Normalize the player name
+    name_clean = str(player_name).lower().strip()
+    
+    # Check exact match first
+    if name_clean in current_teams:
+        return current_teams[name_clean]['current_team']
+    
+    # Check for partial matches if exact match fails
+    # First try: see if the prediction name is contained in any roster name
+    for roster_name, roster_info in current_teams.items():
+        if name_clean in roster_name or roster_name in name_clean:
+            return roster_info['current_team']
+    
+    # Second try: Handle common name variations (e.g., "Joe" vs "Joseph")
+    name_parts = name_clean.split()
+    if len(name_parts) >= 2:
+        # Try just first and last name
+        simplified_name = f"{name_parts[0]} {name_parts[-1]}"
+        if simplified_name in current_teams:
+            return current_teams[simplified_name]['current_team']
+        
+        # Try matching by last name + first letter of first name
+        for roster_name, roster_info in current_teams.items():
+            roster_parts = roster_name.split()
+            if len(roster_parts) >= 2:
+                # Check if last names match and first names start with same letter
+                if (name_parts[-1] == roster_parts[-1] and 
+                    name_parts[0][0] == roster_parts[0][0]):
+                    return roster_info['current_team']
+    
+    return None
+
+def create_frontend_player_pools(season=2025, week=1, 
+                                predictions_dir="predictions",
+                                output_dir="player_pools"):
+    """
+    Create player pools in the exact format expected by the Svelte frontend
+    Focuses only on the columns needed by the lineup picker
+    """
+    
+    print(f"Creating FRONTEND-READY player pools for {season} Week {week}")
+    print("="*70)
     
     # Load current roster and schedule data
     current_teams = load_current_rosters(season)
     matchup_data = load_schedule_data(season, week)
     team_mapping = create_team_mapping()
-    
-    # Load historical dataset for player info
-    df_enhanced = pd.read_csv(dataset_path, low_memory=False)
-    print(f"📊 Loaded historical dataset: {df_enhanced.shape}")
-    
-    # Create player lookup
-    player_lookup = {}
-    
-    # Get latest info for each player from historical data
-    for _, player in df_enhanced.groupby('player_id').last().iterrows():
-        names_to_try = []
-        
-        for name_col in ['player_name', 'player_display_name', 'sportradar_name']:
-            if pd.notna(player.get(name_col)):
-                names_to_try.append(str(player[name_col]).lower().strip())
-        
-        for name in names_to_try:
-            if name:
-                player_lookup[name] = {
-                    'sportradar_player_id': player.get('sportradar_player_id', ''),
-                    'player_name': player.get('player_display_name', player.get('player_name', '')),
-                    'name': player.get('player_display_name', player.get('player_name', '')),
-                    'position': player.get('position', ''),
-                    'headshot_url': player.get('headshot_url', ''),
-                    'historical_team': player.get('recent_team', player.get('sportradar_team_alias', ''))
-                }
-    
-    # Update with current roster data
-    team_updates = 0
-    for name, current_info in current_teams.items():
-        if name in player_lookup:
-            player_lookup[name]['current_team'] = current_info['current_team']
-            player_lookup[name]['position'] = current_info['position'] or player_lookup[name]['position']
-            player_lookup[name]['jersey_number'] = current_info['jersey_number']
-            player_lookup[name]['roster_status'] = current_info['status']
-            team_updates += 1
-        else:
-            player_lookup[name] = {
-                'sportradar_player_id': '',
-                'player_name': current_info['roster_name'],
-                'name': current_info['roster_name'],
-                'position': current_info['position'],
-                'headshot_url': '',
-                'current_team': current_info['current_team'],
-                'jersey_number': current_info['jersey_number'],
-                'roster_status': current_info['status'],
-                'historical_team': ''
-            }
-    
-    print(f"🎯 Created lookup for {len(player_lookup)} player name variations")
-    print(f"🔄 Updated {team_updates} players with current team assignments")
-    
-    # Add schedule data to player lookup
-    for name, player_info in player_lookup.items():
-        player_team = player_info.get('current_team') or player_info.get('historical_team', '')
-        team_key = team_mapping.get(player_team, player_team)
-        matchup_info = matchup_data.get(team_key, {})
-        
-        opponent = matchup_info.get('opponent_team', '')
-        home_away = matchup_info.get('home_away', '')
-        
-        if opponent and home_away:
-            opponent_display = f"vs {opponent}" if home_away == 'home' else f"@ {opponent}"
-        else:
-            opponent_display = "TBD"
-        
-        player_info.update({
-            'team': player_team,
-            'recent_team': player_team,
-            'opponent_team': opponent,
-            'opponent_display': opponent_display,
-            'home_away': home_away,
-            'game_time': matchup_info.get('game_time', 'TBD'),
-            'gameday': matchup_info.get('gameday', ''),
-            'stadium': matchup_info.get('stadium', ''),
-            'game_id': matchup_info.get('game_id', '')
-        })
-    
-    if matchup_data:
-        print(f"📅 Schedule data loaded for {len(matchup_data)} teams")
     
     # Process predictions for each position
     positions = ['QB', 'RB', 'WR', 'TE']
@@ -264,95 +258,130 @@ def create_player_pools(season=2025, week=1,
         # Load predictions
         df_pred = pd.read_csv(pred_path)
         print(f"  📄 Loaded {len(df_pred)} predictions from {os.path.basename(pred_path)}")
+        print(f"  🔍 Prediction columns: {list(df_pred.columns)}")
         
         # Create player pool
-        clean_players = []
-        matched = 0
-        with_schedule = 0
-        with_current_team = 0
+        frontend_players = []
+        team_corrections = 0
         
         for _, pred in df_pred.iterrows():
-            name_clean = str(pred['player_name']).lower().strip()
-            player_info = player_lookup.get(name_clean, {})
+            # Get current team assignment
+            current_team = find_current_team_for_player(pred['player_name'], current_teams)
             
-            if player_info.get('sportradar_player_id'):
-                matched += 1
-            if player_info.get('opponent_team'):
-                with_schedule += 1
-            if player_info.get('current_team'):
-                with_current_team += 1
+            if current_team:
+                final_team = current_team
+                team_corrections += 1
+                print(f"    🔄 {pred['player_name']}: assigned to {current_team}")
+            else:
+                # No current team found, need to handle this
+                final_team = ""  # Will show as TBD in frontend
+                print(f"    ⚠️ {pred['player_name']}: no current team found")
             
-            # Get projected points and calculate price
-            projected_points = pred.get('fanduel_fantasy_points', pred.get('projected_points', 0)) or 0
-            price = max(4000, round(int(projected_points * 500) / 100) * 100)
+            # Get projected points from prediction data
+            projected_points = pred.get('fanduel_fantasy_points', 0) or 0
             
-            clean_player = {
-                'sportradar_player_id': player_info.get('sportradar_player_id', ''),
-                'player_name': player_info.get('player_name', pred['player_name']),
-                'name': player_info.get('name', pred['player_name']),
-                'position': player_info.get('position', position),
-                'headshot_url': player_info.get('headshot_url', ''),
-                'price': price,
-                'salary': price,
+            # Calculate salary (price) based on projected points
+            salary = max(4000, round(int(projected_points * 500) / 100) * 100)
+            
+            # Get opponent and schedule info
+            team_key = team_mapping.get(final_team, final_team)
+            matchup_info = matchup_data.get(team_key, {})
+            
+            opponent = matchup_info.get('opponent_team', '')
+            home_away = matchup_info.get('home_away', '')
+            
+            if opponent and home_away:
+                opponent_display = f"vs {opponent}" if home_away == 'home' else f"@ {opponent}"
+            else:
+                opponent_display = "TBD"
+            
+            # Create frontend-compatible player object
+            frontend_player = {
+                # Essential IDs
+                'id': f"{pred['player_name'].lower().replace(' ', '_')}_{final_team}_{season}",
+                'sportradar_player_id': '',  # We don't have this from predictions alone
+                
+                # Names (frontend uses both)
+                'player_name': pred['player_name'],
+                'name': pred['player_name'],
+                
+                # Position
+                'position': pred.get('position', position),
+                
+                # Pricing (frontend expects both)
+                'price': salary,
+                'salary': salary,
+                
+                # Fantasy projections (frontend expects both)
                 'projected_points': round(projected_points, 1),
                 'avg_fppg': round(projected_points, 1),
-                'team': player_info.get('current_team') or player_info.get('historical_team', pred.get('team', '')),
-                'recent_team': player_info.get('current_team') or player_info.get('historical_team', pred.get('team', '')),
-                'opponent_team': player_info.get('opponent_team', ''),
-                'opponent_display': player_info.get('opponent_display', 'TBD'),
-                'home_away': player_info.get('home_away', ''),
-                'game_time': player_info.get('game_time', 'TBD'),
-                'gameday': player_info.get('gameday', ''),
-                'stadium': player_info.get('stadium', ''),
-                'game_id': player_info.get('game_id', ''),
-                'jersey_number': player_info.get('jersey_number', ''),
-                'roster_status': player_info.get('roster_status', 'ACT'),
-                'prediction_rank': pred.get('rank', pred.get('prediction_rank', len(clean_players) + 1)),
-                'confidence': pred.get('confidence_score', pred.get('vs_season_avg', 0))
+                
+                # Team info (required for display)
+                'team': final_team,
+                'recent_team': final_team,
+                
+                # Opponent info (required for matchup display)
+                'opponent_team': opponent,
+                'opponent_display': opponent_display,
+                'home_away': home_away,
+                
+                # Game timing (required for frontend display)
+                'game_time': matchup_info.get('game_time', 'TBD'),
+                'gameday': matchup_info.get('gameday', ''),
+                'stadium': matchup_info.get('stadium', ''),
+                'game_id': matchup_info.get('game_id', ''),
+                
+                # Player details
+                'headshot_url': '',  # We don't have this from predictions
+                'jersey_number': '',
+                'roster_status': 'ACT',
+                
+                # Ranking and confidence
+                'rank': pred.get('rank', len(frontend_players) + 1),
+                'prediction_rank': pred.get('rank', len(frontend_players) + 1),
+                'confidence': (pred.get('vs_season_avg', 0) / 100) if pd.notna(pred.get('vs_season_avg')) else 0
             }
             
-            clean_players.append(clean_player)
+            frontend_players.append(frontend_player)
         
-        # Sort and save
-        if clean_players:
-            df_clean = pd.DataFrame(clean_players)
-            df_clean = df_clean.sort_values('price', ascending=False)
-            df_clean['rank'] = range(1, len(df_clean) + 1)
+        # Sort by projected points (descending) and assign ranks
+        if frontend_players:
+            df_frontend = pd.DataFrame(frontend_players)
+            df_frontend = df_frontend.sort_values('projected_points', ascending=False)
+            df_frontend['rank'] = range(1, len(df_frontend) + 1)
+            df_frontend['prediction_rank'] = df_frontend['rank']
             
+            # Save to CSV
             output_file = f"{position}_player_pool_{season}_week{week}.csv"
             output_path = os.path.join(output_dir, output_file)
-            df_clean.to_csv(output_path, index=False)
+            df_frontend.to_csv(output_path, index=False)
             
-            total_players_created += len(clean_players)
+            total_players_created += len(frontend_players)
             
-            print(f"  ✅ {position}: {len(clean_players)} players saved")
-            print(f"     Sportradar IDs: {matched}/{len(clean_players)} ({matched/len(clean_players)*100:.1f}%)")
-            print(f"     Current teams: {with_current_team}/{len(clean_players)} ({with_current_team/len(clean_players)*100:.1f}%)")
-            print(f"     Schedule data: {with_schedule}/{len(clean_players)} ({with_schedule/len(clean_players)*100:.1f}%)")
-            print(f"     Price range: ${df_clean['price'].min():,} - ${df_clean['price'].max():,}")
+            print(f"  ✅ {position}: {len(frontend_players)} players saved")
+            print(f"     Team assignments: {team_corrections}/{len(frontend_players)}")
+            print(f"     Price range: ${df_frontend['salary'].min():,} - ${df_frontend['salary'].max():,}")
             
             # Show top 3
             print(f"     Top 3:")
-            for _, player in df_clean.head(3).iterrows():
-                matchup = player.get('opponent_display', 'TBD')
-                game_time = player.get('game_time', 'TBD')
-                current_team = player.get('team', 'UNK')
-                print(f"       {player['rank']}. {player['player_name']} ({current_team}) - ${player['price']:,} ({player['projected_points']} pts) - {matchup} {game_time}")
-        else:
-            print(f"  ❌ No valid players created for {position}")
+            for _, player in df_frontend.head(3).iterrows():
+                team_display = player['team'] if player['team'] else 'UNK'
+                matchup = player['opponent_display']
+                game_time = player['game_time']
+                print(f"       {player['rank']}. {player['player_name']} ({team_display}) - ${player['salary']:,} ({player['projected_points']} pts) - {matchup} {game_time}")
     
     # Create combined file
-    create_combined_file(season, week, output_dir)
+    create_combined_frontend_file(season, week, output_dir)
     
-    print(f"\n{'='*60}")
-    print(f"✅ Player pool creation complete!")
+    print(f"\n{'='*70}")
+    print(f"✅ FRONTEND-READY player pools complete!")
     print(f"📊 Total players created: {total_players_created}")
     print(f"📁 Files saved to: {output_dir}/")
     
     return True
 
-def create_combined_file(season, week, output_dir):
-    """Create combined file with all positions"""
+def create_combined_frontend_file(season, week, output_dir):
+    """Create combined file with all positions in frontend format"""
     positions = ['QB', 'RB', 'WR', 'TE']
     all_players = []
     
@@ -365,10 +394,10 @@ def create_combined_file(season, week, output_dir):
     if all_players:
         df_combined = pd.concat(all_players, ignore_index=True)
         
-        # Sort by position priority, then by price
+        # Sort by position priority, then by projected points
         position_order = {'QB': 1, 'RB': 2, 'WR': 3, 'TE': 4}
         df_combined['position_order'] = df_combined['position'].map(position_order)
-        df_combined = df_combined.sort_values(['position_order', 'price'], ascending=[True, False])
+        df_combined = df_combined.sort_values(['position_order', 'projected_points'], ascending=[True, False])
         df_combined = df_combined.drop('position_order', axis=1)
         
         # Save combined file
@@ -376,7 +405,7 @@ def create_combined_file(season, week, output_dir):
         combined_path = os.path.join(output_dir, combined_file)
         df_combined.to_csv(combined_path, index=False)
         
-        print(f"\n📋 Combined file: {combined_file}")
+        print(f"\n📋 Combined frontend file: {combined_file}")
         print(f"   Total players: {len(df_combined)}")
         
         position_counts = df_combined['position'].value_counts()
@@ -384,26 +413,27 @@ def create_combined_file(season, week, output_dir):
             if pos in position_counts:
                 print(f"   {pos}: {position_counts[pos]} players")
         
-        print(f"   Price range: ${df_combined['price'].min():,} - ${df_combined['price'].max():,}")
-        print(f"   Average price: ${df_combined['price'].mean():,.0f}")
+        print(f"   Salary range: ${df_combined['salary'].min():,} - ${df_combined['salary'].max():,}")
+        print(f"   Average salary: ${df_combined['salary'].mean():,.0f}")
         
-        # Show sample matchups
-        sample_with_schedule = df_combined[df_combined['opponent_team'].notna()].head(3)
-        if not sample_with_schedule.empty:
-            print(f"\n📅 Sample matchups with current teams:")
-            for _, player in sample_with_schedule.iterrows():
+        # Show sample with teams assigned
+        players_with_teams = df_combined[df_combined['team'] != '']
+        if not players_with_teams.empty:
+            print(f"\n📅 Sample players with team assignments:")
+            for _, player in players_with_teams.head(3).iterrows():
                 print(f"   {player['player_name']} ({player['team']}) {player['opponent_display']} - {player['game_time']}")
 
 if __name__ == "__main__":
-    success = create_player_pools()
+    success = create_frontend_player_pools()
     
     if success:
-        print("\n" + "="*60)
-        print("🎯 FRONTEND INTEGRATION READY!")
+        print("\n" + "="*70)
+        print("🎯 SVELTE FRONTEND INTEGRATION READY!")
         print("\n✅ Features included:")
-        print("   • Sportradar player IDs")
+        print("   • All columns expected by lineup picker")
         print("   • Current 2025 team assignments") 
-        print("   • Real schedule matchups")
-        print("   • Calculated prices")
-        print("   • Frontend-compatible format")
-        print("\n🚀 Ready to load into your Svelte app!")
+        print("   • Opponent matchups and game times")
+        print("   • Calculated salaries based on projections")
+        print("   • Proper ranking and confidence scores")
+        print("\n🚀 Ready to load directly into your Svelte app!")
+        print("📝 Import this CSV into your frontend player pool loader")
