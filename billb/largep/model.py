@@ -23,8 +23,17 @@ from injuries import integrate_sportradar_injuries
 # Suppress warnings
 warnings.filterwarnings('ignore')
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging with both file and console output
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('model_debug.log', mode='w'),  # Write to file
+        logging.StreamHandler()  # Also print to console
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 # Load the enhanced data
 logging.info("Loading enhanced data from CSV...")
@@ -738,21 +747,71 @@ class EnhancedDepthChartAnalyzer:
         return False
 
 # ===== INJURY STATUS ANALYZER WITH SPORTRADAR DATA =====
-
 class InjuryStatusAnalyzer:
     """Analyze player injury status using Sportradar API data"""
     
     def __init__(self, injury_overrides, backup_situations):
         self.injury_overrides = injury_overrides
         self.backup_situations = backup_situations
+        # Create normalized name lookups
+        self._create_normalized_lookups()
+    
+    def _create_normalized_lookups(self):
+        """Create normalized name lookups for better matching"""
+        self.injury_by_normalized = {}
+        for name, info in self.injury_overrides.items():
+            normalized = self._normalize_name(name)
+            self.injury_by_normalized[normalized] = (name, info)
+        
+        self.backup_by_normalized = {}
+        for name, info in self.backup_situations.items():
+            normalized = self._normalize_name(name)
+            self.backup_by_normalized[normalized] = (name, info)
+    
+    def _normalize_name(self, name):
+        """Normalize a name for comparison"""
+        if not name:
+            return ""
+        # Remove suffixes, convert to lowercase, remove extra spaces
+        name_clean = name.lower().strip()
+        # Remove common suffixes
+        for suffix in [' jr.', ' sr.', ' iii', ' ii', ' iv', ' jr', ' sr']:
+            name_clean = name_clean.replace(suffix, '')
+        return ' '.join(name_clean.split())
     
     def check_player_status(self, player_name):
-        """Check if player has injury/status issues"""
+        """Check if player has injury/status issues with fuzzy matching"""
+        # Direct match first
         if player_name in self.injury_overrides:
             return self.injury_overrides[player_name]
         
         if player_name in self.backup_situations:
             return self.backup_situations[player_name]
+        
+        # Try normalized matching
+        normalized = self._normalize_name(player_name)
+        
+        if normalized in self.injury_by_normalized:
+            original_name, info = self.injury_by_normalized[normalized]
+            return info
+        
+        if normalized in self.backup_by_normalized:
+            original_name, info = self.backup_by_normalized[normalized]
+            return info
+        
+        # Try partial matching on last name
+        last_name = normalized.split()[-1] if normalized else ""
+        if last_name and len(last_name) > 3:
+            for norm_key, (orig_name, info) in self.injury_by_normalized.items():
+                if norm_key.endswith(last_name):
+                    # Check first initial matches
+                    if normalized[0] == norm_key[0]:
+                        return info
+            
+            for norm_key, (orig_name, info) in self.backup_by_normalized.items():
+                if norm_key.endswith(last_name):
+                    if normalized[0] == norm_key[0]:
+                        return info
         
         return None
     
@@ -765,7 +824,17 @@ class InjuryStatusAnalyzer:
     
     def should_boost_backup(self, player_name):
         """Determine if backup should get starter-level projections"""
-        return player_name in self.backup_situations
+        status_info = self.check_player_status(player_name)
+        # Check if this player is in backup_situations
+        if player_name in self.backup_situations:
+            return True
+        
+        # Try normalized matching
+        normalized = self._normalize_name(player_name)
+        if normalized in self.backup_by_normalized:
+            return True
+        
+        return False
     
     def get_adjustment_info(self, player_name):
         """Get detailed adjustment information"""
@@ -788,10 +857,33 @@ class InjuryStatusAnalyzer:
             }
         
         return None
-
+    
 # Initialize the injury analyzer with Sportradar data
-print("\n=== INITIALIZING INJURY STATUS ANALYZER ===")
+logger.info("\n=== INITIALIZING INJURY STATUS ANALYZER ===")
 injury_analyzer = InjuryStatusAnalyzer(injury_overrides, backup_situations)
+
+# DEBUG: Verify George Kittle
+logger.info("\n=== DEBUG: GEORGE KITTLE CHECK ===")
+kittle_variations = ['George Kittle', 'G. Kittle', 'Kittle', 'george kittle']
+for name in kittle_variations:
+    status = injury_analyzer.check_player_status(name)
+    should_zero = injury_analyzer.should_zero_out_player(name)
+    logger.info(f"  '{name}': status={status}, should_zero={should_zero}")
+
+# Check what's actually in injury_overrides for TEs
+logger.info("\nAll TEs in injury_overrides:")
+for name, info in injury_overrides.items():
+    if info.get('position') == 'TE':
+        logger.info(f"  '{name}': {info}")
+
+# Check roster data for Kittle
+logger.info("\nChecking roster for George Kittle:")
+kittle_roster = latest_rosters[
+    latest_rosters['player_name'].str.contains('Kittle', case=False, na=False)
+]
+logger.info(f"Found {len(kittle_roster)} matches:")
+for _, row in kittle_roster.iterrows():
+    logger.info(f"  Name: '{row['player_name']}', Status: {row['status']}, Position: {row['position']}, Team: {row.get('team', 'N/A')}")
 
 # Report current injury situations
 if injury_overrides:
@@ -1133,17 +1225,18 @@ def comprehensive_predict_week_enhanced(player_name, week):
     except Exception as e:
         print(f"Error predicting for {player_name}: {e}")
         return None
-
+    
 def get_comprehensive_predictions(position, week):
     """Generate predictions for all players at a position"""
     predictions = []
     
-    active_players = latest_rosters[
-        (latest_rosters['position'] == position) & 
-        (latest_rosters['status'] == 'ACT')
+    # GET ALL PLAYERS, not just active ones - we need to check injuries for everyone
+    all_position_players = latest_rosters[
+        latest_rosters['position'] == position
     ]
     
-    print(f"\nGenerating predictions for {len(active_players)} {position}s...")
+    print(f"\nGenerating predictions for {len(all_position_players)} {position}s...")
+    print(f"  Status breakdown: {all_position_players['status'].value_counts().to_dict()}")
     
     veteran_count = 0
     rookie_count = 0
@@ -1151,14 +1244,36 @@ def get_comprehensive_predictions(position, week):
     backup_elevated_count = 0
     processed_players = set()
     
-    for _, player in tqdm(active_players.iterrows(), 
-                         total=len(active_players), 
+    for _, player in tqdm(all_position_players.iterrows(), 
+                         total=len(all_position_players), 
                          desc=f"Predicting {position}"):
         
         player_name = player['player_name']
         
         if player_name in processed_players:
-            print(f"Skipping duplicate player: {player_name}")
+            continue
+        
+        # CHECK INJURY STATUS BEFORE ANYTHING ELSE
+        if injury_analyzer.should_zero_out_player(player_name):
+            adjustment_info = injury_analyzer.get_adjustment_info(player_name)
+            print(f"INJURED: {player_name} -> 0 points ({adjustment_info['reason']})")
+            
+            processed_players.add(player_name)
+            predictions.append({
+                'player_name': player_name,
+                'position': position,
+                'team': player.get('team', 'Unknown'),
+                'fanduel_fantasy_points': 0.0,
+                'prediction_type': 'injured_out',
+                'injury_status': 'OUT',
+                'injury_reason': adjustment_info['reason'],
+                'role_adjustment': adjustment_info['reason']
+            })
+            injured_count += 1
+            continue
+        
+        # Skip inactive players who are NOT injured (practice squad, etc)
+        if player['status'] != 'ACT' and not injury_analyzer.should_boost_backup(player_name):
             continue
         
         pred = comprehensive_predict_week_enhanced(player_name, week)
@@ -1180,13 +1295,7 @@ def get_comprehensive_predictions(position, week):
         predictions_df = pd.DataFrame(predictions)
         
         print(f"Before duplicate removal: {len(predictions_df)} players")
-        initial_count = len(predictions_df)
-        
         predictions_df = predictions_df.drop_duplicates(subset=['player_name'], keep='first')
-        
-        final_count = len(predictions_df)
-        if initial_count != final_count:
-            print(f"Removed {initial_count - final_count} duplicates")
         
         predictions_df = predictions_df.sort_values('fanduel_fantasy_points', ascending=False)
         predictions_df = predictions_df.reset_index(drop=True)
