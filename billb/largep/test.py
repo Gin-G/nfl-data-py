@@ -1,20 +1,5 @@
-import nfl_data_py as nfl
-import pandas as pd
-picks = nfl.import_draft_picks([2025])
-
-# See all columns
-print("All columns:")
-print(picks.columns.tolist())
-
-# See first row with all data
-pd.set_option('display.max_columns', None)
-print("\nFirst row with all columns:")
-print(picks.head(1))
-
-# Look for name-related columns specifically
-name_cols = [col for col in picks.columns if 'name' in col.lower()]
-print(f"\nName-related columns: {name_cols}")
-
-if name_cols:
-    print("\nSample name data:")
-    print(picks[['season', 'round', 'pick', 'team'] + name_cols].head(10))
+# Quick test to see what's actually in the roster
+from nfl_data_py import import_weekly_rosters
+rosters = import_weekly_rosters([2025])
+print(rosters.columns.tolist())
+print(rosters[['player_id', 'sportradar_id', 'player_name']].head())

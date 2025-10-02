@@ -32,6 +32,34 @@ year = 2025
 latest_rosters = import_weekly_rosters([year])
 schedule = import_schedules([year])
 
+print("\n🧹 CLEANING ROSTER DATA TO PREVENT DUPLICATES...")
+print(f"Original roster data: {len(latest_rosters)} rows")
+
+# Check for duplicates in roster data
+duplicate_players = latest_rosters['player_name'].duplicated().sum()
+if duplicate_players > 0:
+    print(f"Found {duplicate_players} duplicate player entries in roster data")
+    
+    # Show examples of duplicates
+    dup_names = latest_rosters[latest_rosters['player_name'].duplicated(keep=False)]['player_name'].value_counts().head(5)
+    print("Top duplicate players:")
+    for name, count in dup_names.items():
+        print(f"  {name}: {count} entries")
+    
+    # Priority order for keeping duplicates: ACT > INACT > other statuses
+    status_priority = {'ACT': 1, 'INACT': 2}
+    latest_rosters['status_priority'] = latest_rosters['status'].map(status_priority).fillna(3)
+    
+    # Sort by priority and keep best entry for each player
+    latest_rosters = latest_rosters.sort_values(['player_name', 'status_priority', 'week'], 
+                                                ascending=[True, True, False])
+    latest_rosters = latest_rosters.drop_duplicates(subset=['player_name'], keep='first')
+    
+    print(f"After deduplication: {len(latest_rosters)} rows")
+    print(f"Removed {duplicate_players} duplicate roster entries")
+else:
+    print("No duplicate players found in roster data")
+
 # Load current depth charts for real-time role detection
 print("Loading current depth charts...")
 current_depth_charts = import_depth_charts([year])
@@ -79,6 +107,55 @@ def analyze_and_clean_data(df):
         recent_games = clean_games
     
     return recent_games
+
+def validate_predictions_no_duplicates(predictions_df, position):
+    """Validate that predictions have no duplicates"""
+    if predictions_df.empty:
+        return predictions_df
+    
+    print(f"\n🔍 Validating {position} predictions...")
+    
+    # Check for exact duplicates (all columns)
+    exact_dupes = predictions_df.duplicated().sum()
+    if exact_dupes > 0:
+        print(f"⚠️  Found {exact_dupes} exact duplicate rows")
+        predictions_df = predictions_df.drop_duplicates()
+    
+    # Check for player name duplicates
+    name_dupes = predictions_df['player_name'].duplicated().sum()
+    if name_dupes > 0:
+        print(f"⚠️  Found {name_dupes} duplicate player names")
+        duplicated_players = predictions_df[predictions_df['player_name'].duplicated(keep=False)]
+        print("Duplicate players found:")
+        for name in duplicated_players['player_name'].unique():
+            player_rows = predictions_df[predictions_df['player_name'] == name]
+            print(f"  {name}: {len(player_rows)} copies")
+            print(f"    Ranks: {player_rows['rank'].tolist()}")
+            print(f"    Points: {player_rows['fanduel_fantasy_points'].tolist()}")
+        
+        # Keep only first occurrence
+        predictions_df = predictions_df.drop_duplicates(subset=['player_name'], keep='first')
+        print(f"✅ After cleanup: {len(predictions_df)} unique players")
+    
+    # Validate rank sequence
+    expected_ranks = list(range(1, len(predictions_df) + 1))
+    actual_ranks = sorted(predictions_df['rank'].tolist())
+    
+    if actual_ranks != expected_ranks:
+        print(f"⚠️  Rank sequence issue!")
+        print(f"   Expected: 1 to {len(predictions_df)}")
+        print(f"   Actual: {actual_ranks}")
+        
+        # Fix ranks
+        predictions_df = predictions_df.sort_values('fanduel_fantasy_points', ascending=False)
+        predictions_df = predictions_df.reset_index(drop=True)
+        predictions_df['rank'] = range(1, len(predictions_df) + 1)
+        if 'prediction_rank' in predictions_df.columns:
+            predictions_df['prediction_rank'] = predictions_df['rank']
+        print("✅ Fixed rank sequence")
+    
+    print(f"✅ Validation complete: {len(predictions_df)} unique players with ranks 1-{len(predictions_df)}")
+    return predictions_df
 
 # Clean the data
 df_clean = analyze_and_clean_data(df)
@@ -753,6 +830,111 @@ class EnhancedDepthChartAnalyzer:
         
         return False
 
+class InjuryStatusAnalyzer:
+    """Analyze player injury status and team depth situations"""
+    
+    def __init__(self, roster_data, depth_charts):
+        self.roster_data = roster_data
+        self.depth_charts = depth_charts
+        self.injury_overrides = self._setup_injury_overrides()
+        self.backup_situations = self._identify_backup_situations()
+    
+    def _setup_injury_overrides(self):
+        """Manual injury/suspension overrides for current season"""
+        # Update this list based on current NFL injury reports
+        return {
+            # Format: 'Player Name': {'status': 'OUT'/'QUESTIONABLE'/'IR', 'replacement': 'Backup Name', 'reason': 'injury reason'}
+            'Joe Burrow': {
+                'status': 'IR', 
+                'replacement': 'Jake Browning', 
+                'reason': 'wrist injury',
+                'team': 'CIN',
+                'position': 'QB'
+            },
+            # Add other injured players as needed
+            # 'Aaron Rodgers': {'status': 'OUT', 'replacement': 'Zach Wilson', 'reason': 'achilles injury', 'team': 'NYJ', 'position': 'QB'},
+        }
+    
+    def _identify_backup_situations(self):
+        """Identify backup players who should get starter projections"""
+        backup_situations = {}
+        
+        for injured_player, info in self.injury_overrides.items():
+            if info['status'] in ['OUT', 'IR'] and 'replacement' in info:
+                replacement = info['replacement']
+                backup_situations[replacement] = {
+                    'replacing': injured_player,
+                    'reason': f"Starting due to {injured_player} {info['reason']}",
+                    'team': info['team'],
+                    'position': info['position'],
+                    'role': 'emergency_starter'
+                }
+        
+        return backup_situations
+    
+    def check_player_status(self, player_name):
+        """Check if player has injury/status issues"""
+        # Direct injury match
+        if player_name in self.injury_overrides:
+            return self.injury_overrides[player_name]
+        
+        # Check if player is a backup getting starter role
+        if player_name in self.backup_situations:
+            return self.backup_situations[player_name]
+        
+        return None
+    
+    def should_zero_out_player(self, player_name):
+        """Determine if player should get 0 points due to injury"""
+        status_info = self.check_player_status(player_name)
+        if status_info:
+            return status_info.get('status') in ['OUT', 'IR', 'SUSPENDED']
+        return False
+    
+    def should_boost_backup(self, player_name):
+        """Determine if backup should get starter-level projections"""
+        return player_name in self.backup_situations
+    
+    def get_adjustment_info(self, player_name):
+        """Get detailed adjustment information for logging"""
+        status_info = self.check_player_status(player_name)
+        if not status_info:
+            return None
+        
+        if self.should_zero_out_player(player_name):
+            return {
+                'type': 'injury_zero',
+                'reason': f"OUT due to {status_info.get('reason', 'injury')}",
+                'original_role': 'injured_starter'
+            }
+        elif self.should_boost_backup(player_name):
+            return {
+                'type': 'backup_boost', 
+                'reason': status_info.get('reason', 'replacing injured starter'),
+                'replacing': status_info.get('replacing'),
+                'original_role': 'backup_now_starting'
+            }
+        
+        return None
+
+# Initialize the injury analyzer
+print("\n=== INITIALIZING INJURY STATUS ANALYZER ===")
+injury_analyzer = InjuryStatusAnalyzer(latest_rosters, current_depth_charts)
+
+# Report current injury situations
+print("Current injury overrides:")
+for player, info in injury_analyzer.injury_overrides.items():
+    status = info.get('status', 'Unknown')
+    reason = info.get('reason', 'Unknown')
+    replacement = info.get('replacement', 'None')
+    print(f"  {player} ({status}): {reason} -> {replacement}")
+
+print("\nBackup players getting starter roles:")
+for backup, info in injury_analyzer.backup_situations.items():
+    replacing = info.get('replacing', 'Unknown')
+    reason = info.get('reason', 'Unknown')
+    print(f"  {backup}: {reason}")
+
 # ===== ENHANCED ROOKIE PREDICTOR =====
 
 class EnhancedRookiePredictor:
@@ -843,22 +1025,22 @@ class EnhancedRookiePredictor:
         if draft_info:
             pick = draft_info['draft_position']
             if pick <= 10:
-                draft_multiplier = 1.6
+                draft_multiplier = 1
                 tier = 'elite'
             elif pick <= 32:
-                draft_multiplier = 1.3
+                draft_multiplier = 0.8
                 tier = 'high'
             elif pick <= 64:
-                draft_multiplier = 1.0
+                draft_multiplier = 0.7
                 tier = 'medium'
             elif pick <= 100:
-                draft_multiplier = 0.8
+                draft_multiplier = 0.6
                 tier = 'late'
             else:
-                draft_multiplier = 0.6
+                draft_multiplier = 0.5
                 tier = 'very_late'
         else:
-            draft_multiplier = 0.4
+            draft_multiplier = 0.3
             tier = 'undrafted'
         
         # CRITICAL: Analyze depth chart opportunity
@@ -919,7 +1101,7 @@ enhanced_rookie_predictor = EnhancedRookiePredictor(df_final_clean, enhanced_dep
 # ===== ENHANCED COMPREHENSIVE PREDICTION FUNCTION =====
 
 def comprehensive_predict_week_enhanced(player_name, week):
-    """Enhanced prediction with better rookie detection and depth chart integration"""
+    """Enhanced prediction with injury status integration"""
     try:
         # Find player in roster
         player_matches = latest_rosters[
@@ -934,11 +1116,33 @@ def comprehensive_predict_week_enhanced(player_name, week):
         team = player_info.get('team', 'Unknown')
         player_id = player_info.get('player_id', '')
         
+        # CRITICAL: Check injury status FIRST
+        injury_status = injury_analyzer.check_player_status(player_name)
+        
+        if injury_analyzer.should_zero_out_player(player_name):
+            # Player is injured/out - return 0 points
+            adjustment_info = injury_analyzer.get_adjustment_info(player_name)
+            print(f"INJURED: {player_name} -> 0 points ({adjustment_info['reason']})")
+            
+            return {
+                'player_name': player_name,
+                'position': position,
+                'team': team,
+                'fanduel_fantasy_points': 0.0,
+                'prediction_type': 'injured_out',
+                'injury_status': injury_status.get('status', 'OUT'),
+                'injury_reason': injury_status.get('reason', 'injury'),
+                'role_adjustment': adjustment_info['reason']
+            }
+        
+        # Check if this is a backup getting starter role
+        backup_boost = injury_analyzer.should_boost_backup(player_name)
+        
         # Enhanced rookie detection
         is_rookie = is_actually_rookie(player_name, player_id, df_final_clean, year)
         
         if is_rookie:
-            # This is a rookie
+            # Rookie prediction logic (same as before)
             print(f"ROOKIE: {player_name} ({position}, {team})")
             rookie_pred = enhanced_rookie_predictor.predict_rookie(player_name, position, team)
             if rookie_pred:
@@ -947,7 +1151,6 @@ def comprehensive_predict_week_enhanced(player_name, week):
                 rookie_pred['team'] = team
                 return rookie_pred
             else:
-                # Fallback for rookies
                 depth_role = enhanced_depth_analyzer.get_player_role(player_name)
                 fallback_points = 3.0
                 if depth_role and depth_role['role'] == 'starter':
@@ -961,10 +1164,10 @@ def comprehensive_predict_week_enhanced(player_name, week):
                     'prediction_type': 'rookie_fallback'
                 }
         
-        # Veteran player logic
+        # Veteran player logic with injury adjustments
         print(f"VETERAN: {player_name} ({position}, {team})")
         
-        # Get player data
+        # Get player data for ML prediction
         player_data = df_final_clean[
             (df_final_clean['player_display_name'].str.contains(player_name, case=False, na=False)) |
             (df_final_clean['player_name'].str.contains(player_name, case=False, na=False))
@@ -979,7 +1182,7 @@ def comprehensive_predict_week_enhanced(player_name, week):
         
         recent_stats = recent_data.sort_values(['season', 'week']).iloc[-1]
         
-        # ML prediction
+        # ML prediction (same as before)
         input_data = pd.DataFrame()
         
         for col in numerical_features:
@@ -1011,43 +1214,52 @@ def comprehensive_predict_week_enhanced(player_name, week):
                 result[stat] = max(0, prediction[i])
             result[stat] = round(result[stat], 2)
         
-        # Enhanced role adjustments with depth chart
-        depth_role = enhanced_depth_analyzer.get_player_role(player_name)
+        # INJURY/BACKUP ADJUSTMENTS
         original_points = result['fanduel_fantasy_points']
+        adjustment = "no adjustment"
         
-        if depth_role:
-            if depth_role['role'] == 'backup' or depth_role['depth_rank'] > 2:
-                if position == 'QB':
-                    result['fanduel_fantasy_points'] *= 0.12
-                    adjustment = "depth chart backup QB penalty"
-                else:
-                    result['fanduel_fantasy_points'] *= 0.3
-                    adjustment = f"depth chart backup {position} penalty"
-                snap_role = 'Backup'
-            elif depth_role['role'] == 'deep_backup':
-                result['fanduel_fantasy_points'] *= 0.05
-                adjustment = "deep backup penalty"
-                snap_role = 'Deep Backup'
+        if backup_boost:
+            # This backup is now starting due to injury
+            adjustment_info = injury_analyzer.get_adjustment_info(player_name)
+            replacing = adjustment_info.get('replacing', 'injured starter')
+            
+            if position == 'QB':
+                # Backup QBs getting starter role - significant boost
+                result['fanduel_fantasy_points'] *= 2.5  # Big boost for emergency starter
+                adjustment = f"emergency starter boost (replacing {replacing})"
+                print(f"BACKUP BOOST: {player_name} now starting for {replacing}")
             else:
-                # Elite player boosts for starters
-                if position == 'QB':
-                    elite_qbs = ['Josh Allen', 'Lamar Jackson', 'Patrick Mahomes', 'Joe Burrow']
-                    tier1_qbs = ['Dak Prescott', 'Tua Tagovailoa', 'C.J. Stroud', 'Jalen Hurts']
-                    
-                    if player_name in elite_qbs:
-                        result['fanduel_fantasy_points'] *= 1.5
-                        adjustment = "elite QB boost"
-                    elif player_name in tier1_qbs:
-                        result['fanduel_fantasy_points'] *= 1.25
-                        adjustment = "tier 1 QB boost"
+                # Other positions - moderate boost
+                result['fanduel_fantasy_points'] *= 1.8
+                adjustment = f"injury replacement boost (replacing {replacing})"
+        
+        # Standard depth chart adjustments (only if not already boosted)
+        if not backup_boost:
+            depth_role = enhanced_depth_analyzer.get_player_role(player_name)
+            
+            if depth_role:
+                if depth_role['role'] == 'backup' or depth_role['depth_rank'] > 2:
+                    if position == 'QB':
+                        result['fanduel_fantasy_points'] *= 0.12
+                        adjustment = "depth chart backup QB penalty"
                     else:
-                        adjustment = "no adjustment"
+                        result['fanduel_fantasy_points'] *= 0.3
+                        adjustment = f"depth chart backup {position} penalty"
+                elif depth_role['role'] == 'deep_backup':
+                    result['fanduel_fantasy_points'] *= 0.05
+                    adjustment = "deep backup penalty"
                 else:
-                    adjustment = "no adjustment"
-                snap_role = 'Starter'
-        else:
-            adjustment = "no depth chart data"
-            snap_role = 'Unknown'
+                    # Elite player boosts for starters
+                    if position == 'QB':
+                        elite_qbs = ['Josh Allen', 'Lamar Jackson', 'Patrick Mahomes']  # Removed Joe Burrow
+                        tier1_qbs = ['Dak Prescott', 'Tua Tagovailoa', 'C.J. Stroud', 'Jalen Hurts']
+                        
+                        if player_name in elite_qbs:
+                            result['fanduel_fantasy_points'] *= 1.5
+                            adjustment = "elite QB boost"
+                        elif player_name in tier1_qbs:
+                            result['fanduel_fantasy_points'] *= 1.25
+                            adjustment = "tier 1 QB boost"
         
         result['fanduel_fantasy_points'] = round(result['fanduel_fantasy_points'], 1)
         
@@ -1056,10 +1268,11 @@ def comprehensive_predict_week_enhanced(player_name, week):
             'position': position,
             'team': team,
             'prediction_type': 'veteran_ml',
-            'depth_chart_role': depth_role['role'] if depth_role else 'unknown',
-            'depth_rank': depth_role['depth_rank'] if depth_role else 'N/A',
+            'depth_chart_role': depth_role['role'] if 'depth_role' in locals() and depth_role else 'unknown',
+            'depth_rank': depth_role['depth_rank'] if 'depth_role' in locals() and depth_role else 'N/A',
             'role_adjustment': adjustment,
-            'original_prediction': round(original_points, 1)
+            'original_prediction': round(original_points, 1),
+            'injury_replacement': backup_boost
         })
         
         return result
@@ -1083,13 +1296,24 @@ def get_comprehensive_predictions(position, week):
     veteran_count = 0
     rookie_count = 0
     depth_chart_adjustments = 0
+    processed_players = set()  # Track processed players to avoid duplicates
     
     for _, player in tqdm(active_players.iterrows(), 
                          total=len(active_players), 
                          desc=f"Predicting {position}"):
-        pred = comprehensive_predict_week_enhanced(player['player_name'], week)
+        
+        player_name = player['player_name']
+        
+        # CRITICAL: Skip if we already processed this player
+        if player_name in processed_players:
+            print(f"⚠️  Skipping duplicate player: {player_name}")
+            continue
+        
+        pred = comprehensive_predict_week_enhanced(player_name, week)
         if pred:
+            processed_players.add(player_name)  # Mark as processed
             predictions.append(pred)
+            
             if pred.get('prediction_type', '').startswith('rookie'):
                 rookie_count += 1
             else:
@@ -1098,13 +1322,43 @@ def get_comprehensive_predictions(position, week):
                     depth_chart_adjustments += 1
     
     if predictions:
+        # Convert to DataFrame
         predictions_df = pd.DataFrame(predictions)
+        
+        # CRITICAL: Remove any remaining duplicates based on player_name
+        print(f"Before duplicate removal: {len(predictions_df)} players")
+        initial_count = len(predictions_df)
+        
+        predictions_df = predictions_df.drop_duplicates(subset=['player_name'], keep='first')
+        
+        final_count = len(predictions_df)
+        if initial_count != final_count:
+            print(f"⚠️  Removed {initial_count - final_count} duplicates after DataFrame creation")
+        
+        # Sort by fantasy points
         predictions_df = predictions_df.sort_values('fanduel_fantasy_points', ascending=False)
+        
+        # RESET INDEX before assigning ranks
+        predictions_df = predictions_df.reset_index(drop=True)
+        
+        # Assign clean sequential ranks
         predictions_df['rank'] = range(1, len(predictions_df) + 1)
+        predictions_df['prediction_rank'] = predictions_df['rank']  # Mirror rank to prediction_rank
+        
+        # Final validation
+        duplicate_check = predictions_df['player_name'].duplicated().sum()
+        if duplicate_check > 0:
+            print(f"❌ ERROR: Still have {duplicate_check} duplicates after cleaning!")
+            print("Duplicate players:", predictions_df[predictions_df['player_name'].duplicated()]['player_name'].tolist())
+            
+            # Emergency cleanup
+            predictions_df = predictions_df.drop_duplicates(subset=['player_name'], keep='first').reset_index(drop=True)
+            predictions_df['rank'] = range(1, len(predictions_df) + 1)
+            predictions_df['prediction_rank'] = predictions_df['rank']
         
         # Save predictions
         os.makedirs('predictions', exist_ok=True)
-        filename = f'predictions/{position}_comprehensive_predictions_week{week}_season{year}.csv'
+        filename = f'predictions/{position}_predictions_week{week}_season{year}.csv'
         predictions_df.to_csv(filename, index=False)
         
         print(f"\n📊 {position} Summary:")
@@ -1112,6 +1366,7 @@ def get_comprehensive_predictions(position, week):
         print(f"  • Veterans (ML): {veteran_count}")
         print(f"  • Rookies: {rookie_count}")
         print(f"  • Depth chart adjustments: {depth_chart_adjustments}")
+        print(f"  • Ranks: 1 to {len(predictions_df)}")
         print(f"  • Saved: {filename}")
         
         return predictions_df
@@ -1120,7 +1375,7 @@ def get_comprehensive_predictions(position, week):
 
 # Generate predictions for all positions
 positions = ['QB', 'RB', 'WR', 'TE']
-week_to_predict = 1
+week_to_predict = 5
 
 print("\n" + "="*80)
 print("COMPREHENSIVE PREDICTIONS WITH ENHANCED DEPTH CHART INTEGRATION")

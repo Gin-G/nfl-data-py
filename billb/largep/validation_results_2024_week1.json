@@ -1,0 +1,22 @@
+{
+  "week": 1,
+  "accuracy": 100.0,
+  "common_players": 287,
+  "perfect_matches": 287,
+  "discrepancy_count": 0,
+  "play_analysis": {
+    "total_plays": 163,
+    "official_plays": 163,
+    "unofficial_plays": 0,
+    "plays_by_type": {
+      "kickoff": 11,
+      "rush": 56,
+      "pass": 78,
+      "extra_point": 5,
+      "punt": 5,
+      "field_goal": 5,
+      "penalty": 3
+    },
+    "unofficial_reasons": {}
+  }
+}
