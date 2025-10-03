@@ -198,9 +198,6 @@ class SportradarInjuryAnalyzer:
             team_name = team.get('name', '')
             players = team.get('players', [])
             
-            if players:
-                print(f"\n  {team_alias} ({team_name}): {len(players)} injured players")
-            
             for player_entry in players:
                 
                 player_name = (player_entry.get('name') or 
@@ -442,21 +439,6 @@ class SportradarInjuryAnalyzer:
         print(f"Players OUT/Doubtful: {len(impact['zero_out'])}")
         print(f"Backups elevated: {len(impact['boost_backup'])}")
         print(f"Questionable (normal projections): {len(impact['questionable'])}")
-        
-        if impact['zero_out']:
-            print("\n🚫 Players to zero out:")
-            for p in impact['zero_out'][:15]:
-                print(f"  {p['player']} ({p['position']}, {p['team']}): {p['status']} - {p['injury']}")
-        
-        if impact['boost_backup']:
-            print("\n⬆️  Backups getting starter projections:")
-            for b in impact['boost_backup'][:15]:
-                print(f"  {b['player']} replacing {b['replacing']} ({b['position']}, {b['team']})")
-        
-        if impact['questionable']:
-            print("\n❓ Questionable players (normal projections):")
-            for q in impact['questionable'][:10]:
-                print(f"  {q['player']} ({q['position']}, {q['team']}): {q['injury']}")
         
         return overrides, backup_situations
 
