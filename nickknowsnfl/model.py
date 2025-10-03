@@ -1223,7 +1223,6 @@ def get_comprehensive_predictions(position, week):
         print(f"  Veterans (ML): {veteran_count}")
         print(f"  Rookies: {rookie_count}")
         print(f"  Injured (zeroed): {injured_count}")
-        print(f"  Backups elevated: {backup_elevated_count}")
         print(f"  Saved: {filename}")
         
         return predictions_df
@@ -1251,13 +1250,6 @@ for position in positions:
             print(f"\nInjured {position}s (0 points):")
             for _, player in injured.head(5).iterrows():
                 print(f"  {player['player_name']}: {player['injury_status']} - {player['injury_reason']}")
-        
-        backups = predictions_df[predictions_df.get('injury_replacement', False) == True]
-        if len(backups) > 0:
-            print(f"\nElevated Backups:")
-            for _, player in backups.head(5).iterrows():
-                original = player.get('original_prediction', 0)
-                print(f"  {player['player_name']}: {player['fanduel_fantasy_points']} pts (boosted from {original})")
         
         healthy = predictions_df[~predictions_df['prediction_type'].str.contains('injured', na=False)]
         print(f"\nTop Healthy Players:")
