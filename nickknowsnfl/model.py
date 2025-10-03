@@ -1050,8 +1050,6 @@ def comprehensive_predict_week_enhanced(player_name, week):
                 'role_adjustment': adjustment_info['reason']
             }
         
-        backup_boost = injury_analyzer.should_boost_backup(player_name)
-        
         is_rookie = is_actually_rookie(player_name, player_id, df_final_clean, year)
         
         if is_rookie:
@@ -1122,78 +1120,7 @@ def comprehensive_predict_week_enhanced(player_name, week):
         
         original_points = result['fanduel_fantasy_points']
         adjustment = "no adjustment"
-        
-        if backup_boost:
-            adjustment_info = injury_analyzer.get_adjustment_info(player_name)
-            replacing = adjustment_info.get('replacing', 'injured starter')
-            
-            # Get the backup player's historical production
-            avg_fppg = recent_stats.get('avg_fppg', 0) if 'avg_fppg' in recent_stats.index else 0
-            games_played = len(player_data[player_data['week'] != 'AVG'])
-            
-            # Only boost if player has some track record OR is a high-ranked backup
-            depth_role = enhanced_depth_analyzer.get_player_role(player_name)
-            is_second_string = depth_role and depth_role.get('depth_rank', 99) == 2
-            
-            # Tiered boost based on player's history
-            if games_played >= 5 and avg_fppg >= 5.0:
-                # Proven backup with decent production
-                if position == 'QB':
-                    result['fanduel_fantasy_points'] *= 2.5
-                    adjustment = f"proven backup QB replacing {replacing}"
-                else:
-                    result['fanduel_fantasy_points'] *= 1.8
-                    adjustment = f"proven backup replacing {replacing}"
-            elif is_second_string and games_played >= 3:
-                # Listed #2 on depth chart with some experience
-                if position == 'QB':
-                    result['fanduel_fantasy_points'] *= 2.0
-                    adjustment = f"backup QB replacing {replacing}"
-                else:
-                    result['fanduel_fantasy_points'] *= 1.4
-                    adjustment = f"backup replacing {replacing}"
-            elif result['fanduel_fantasy_points'] < 3.0:
-                # Deep backup with no history - give them a baseline floor instead of boost
-                if position == 'QB':
-                    result['fanduel_fantasy_points'] = 12.0  # QB floor
-                    adjustment = f"emergency QB replacing {replacing} (baseline)"
-                elif position in ['RB', 'WR']:
-                    result['fanduel_fantasy_points'] = 6.0  # Skill position floor
-                    adjustment = f"emergency starter replacing {replacing} (baseline)"
-                else:  # TE
-                    result['fanduel_fantasy_points'] = 4.0  # TE floor
-                    adjustment = f"emergency TE replacing {replacing} (baseline)"
-            else:
-                # Has minimal production, apply conservative boost
-                result['fanduel_fantasy_points'] *= 1.3
-                adjustment = f"backup replacing {replacing} (limited history)"
-        
-        if not backup_boost:
-            depth_role = enhanced_depth_analyzer.get_player_role(player_name)
-            
-            if depth_role:
-                if depth_role['role'] == 'backup' or depth_role['depth_rank'] > 2:
-                    if position == 'QB':
-                        result['fanduel_fantasy_points'] *= 0.12
-                        adjustment = "depth chart backup QB penalty"
-                    else:
-                        result['fanduel_fantasy_points'] *= 0.3
-                        adjustment = f"depth chart backup {position} penalty"
-                elif depth_role['role'] == 'deep_backup':
-                    result['fanduel_fantasy_points'] *= 0.05
-                    adjustment = "deep backup penalty"
-                else:
-                    if position == 'QB':
-                        elite_qbs = ['Josh Allen', 'Lamar Jackson', 'Patrick Mahomes']
-                        tier1_qbs = ['Dak Prescott', 'Tua Tagovailoa', 'C.J. Stroud', 'Jalen Hurts']
-                        
-                        if player_name in elite_qbs:
-                            result['fanduel_fantasy_points'] *= 1.5
-                            adjustment = "elite QB boost"
-                        elif player_name in tier1_qbs:
-                            result['fanduel_fantasy_points'] *= 1.25
-                            adjustment = "tier 1 QB boost"
-        
+
         result['fanduel_fantasy_points'] = round(result['fanduel_fantasy_points'], 1)
         
         result.update({
@@ -1205,7 +1132,6 @@ def comprehensive_predict_week_enhanced(player_name, week):
             'depth_rank': depth_role['depth_rank'] if 'depth_role' in locals() and depth_role else 'N/A',
             'role_adjustment': adjustment,
             'original_prediction': round(original_points, 1),
-            'injury_replacement': backup_boost
         })
         
         return result
@@ -1229,7 +1155,6 @@ def get_comprehensive_predictions(position, week):
     veteran_count = 0
     rookie_count = 0
     injured_count = 0
-    backup_elevated_count = 0
     processed_players = set()
     
     for _, player in tqdm(all_position_players.iterrows(), 
