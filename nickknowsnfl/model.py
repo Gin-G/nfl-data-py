@@ -61,17 +61,13 @@ if duplicate_players > 0:
     for name, count in dup_names.items():
         print(f"  {name}: {count} entries")
     
-    # Priority order for keeping duplicates: ACT > INACT > other statuses
-    status_priority = {'ACT': 1, 'INACT': 2}
-    latest_rosters['status_priority'] = latest_rosters['status'].map(status_priority).fillna(3)
-    
-    # Sort by priority and keep best entry for each player
-    latest_rosters = latest_rosters.sort_values(['player_name', 'status_priority', 'week'], 
-                                                ascending=[True, True, False])
+    # Keep the MOST RECENT week's data (highest week number)
+    latest_rosters = latest_rosters.sort_values(['player_name', 'week'], 
+                                                ascending=[True, False])
     latest_rosters = latest_rosters.drop_duplicates(subset=['player_name'], keep='first')
     
     print(f"After deduplication: {len(latest_rosters)} rows")
-    print(f"Removed {duplicate_players} duplicate roster entries")
+    print(f"Kept most recent week data for each player")
 else:
     print("No duplicate players found in roster data")
 
@@ -862,43 +858,6 @@ class InjuryStatusAnalyzer:
 logger.info("\n=== INITIALIZING INJURY STATUS ANALYZER ===")
 injury_analyzer = InjuryStatusAnalyzer(injury_overrides, backup_situations)
 
-# DEBUG: Verify George Kittle
-logger.info("\n=== DEBUG: GEORGE KITTLE CHECK ===")
-kittle_variations = ['George Kittle', 'G. Kittle', 'Kittle', 'george kittle']
-for name in kittle_variations:
-    status = injury_analyzer.check_player_status(name)
-    should_zero = injury_analyzer.should_zero_out_player(name)
-    logger.info(f"  '{name}': status={status}, should_zero={should_zero}")
-
-# Check what's actually in injury_overrides for TEs
-logger.info("\nAll TEs in injury_overrides:")
-for name, info in injury_overrides.items():
-    if info.get('position') == 'TE':
-        logger.info(f"  '{name}': {info}")
-
-# Check roster data for Kittle
-logger.info("\nChecking roster for George Kittle:")
-kittle_roster = latest_rosters[
-    latest_rosters['player_name'].str.contains('Kittle', case=False, na=False)
-]
-logger.info(f"Found {len(kittle_roster)} matches:")
-for _, row in kittle_roster.iterrows():
-    logger.info(f"  Name: '{row['player_name']}', Status: {row['status']}, Position: {row['position']}, Team: {row.get('team', 'N/A')}")
-
-# Report current injury situations
-if injury_overrides:
-    print(f"Injury overrides: {len(injury_overrides)} players")
-    for player, info in list(injury_overrides.items())[:5]:
-        status = info.get('status', 'Unknown')
-        reason = info.get('reason', 'Unknown')
-        print(f"  {player}: {status} - {reason}")
-
-if backup_situations:
-    print(f"Backup situations: {len(backup_situations)} players")
-    for backup, info in list(backup_situations.items())[:5]:
-        replacing = info.get('replacing', 'Unknown')
-        print(f"  {backup} replacing {replacing}")
-
 # ===== ENHANCED ROOKIE PREDICTOR =====
 
 class EnhancedRookiePredictor:
@@ -1079,7 +1038,6 @@ def comprehensive_predict_week_enhanced(player_name, week):
         
         if injury_analyzer.should_zero_out_player(player_name):
             adjustment_info = injury_analyzer.get_adjustment_info(player_name)
-            print(f"INJURED: {player_name} -> 0 points ({adjustment_info['reason']})")
             
             return {
                 'player_name': player_name,
@@ -1097,7 +1055,6 @@ def comprehensive_predict_week_enhanced(player_name, week):
         is_rookie = is_actually_rookie(player_name, player_id, df_final_clean, year)
         
         if is_rookie:
-            print(f"ROOKIE: {player_name} ({position}, {team})")
             rookie_pred = enhanced_rookie_predictor.predict_rookie(player_name, position, team)
             if rookie_pred:
                 rookie_pred['player_name'] = player_name
@@ -1117,8 +1074,6 @@ def comprehensive_predict_week_enhanced(player_name, week):
                     'fanduel_fantasy_points': fallback_points,
                     'prediction_type': 'rookie_fallback'
                 }
-        
-        print(f"VETERAN: {player_name} ({position}, {team})")
         
         player_data = df_final_clean[
             (df_final_clean['player_display_name'].str.contains(player_name, case=False, na=False)) |
@@ -1172,13 +1127,46 @@ def comprehensive_predict_week_enhanced(player_name, week):
             adjustment_info = injury_analyzer.get_adjustment_info(player_name)
             replacing = adjustment_info.get('replacing', 'injured starter')
             
-            if position == 'QB':
-                result['fanduel_fantasy_points'] *= 2.5
-                adjustment = f"emergency starter boost (replacing {replacing})"
-                print(f"BACKUP BOOST: {player_name} now starting for {replacing}")
+            # Get the backup player's historical production
+            avg_fppg = recent_stats.get('avg_fppg', 0) if 'avg_fppg' in recent_stats.index else 0
+            games_played = len(player_data[player_data['week'] != 'AVG'])
+            
+            # Only boost if player has some track record OR is a high-ranked backup
+            depth_role = enhanced_depth_analyzer.get_player_role(player_name)
+            is_second_string = depth_role and depth_role.get('depth_rank', 99) == 2
+            
+            # Tiered boost based on player's history
+            if games_played >= 5 and avg_fppg >= 5.0:
+                # Proven backup with decent production
+                if position == 'QB':
+                    result['fanduel_fantasy_points'] *= 2.5
+                    adjustment = f"proven backup QB replacing {replacing}"
+                else:
+                    result['fanduel_fantasy_points'] *= 1.8
+                    adjustment = f"proven backup replacing {replacing}"
+            elif is_second_string and games_played >= 3:
+                # Listed #2 on depth chart with some experience
+                if position == 'QB':
+                    result['fanduel_fantasy_points'] *= 2.0
+                    adjustment = f"backup QB replacing {replacing}"
+                else:
+                    result['fanduel_fantasy_points'] *= 1.4
+                    adjustment = f"backup replacing {replacing}"
+            elif result['fanduel_fantasy_points'] < 3.0:
+                # Deep backup with no history - give them a baseline floor instead of boost
+                if position == 'QB':
+                    result['fanduel_fantasy_points'] = 12.0  # QB floor
+                    adjustment = f"emergency QB replacing {replacing} (baseline)"
+                elif position in ['RB', 'WR']:
+                    result['fanduel_fantasy_points'] = 6.0  # Skill position floor
+                    adjustment = f"emergency starter replacing {replacing} (baseline)"
+                else:  # TE
+                    result['fanduel_fantasy_points'] = 4.0  # TE floor
+                    adjustment = f"emergency TE replacing {replacing} (baseline)"
             else:
-                result['fanduel_fantasy_points'] *= 1.8
-                adjustment = f"injury replacement boost (replacing {replacing})"
+                # Has minimal production, apply conservative boost
+                result['fanduel_fantasy_points'] *= 1.3
+                adjustment = f"backup replacing {replacing} (limited history)"
         
         if not backup_boost:
             depth_role = enhanced_depth_analyzer.get_player_role(player_name)
@@ -1256,7 +1244,6 @@ def get_comprehensive_predictions(position, week):
         # CHECK INJURY STATUS BEFORE ANYTHING ELSE
         if injury_analyzer.should_zero_out_player(player_name):
             adjustment_info = injury_analyzer.get_adjustment_info(player_name)
-            print(f"INJURED: {player_name} -> 0 points ({adjustment_info['reason']})")
             
             processed_players.add(player_name)
             predictions.append({
