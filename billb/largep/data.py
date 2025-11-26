@@ -241,7 +241,7 @@ def create_dataframe(seasons):
         if not API_KEY:
             print("WARNING: SPORTRADAR_API_KEY not set, skipping 2025 data")
         else:
-            completed_2025_weeks = [1, 2, 3, 4]  # Update as more weeks complete
+            completed_2025_weeks = [1, 2, 3, 4, 5]  # Update as more weeks complete
             print(f"Collecting 2025 weeks: {completed_2025_weeks}")
             
             df_2025 = collect_2025_data(api_key=API_KEY, weeks=completed_2025_weeks)

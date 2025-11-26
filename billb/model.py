@@ -265,7 +265,7 @@ def get_all_predictions(position, week):
 
 # Main execution
 positions = ['QB', 'RB', 'WR', 'TE']
-week_to_predict = 1  # Set this to the week you want to predict
+week_to_predict = 7  # Set this to the week you want to predict
 
 start_time = time.time()
 

@@ -1,5 +1,8 @@
-# Quick test to see what's actually in the roster
-from nfl_data_py import import_weekly_rosters
-rosters = import_weekly_rosters([2025])
-print(rosters.columns.tolist())
-print(rosters[['player_id', 'sportradar_id', 'player_name']].head())
+"""
+Test script to see what nflreadpy actually returns
+Run this in your Flask app context or Python shell
+"""
+import nflreadpy as nfl
+import pandas as pd
+
+print(nfl.get_current_week())

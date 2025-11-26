@@ -44,10 +44,22 @@ class SportradarInjuryAnalyzer:
                 response = requests.get(url, headers=self.headers, timeout=10)
                 
                 print(f"Status Code: {response.status_code}")
+                print(f"Response Headers: {dict(response.headers)}")
                 
                 if response.status_code == 200:
                     print("✅ Success! Received data")
                     data = response.json()
+                    
+                    print(f"\nResponse structure:")
+                    print(f"  Top-level keys: {list(data.keys())}")
+                    
+                    if 'teams' in data:
+                        print(f"  Number of teams: {len(data['teams'])}")
+                        if data['teams']:
+                            first_team = data['teams'][0]
+                            print(f"  First team keys: {list(first_team.keys())}")
+                            if 'players' in first_team:
+                                print(f"  Players in first team: {len(first_team['players'])}")
                     
                     return data
                     
@@ -94,10 +106,17 @@ class SportradarInjuryAnalyzer:
         
         ir_pup_players = {}
         
+        # Add player_name column if it doesn't exist (use full_name)
+        if 'player_name' not in roster_data.columns and 'full_name' in roster_data.columns:
+            import pandas as pd
+            roster_data = roster_data.copy()
+            roster_data['player_name'] = roster_data['full_name']
+        
         # Filter for inactive statuses
         inactive_statuses = ['RES', 'IR', 'PUP', 'SUS', 'NON']
         
         if 'status' not in roster_data.columns:
+            print("⚠️  No 'status' column in roster data")
             return ir_pup_players
         
         inactive_roster = roster_data[roster_data['status'].isin(inactive_statuses)]
@@ -105,12 +124,16 @@ class SportradarInjuryAnalyzer:
         # Deduplicate by player name (roster has multiple week entries per player)
         inactive_roster = inactive_roster.drop_duplicates(subset=['player_name', 'team', 'position'], keep='first')
         
+        print(f"Found {len(inactive_roster)} players on IR/PUP/Reserve")
+        
         # Focus on offensive skill positions
         skill_positions = ['QB', 'RB', 'WR', 'TE']
         skill_inactive = inactive_roster[inactive_roster['position'].isin(skill_positions)]
         
+        print(f"  • Skill position players: {len(skill_inactive)}")
+        
         for _, player in skill_inactive.iterrows():
-            player_name = player.get('player_name', player.get('display_name', ''))
+            player_name = player.get('player_name', player.get('full_name', ''))
             if not player_name:
                 continue
                 
@@ -119,11 +142,13 @@ class SportradarInjuryAnalyzer:
                 'injury_type': f"{player['status']} list",
                 'position': player['position'],
                 'team': player.get('team', 'UNK'),
-                'player_id': player.get('player_id', ''),
-                'sportradar_id': '',
+                'player_id': player.get('gsis_id', player.get('player_id', '')),
+                'sportradar_id': player.get('sportradar_id', ''),
                 'practice_status': 'IR/PUP/Reserve'
             }
             
+            print(f"    • {player_name} ({player['position']}, {player['team']}): {player['status']}")
+        
         return ir_pup_players
     
     def merge_injury_sources(self, api_injuries, ir_injuries):
@@ -193,12 +218,22 @@ class SportradarInjuryAnalyzer:
             if 'week' in injury_data:
                 teams = injury_data['week'].get('teams', [])
         
+        print(f"\nProcessing {len(teams)} teams...")
+        
         for team in teams:
             team_alias = team.get('alias', team.get('market', 'UNK'))
             team_name = team.get('name', '')
             players = team.get('players', [])
             
+            if players:
+                print(f"\n  {team_alias} ({team_name}): {len(players)} injured players")
+            
             for player_entry in players:
+                if len(injuries) == 0:
+                    print(f"\n  🔍 DEBUG - First player structure:")
+                    print(f"     Keys: {list(player_entry.keys())}")
+                    if 'injuries' in player_entry and player_entry['injuries']:
+                        print(f"     First injury keys: {list(player_entry['injuries'][0].keys())}")
                 
                 player_name = (player_entry.get('name') or 
                               player_entry.get('full_name') or 
@@ -235,6 +270,15 @@ class SportradarInjuryAnalyzer:
                                     injury_info.get('injury') or
                                     injury_info.get('comment', ''))
                     
+                    if len(injuries) < 3:
+                        print(f"  🔍 DEBUG - Extracted values:")
+                        print(f"     Name: '{player_name}'")
+                        print(f"     Position: '{position}'")
+                        print(f"     Game Status: '{status}'")
+                        print(f"     Practice Status: '{practice_status}'")
+                        print(f"     Injury: '{primary_injury}'")
+                        print(f"     Raw injury data: {injury_info}")
+                    
                     # Only include if we have a status (game or inferred from practice)
                     if player_name and status:
                         player_key = player_name
@@ -250,6 +294,8 @@ class SportradarInjuryAnalyzer:
                                 'sportradar_id': sr_id,
                                 'practice_status': practice_status
                             }
+                        
+                        print(f"    • {player_name} ({position}): {status} ({practice_status}) - {primary_injury}")
                     
                     break
         
@@ -268,6 +314,12 @@ class SportradarInjuryAnalyzer:
         print(f"\n{'='*70}")
         print("CATEGORIZING INJURY IMPACT")
         print(f"{'='*70}")
+        
+        # Ensure roster has player_name column
+        if 'player_name' not in roster_data.columns and 'full_name' in roster_data.columns:
+            import pandas as pd
+            roster_data = roster_data.copy()
+            roster_data['player_name'] = roster_data['full_name']
         
         # First pass: categorize all injuries and build injured players set
         out_doubtful_players = set()
@@ -306,24 +358,14 @@ class SportradarInjuryAnalyzer:
             )
             
             if backup:
-                # VERIFY THE BACKUP IS ON THE SAME TEAM
-                backup_team = depth_charts[
-                    depth_charts['player_name'].str.contains(backup, case=False, na=False)
-                ]['team'].iloc[0] if len(depth_charts[
-                    depth_charts['player_name'].str.contains(backup, case=False, na=False)
-                ]) > 0 else None
-                
-                if backup_team == team:  # ONLY add if same team
-                    impact_categories['boost_backup'].append({
-                        'player': backup,
-                        'replacing': player_name,
-                        'reason': f"{player_name} {injured_info['status'].lower()} - {injured_info['injury']}",
-                        'position': position,
-                        'team': team
-                    })
-                else:
-                    pass
-                    
+                impact_categories['boost_backup'].append({
+                    'player': backup,
+                    'replacing': player_name,
+                    'reason': f"{player_name} {injured_info['status'].lower()} - {injured_info['injury']}",
+                    'position': position,
+                    'team': team
+                })
+        
         return impact_categories
     
     def _find_healthy_backup(self, team, position, injured_player, roster_data, depth_charts, out_doubtful_players):
@@ -335,6 +377,7 @@ class SportradarInjuryAnalyzer:
         ].sort_values('pos_rank')
         
         if team_depth.empty:
+            print(f"    ⚠️  No depth chart for {team} {position}")
             return None
         
         # Find injured player's rank using partial name matching
@@ -351,6 +394,7 @@ class SportradarInjuryAnalyzer:
                 ]
         
         if injured_rank.empty:
+            print(f"    ⚠️  {injured_player} not found in {team} {position} depth chart")
             return None
         
         injured_pos_rank = injured_rank.iloc[0]['pos_rank']
@@ -363,20 +407,29 @@ class SportradarInjuryAnalyzer:
         ].sort_values('pos_rank')
         
         # Find the first HEALTHY backup
-        checked_players = set()
+        checked_players = set()  # Prevent duplicate checks
         for _, backup_row in potential_backups.iterrows():
             backup_name = backup_row['player_name']
-            backup_lower = backup_name.lower()
-            
+            try:
+                backup_lower = backup_name.lower()
+            except AttributeError:
+                print(f"    ⚠️  Invalid backup name format: {backup_name}")
+                continue
+            # Skip if already checked
             if backup_lower in checked_players:
                 continue
             checked_players.add(backup_lower)
             
+            # Check if this backup is also injured
             if backup_lower in out_doubtful_players:
+                print(f"    ⚠️  {backup_name} is also injured, checking next...")
                 continue
             
+            # Found a healthy backup!
+            print(f"    ✅ Healthy backup found: {backup_name} replaces {injured_player}")
             return backup_name
         
+        print(f"    ⚠️  No healthy backup found for {injured_player} (all backups injured)")
         return None
     
     def create_injury_overrides(self, week, roster_data, depth_charts):
@@ -440,7 +493,23 @@ class SportradarInjuryAnalyzer:
         print(f"Backups elevated: {len(impact['boost_backup'])}")
         print(f"Questionable (normal projections): {len(impact['questionable'])}")
         
+        if impact['zero_out']:
+            print("\n🚫 Players to zero out:")
+            for p in impact['zero_out'][:15]:  # Show more
+                print(f"  {p['player']} ({p['position']}, {p['team']}): {p['status']} - {p['injury']}")
+        
+        if impact['boost_backup']:
+            print("\n⬆️  Backups getting starter projections:")
+            for b in impact['boost_backup'][:15]:  # Show more
+                print(f"  {b['player']} replacing {b['replacing']} ({b['position']}, {b['team']})")
+        
+        if impact['questionable']:
+            print("\n❓ Questionable players (normal projections):")
+            for q in impact['questionable'][:10]:
+                print(f"  {q['player']} ({q['position']}, {q['team']}): {q['injury']}")
+        
         return overrides, backup_situations
+
 
 def integrate_sportradar_injuries(week, roster_data, depth_charts):
     """
@@ -475,14 +544,13 @@ if __name__ == "__main__":
     
     print(f"✅ API Key found: {API_KEY[:10]}...")
     
-    # Load required data
+    # Load required data using nflreadpy
     print("\n📊 Loading roster and depth chart data...")
     rosters = nfl.load_rosters_weekly(seasons=[2025])
-    depth_charts = nfl.load_depth_charts(seasons=[2025])
-    
-    # Convert from Polars to Pandas if needed
     if hasattr(rosters, 'to_pandas'):
         rosters = rosters.to_pandas()
+    
+    depth_charts = nfl.load_depth_charts(seasons=[2025])
     if hasattr(depth_charts, 'to_pandas'):
         depth_charts = depth_charts.to_pandas()
     

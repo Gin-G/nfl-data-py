@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
 """
-Enhanced NFL Data Processing Script
+NFL Data Processing Script using nflreadpy
 Run with: python data.py
 
-This script processes NFL data and creates an enhanced dataset with:
-- All original player stats and snap counts (using nflreadpy.import_snap_counts)
-- 2025 data from Sportradar API with proper ID mapping and headshots
+This script processes NFL data using nflreadpy:
+- All player stats and snap counts (2018-2025)
+- Sportradar player IDs from roster data
 - Season averages for each player (rows with week='AVG')  
 - Rolling weekly averages (avg_fppg column)
 - FanDuel fantasy points calculations
 
-Output: data/nfl_dataset.csv (same filename as before, but enhanced)
+Output: data/nfl_dataset.csv
 """
 
 import pandas as pd
 import numpy as np
 import os
-from collections import defaultdict
 import nflreadpy as nfl
-from sportradar_nfl_data_collector import collect_2025_data
+
 
 @np.vectorize
 def calculate_fanduel_fantasy_points(
@@ -30,7 +29,6 @@ def calculate_fanduel_fantasy_points(
     extra_points=0
 ):
     """Calculate FanDuel fantasy points based on player stats"""
-    # Handle NaN values by converting to 0
     def safe_value(val):
         return 0 if pd.isna(val) else val
     
@@ -56,11 +54,11 @@ def calculate_fanduel_fantasy_points(
     )
     return points
 
+
 def process_snap_counts(snap_data):
     """Process and clean snap count data from nflreadpy"""
     print("Processing snap count data...")
     
-    # Create a copy to avoid modifying original
     processed_data = snap_data.copy()
     
     # Check what the actual player ID column is
@@ -86,7 +84,6 @@ def process_snap_counts(snap_data):
         'st_pct': 'special_teams_snap_pct'
     }
     
-    # Apply column renaming where columns exist
     for old_col, new_col in column_mapping.items():
         if old_col in processed_data.columns:
             processed_data = processed_data.rename(columns={old_col: new_col})
@@ -119,6 +116,7 @@ def process_snap_counts(snap_data):
     
     return processed_data
 
+
 def add_season_averages(df):
     """Add season average rows for each player-season combination"""
     avg_columns = [
@@ -133,14 +131,12 @@ def add_season_averages(df):
     # Filter to only include regular season weeks (not AVG rows if they already exist)
     regular_weeks = df[df['week'] != 'AVG'].copy()
     
-    # Group by player and season to calculate averages
     season_averages = []
     
     for (player_id, season), group in regular_weeks.groupby(['player_id', 'season']):
         if len(group) == 0:
             continue
             
-        # Calculate averages for numeric columns
         avg_row = {}
         avg_row['player_id'] = player_id
         avg_row['season'] = season
@@ -157,14 +153,12 @@ def add_season_averages(df):
             if col in group.columns:
                 avg_row[col] = group[col].mean()
         
-        # Calculate games played and fantasy point totals
         avg_row['games_played'] = len(group)
         if 'fanduel_fantasy_points' in group.columns:
             avg_row['fanduel_fantasy_points_total'] = group['fanduel_fantasy_points'].sum()
         
         season_averages.append(avg_row)
     
-    # Create DataFrame from season averages
     if season_averages:
         season_avg_df = pd.DataFrame(season_averages)
         
@@ -173,26 +167,21 @@ def add_season_averages(df):
             if col not in season_avg_df.columns:
                 season_avg_df[col] = np.nan
         
-        # Reorder columns to match original DataFrame
         season_avg_df = season_avg_df.reindex(columns=df.columns, fill_value=np.nan)
-        
-        # Combine original data with season averages
         combined_df = pd.concat([df, season_avg_df], ignore_index=True)
     else:
         combined_df = df.copy()
     
     return combined_df
 
+
 def add_rolling_averages(df):
     """Add rolling average fantasy points per game (avg_fppg) for each player"""
     df['avg_fppg'] = np.nan
     
-    # Sort by player, season, week for proper rolling calculation
     df_sorted = df.sort_values(['player_id', 'season', 'week']).copy()
     
-    # Process each player separately
     for player_id, player_data in df_sorted.groupby('player_id'):
-        # Separate regular weeks from AVG rows
         regular_weeks = player_data[player_data['week'] != 'AVG'].copy()
         avg_rows = player_data[player_data['week'] == 'AVG'].copy()
         
@@ -226,122 +215,54 @@ def add_rolling_averages(df):
     
     return df
 
+
 def create_dataframe(seasons):
     """Create the enhanced dataframe with all stats and averages"""
     current_season = seasons[-1]
     
-    # 1. Fetch historical and current season data
-    print("Importing weekly data...")
-    historical_seasons = [s for s in seasons if s < 2025]
-    current_season_data = []
-
-    # Collect 2025 data from Sportradar if needed
-    if 2025 in seasons:
-        # Check if cached CSV exists
-        cached_2025_file = 'data/sportradar_2025_weeks_1-4.csv'
-        
-        if os.path.exists(cached_2025_file):
-            print(f"Loading cached 2025 data from {cached_2025_file}...")
-            df_2025 = pd.read_csv(cached_2025_file)
-            print(f"  Loaded {len(df_2025)} records from cache")
-        else:
-            API_KEY = os.getenv('SPORTRADAR_API_KEY')
-            if not API_KEY:
-                print("WARNING: SPORTRADAR_API_KEY not set, skipping 2025 data")
-                df_2025 = pd.DataFrame()
-            else:
-                completed_2025_weeks = [1, 2, 3, 4]  # Update as more weeks complete
-                print(f"Collecting 2025 weeks: {completed_2025_weeks}")
-                df_2025 = collect_2025_data(api_key=API_KEY, weeks=completed_2025_weeks)
-        
-        if not df_2025.empty:
-            # Get the roster data with ID mappings and metadata
-                print("Mapping Sportradar IDs to GSIS IDs...")
-                rosters_2025 = nfl.load_rosters_weekly(seasons=[2025])
-                # Convert from Polars to Pandas if needed
-                if hasattr(rosters_2025, 'to_pandas'):
-                    rosters_2025 = rosters_2025.to_pandas()
-                
-                # Debug: print available columns
-                print(f"Available roster columns: {rosters_2025.columns.tolist()}")
-                
-                # Create mapping: sportradar_id -> gsis_id + metadata
-                # Check which ID column exists
-                id_col = 'gsis_id' if 'gsis_id' in rosters_2025.columns else 'player_id'
-                
-                required_cols = ['sportradar_id', id_col]
-                optional_cols = ['headshot_url', 'position']
-                
-                # Only include columns that exist
-                cols_to_select = required_cols + [c for c in optional_cols if c in rosters_2025.columns]
-                
-                id_mapping = rosters_2025[cols_to_select].drop_duplicates('sportradar_id')
-                
-                # Rename to standardize
-                if id_col == 'gsis_id':
-                    id_mapping = id_mapping.rename(columns={'gsis_id': 'player_id'})
-                
-                # Drop headshot_url from Sportradar data if it exists (prevents merge conflict)
-                df_2025 = df_2025.drop(columns=['headshot_url'], errors='ignore')
-                
-                # Merge to add GSIS IDs and metadata
-                df_2025 = pd.merge(
-                    df_2025,
-                    id_mapping,
-                    left_on='player_id',  # This is sportradar_id from collector
-                    right_on='sportradar_id',
-                    how='left',
-                    suffixes=('_sr', '_nfl')
-                )
-                
-                # Rename for clarity
-                df_2025 = df_2025.rename(columns={
-                    'player_id_sr': 'player_id_sportradar',
-                    'player_id_nfl': 'player_id'
-                })
-                
-                # Use NFL position if available, otherwise use Sportradar position
-                if 'position_nfl' in df_2025.columns and 'position_sr' in df_2025.columns:
-                    df_2025['position'] = df_2025['position_nfl'].fillna(df_2025['position_sr'])
-                    df_2025 = df_2025.drop(columns=['position_sr', 'position_nfl'], errors='ignore')
-                
-                # Report matching success
-                matched = df_2025['player_id'].notna().sum()
-                total = len(df_2025)
-                print(f"  Matched {matched}/{total} ({matched/total*100:.1f}%) via sportradar_id")
-                
-                if 'headshot_url' in df_2025.columns:
-                    missing_headshots = df_2025['headshot_url'].isna().sum()
-                    has_headshots = df_2025['headshot_url'].notna().sum()
-                    print(f"  Headshots: {has_headshots} present, {missing_headshots} missing")
-                
-                current_season_data.append(df_2025)
-        else:
-            print("  No 2025 data available")
-
-    # Combine historical and current data
-    if historical_seasons:
-        historical_data = nfl.load_player_stats(seasons=historical_seasons)
-        # Convert from Polars to Pandas if needed
-        if hasattr(historical_data, 'to_pandas'):
-            historical_data = historical_data.to_pandas()
-        
-        if current_season_data:
-            player_stats = pd.concat([historical_data] + current_season_data, ignore_index=True)
-        else:
-            player_stats = historical_data
-    else:
-        if current_season_data:
-            player_stats = pd.concat(current_season_data, ignore_index=True)
-        else:
-            raise ValueError("No data to process")
+    # 1. Load ALL player stats from nflreadpy (includes 2025!)
+    print(f"Loading player stats for seasons {seasons[0]}-{seasons[-1]} from nflreadpy...")
+    player_stats = nfl.load_player_stats(seasons=seasons)
+    
+    # Convert from Polars to Pandas if needed
+    if hasattr(player_stats, 'to_pandas'):
+        player_stats = player_stats.to_pandas()
     
     print(f"Total player stat records: {len(player_stats)}")
     
-    # 2. Import additional data sources
+    # 2. Load rosters to get sportradar_id mapping
+    print("Loading rosters for sportradar_id mapping...")
+    all_rosters = nfl.load_rosters_weekly(seasons=seasons)
+    if hasattr(all_rosters, 'to_pandas'):
+        all_rosters = all_rosters.to_pandas()
+    
+    # Create sportradar_id lookup: gsis_id -> sportradar_id
+    # Keep only unique gsis_id entries (deduplicate by gsis_id)
+    sportradar_mapping = all_rosters[['gsis_id', 'sportradar_id']].drop_duplicates('gsis_id')
+    print(f"Created sportradar_id mapping for {len(sportradar_mapping)} players")
+    
+    # Merge sportradar_id into player stats using gsis_id
+    # player_stats uses 'player_id' which is actually gsis_id
+    player_stats = pd.merge(
+        player_stats,
+        sportradar_mapping,
+        left_on='player_id',
+        right_on='gsis_id',
+        how='left'
+    )
+    
+    # Drop the duplicate gsis_id column from the merge
+    if 'gsis_id' in player_stats.columns:
+        player_stats = player_stats.drop(columns=['gsis_id'])
+    
+    # Report sportradar_id coverage
+    has_sr_id = player_stats['sportradar_id'].notna().sum()
+    total = len(player_stats)
+    print(f"Sportradar ID coverage: {has_sr_id}/{total} ({has_sr_id/total*100:.1f}%)")
+    
+    # 3. Import additional data sources from nflreadpy
     print("Importing players data...")
     players = nfl.load_players()
-    # Convert from Polars to Pandas if needed
     if hasattr(players, 'to_pandas'):
         players = players.to_pandas()
     
@@ -365,10 +286,10 @@ def create_dataframe(seasons):
     if hasattr(snap_data, 'to_pandas'):
         snap_data = snap_data.to_pandas()
     
-    # 3. Process snap count data
+    # 5. Process snap count data
     snap_data_processed = process_snap_counts(snap_data)
 
-    # 4. Merge with snap count data
+    # 6. Merge with snap count data
     print("Merging snap count data...")
     
     # Determine the player name column
@@ -399,7 +320,7 @@ def create_dataframe(seasons):
         coverage_pct = (snap_coverage / total_records) * 100
         print(f"Snap count coverage: {snap_coverage:,}/{total_records:,} ({coverage_pct:.1f}%)")
 
-    # 5. Merge with depth chart data
+    # 7. Merge with depth chart data
     print("Merging depth chart data...")
     depth_charts_slim = depth_charts[['gsis_id', 'season', 'week', 'position', 'depth_team']].copy()
     df = pd.merge(
@@ -415,7 +336,7 @@ def create_dataframe(seasons):
     if 'gsis_id_depth_chart' in df.columns:
         df = df.drop(columns=['gsis_id_depth_chart'])
 
-    # 6. Ensure snap columns exist and are properly calculated
+    # 8. Ensure snap columns exist and are properly calculated
     snap_columns = ['offensive_snaps', 'defensive_snaps', 'special_teams_snaps', 'total_snaps', 
                    'offensive_snap_pct', 'defensive_snap_pct', 'special_teams_snap_pct']
     
@@ -440,7 +361,7 @@ def create_dataframe(seasons):
     for col in percentage_columns:
         df[col] = df[col].clip(0, 100)
 
-    # 7. Calculate FanDuel fantasy points
+    # 9. Calculate FanDuel fantasy points
     print("Calculating FanDuel fantasy points...")
     fumbles_col = (
         df.get('rushing_fumbles', 0).fillna(0) + 
@@ -455,24 +376,26 @@ def create_dataframe(seasons):
         fumbles_col
     )
 
-    # 8. Add season averages
+    # 10. Add season averages
     print("Adding season averages...")
     df = add_season_averages(df)
     
-    # 9. Add rolling averages
+    # 11. Add rolling averages
     print("Adding rolling averages...")
     df = add_rolling_averages(df)
 
-    # 10. Save to CSV
+    # 12. Save to CSV
     os.makedirs('data', exist_ok=True)
     df.to_csv('data/nfl_dataset.csv', index=False)
     print("Enhanced DataFrame saved to data/nfl_dataset.csv")
     
     return df
 
+
 def main():
     """Main execution"""
-    print("Starting enhanced NFL data processing...")
+    print("Starting NFL data processing with nflreadpy...")
+    print("Note: nflreadpy now includes 2025 data - no Sportradar API needed!")
     
     # Include all seasons through 2025
     seasons = list(range(2018, 2026))
@@ -483,6 +406,12 @@ def main():
     if result is not None:
         print("\nData processing completed successfully.")
         print(f"Dataset shape: {result.shape}")
+        
+        # Check sportradar_id coverage
+        if 'sportradar_id' in result.columns:
+            sr_coverage = result['sportradar_id'].notna().sum()
+            total = len(result)
+            print(f"Sportradar ID coverage: {sr_coverage}/{total} ({sr_coverage/total*100:.1f}%)")
         
         # Show summary
         season_avg_rows = result[result['week'] == 'AVG']
@@ -500,6 +429,10 @@ def main():
             if 'headshot_url' in data_2025.columns:
                 headshots = data_2025['headshot_url'].notna().sum()
                 print(f"  Headshots: {headshots}/{len(data_2025)} ({headshots/len(data_2025)*100:.1f}%)")
+            
+            if 'sportradar_id' in data_2025.columns:
+                sr_2025 = data_2025['sportradar_id'].notna().sum()
+                print(f"  Sportradar IDs: {sr_2025}/{len(data_2025)} ({sr_2025/len(data_2025)*100:.1f}%)")
         
         # Show snap count statistics
         snap_cols = ['offensive_snaps', 'defensive_snaps', 'special_teams_snaps', 'total_snaps']
@@ -511,6 +444,7 @@ def main():
         print(f"\nEnhanced dataset saved to: data/nfl_dataset.csv")
     else:
         print("Data processing failed. Please check the logs for details.")
+
 
 if __name__ == "__main__":
     main()
