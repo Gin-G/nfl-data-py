@@ -1,0 +1,260 @@
+"""Feature engineering and training-data preparation (pure pandas/numpy)."""
+
+import logging
+
+import numpy as np
+import pandas as pd
+
+from . import config
+from .utils import regular_games
+
+logger = logging.getLogger(__name__)
+
+# Feature groups pulled straight from the dataset when present
+CORE_OFFENSIVE = [
+    "passing_yards", "passing_tds", "interceptions", "completions", "attempts",
+    "rushing_yards", "rushing_tds", "carries", "rushing_fumbles", "rushing_fumbles_lost",
+    "receiving_yards", "receiving_tds", "receptions", "targets", "receiving_fumbles",
+    "receiving_fumbles_lost", "sacks", "sack_yards", "sack_fumbles", "sack_fumbles_lost",
+]
+ADVANCED_PASSING = [
+    "passing_air_yards", "passing_yards_after_catch", "passing_first_downs",
+    "passing_epa", "passing_2pt_conversions", "pacr", "dakota",
+]
+ADVANCED_RUSHING = ["rushing_first_downs", "rushing_epa", "rushing_2pt_conversions"]
+ADVANCED_RECEIVING = [
+    "receiving_air_yards", "receiving_yards_after_catch", "receiving_first_downs",
+    "receiving_epa", "receiving_2pt_conversions", "racr", "target_share",
+    "air_yards_share", "wopr",
+]
+SNAP_COUNT_FEATURES = [
+    "offensive_snaps", "offensive_snap_pct",
+    "defensive_snaps", "defensive_snap_pct",
+    "special_teams_snaps", "special_teams_snap_pct",
+    "total_snaps",
+]
+SPECIAL_MISC = ["special_teams_tds", "fantasy_points", "fantasy_points_ppr"]
+PERFORMANCE_TRACKING = ["avg_fppg"]
+
+# Features computed in add_derived_features
+DERIVED_FEATURES = [
+    "yards_per_attempt", "yards_per_carry", "yards_per_target",
+    "completion_rate", "catch_rate",
+    "fantasy_per_snap", "high_snap_count", "snap_role", "is_primary_player",
+    "special_teams_player", "opportunity_score", "reduced_snaps",
+    "epa_per_attempt", "epa_per_target", "avg_target_depth",
+    "qb_passing_volume", "rb_total_touches", "wr_te_targets", "wr_te_snap_rate",
+    "performance_vs_average", "is_consistent_performer", "above_season_average",
+    "pass_heavy_script",
+]
+
+VALID_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"]
+
+
+def clean_training_data(df, min_season=config.TRAINING_MIN_SEASON, min_games=3):
+    """Drop AVG rows, low-activity players, fantasy-point outliers, old seasons."""
+    games = regular_games(df) if "week" in df.columns else df.copy()
+
+    player_game_counts = games.groupby("player_id").size()
+    active_players = player_game_counts[player_game_counts >= min_games].index
+    games = games[games["player_id"].isin(active_players)]
+
+    q99 = games["fanduel_fantasy_points"].quantile(0.99)
+    q1 = games["fanduel_fantasy_points"].quantile(0.01)
+    games = games[
+        (games["fanduel_fantasy_points"] >= q1) & (games["fanduel_fantasy_points"] <= q99)
+    ]
+
+    if "season" in games.columns and min_season:
+        games = games[games["season"] >= min_season]
+
+    return games
+
+
+def add_next_week_targets(df, target_cols=None):
+    """Shift each target stat back one game so a row predicts its next week."""
+    target_cols = target_cols or [c for c in config.TARGET_COLS if c in df.columns]
+    out = df.sort_values(["player_id", "season", "week"]).copy()
+
+    for col in target_cols:
+        out[f"next_week_{col}"] = out.groupby(["player_id", "season"])[col].shift(-1)
+
+    shifted = [f"next_week_{col}" for col in target_cols]
+    out = out[~out[shifted].isna().all(axis=1)]
+    return out
+
+
+def get_base_features(df):
+    """Base numerical features present in this dataset."""
+    available = set(df.columns)
+    all_potential = (
+        CORE_OFFENSIVE + ADVANCED_PASSING + ADVANCED_RUSHING
+        + ADVANCED_RECEIVING + SNAP_COUNT_FEATURES + SPECIAL_MISC + PERFORMANCE_TRACKING
+    )
+    return [col for col in all_potential if col in available]
+
+
+def _position_column(df):
+    if "position_x" in df.columns:
+        return "position_x"
+    if "position" in df.columns:
+        return "position"
+    return None
+
+
+def add_derived_features(df):
+    """Add efficiency, snap-share, and usage features derived from base stats."""
+    out = df.copy()
+
+    def ratio(num, den):
+        return np.where(out[den] > 0, out[num] / out[den], 0)
+
+    if {"attempts", "passing_yards"} <= set(out.columns):
+        out["yards_per_attempt"] = ratio("passing_yards", "attempts")
+    if {"carries", "rushing_yards"} <= set(out.columns):
+        out["yards_per_carry"] = ratio("rushing_yards", "carries")
+    if {"targets", "receiving_yards"} <= set(out.columns):
+        out["yards_per_target"] = ratio("receiving_yards", "targets")
+
+    if "offensive_snaps" in out.columns:
+        out["high_snap_count"] = (out["offensive_snaps"] >= 50).astype(int)
+        if "fanduel_fantasy_points" in out.columns:
+            out["fantasy_per_snap"] = np.where(
+                out["offensive_snaps"] > 0,
+                out["fanduel_fantasy_points"] / out["offensive_snaps"], 0,
+            )
+
+    if "offensive_snap_pct" in out.columns:
+        out["snap_role"] = pd.cut(
+            out["offensive_snap_pct"], bins=[0, 25, 60, 100],
+            labels=[0, 1, 2], include_lowest=True,
+        ).astype(float)
+        out["is_primary_player"] = (out["offensive_snap_pct"] >= 60).astype(int)
+        out["reduced_snaps"] = (out["offensive_snap_pct"] < 50).astype(int)
+
+    if "special_teams_snaps" in out.columns:
+        out["special_teams_player"] = (out["special_teams_snaps"] > 0).astype(int)
+
+    if {"carries", "targets", "offensive_snaps"} <= set(out.columns):
+        touches = out["carries"].fillna(0) + out["targets"].fillna(0)
+        out["opportunity_score"] = touches * 2 + out["offensive_snaps"].fillna(0) * 0.1
+
+    if {"passing_epa", "attempts"} <= set(out.columns):
+        out["epa_per_attempt"] = ratio("passing_epa", "attempts")
+    if {"receiving_epa", "targets"} <= set(out.columns):
+        out["epa_per_target"] = ratio("receiving_epa", "targets")
+    if {"receiving_air_yards", "targets"} <= set(out.columns):
+        out["avg_target_depth"] = ratio("receiving_air_yards", "targets")
+    if {"completions", "attempts"} <= set(out.columns):
+        out["completion_rate"] = ratio("completions", "attempts")
+    if {"receptions", "targets"} <= set(out.columns):
+        out["catch_rate"] = ratio("receptions", "targets")
+
+    position_col = _position_column(out)
+    if position_col:
+        if "attempts" in out.columns:
+            out["qb_passing_volume"] = np.where(
+                out[position_col] == "QB", out["attempts"], 0
+            )
+        if {"carries", "targets"} <= set(out.columns):
+            out["rb_total_touches"] = np.where(
+                out[position_col] == "RB",
+                out["carries"].fillna(0) + out["targets"].fillna(0), 0,
+            )
+        if "targets" in out.columns:
+            out["wr_te_targets"] = np.where(
+                out[position_col].isin(["WR", "TE"]), out["targets"], 0
+            )
+        if "offensive_snap_pct" in out.columns:
+            out["wr_te_snap_rate"] = np.where(
+                out[position_col].isin(["WR", "TE"]), out["offensive_snap_pct"], 0
+            )
+
+    if {"avg_fppg", "fanduel_fantasy_points"} <= set(out.columns):
+        out["performance_vs_average"] = out["fanduel_fantasy_points"] - out["avg_fppg"]
+        out["is_consistent_performer"] = (
+            out["performance_vs_average"].abs() < 3
+        ).astype(int)
+        out["above_season_average"] = (
+            out["fanduel_fantasy_points"] > out["avg_fppg"]
+        ).astype(int)
+
+    if {"attempts", "carries"} <= set(out.columns):
+        total_plays = out["attempts"].fillna(0) + out["carries"].fillna(0)
+        out["pass_heavy_script"] = np.where(
+            total_plays > 0, out["attempts"].fillna(0) / total_plays > 0.6, 0
+        ).astype(int)
+
+    return out.fillna(0)
+
+
+def select_feature_columns(df):
+    """Return (numerical_features, categorical_features) available in df."""
+    numerical = [c for c in get_base_features(df) if c in df.columns]
+    numerical += [c for c in DERIVED_FEATURES if c in df.columns]
+
+    categorical = []
+    position_col = _position_column(df)
+    if position_col:
+        categorical.append(position_col)
+    if "recent_team" in df.columns:
+        categorical.append("recent_team")
+
+    return numerical, categorical
+
+
+def clean_categorical_features(df, cat_features):
+    """Map invalid positions to 'Unknown' and stringify categorical columns."""
+    out = df.copy()
+    for col in cat_features:
+        if col not in out.columns:
+            continue
+        if "position" in col:
+            out[col] = out[col].fillna("Unknown").astype(str).apply(
+                lambda x: x if x in VALID_POSITIONS else "Unknown"
+            )
+        else:
+            out[col] = (
+                out[col].fillna("Unknown").astype(str)
+                .replace(["nan", "None"], "Unknown")
+            )
+    return out
+
+
+def is_rookie(player_name, player_id, historical_df, current_season):
+    """True if a player entered the NFL this season and has fewer than 2 games.
+
+    Players with 2+ games in the current season use the ML model even in
+    their rookie year.
+    """
+    history = historical_df[
+        (historical_df["player_id"] == player_id)
+        | historical_df["player_display_name"].str.contains(player_name, case=False, na=False)
+        | historical_df["player_name"].str.contains(player_name, case=False, na=False)
+    ]
+    if history.empty:
+        return True
+
+    actual_games = history[history["week"] != "AVG"]
+    seasons_played = actual_games["season"].unique()
+
+    if any(season < current_season for season in seasons_played):
+        return False
+
+    current_season_games = actual_games[actual_games["season"] == current_season]
+    if len(current_season_games) >= 2:
+        return False
+
+    return True
+
+
+def prepare_prediction_base(df, min_season=config.TRAINING_MIN_SEASON):
+    """History table used to look up a player's latest game at prediction time.
+
+    Same cleaning and derived features as training, but keeps every game
+    (no next-week-target requirement), so a player's true latest game is used.
+    """
+    cleaned = clean_training_data(df, min_season=min_season)
+    with_features = add_derived_features(cleaned)
+    _, categorical = select_feature_columns(with_features)
+    return clean_categorical_features(with_features, categorical)

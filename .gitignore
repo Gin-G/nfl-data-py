@@ -170,3 +170,11 @@ cython_debug/
 #.idea/
 
 *.csv
+# Pipeline outputs
+data/
+predictions/
+player_pools/
+models/
+*.keras
+*.pkl
+model_debug.log
