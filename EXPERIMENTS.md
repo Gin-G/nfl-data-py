@@ -28,6 +28,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 9 | Projector wiring: floor/median/ceiling in `predict` output | — | — | — | **KEPT** — `--quantiles` flag |
 | 10 | Component-derived FP (score predicted stat components) | 4.83 | 0.555 | +0.63 | **REJECTED** — QB catastrophic (6.9→13.1); skill marginally better |
 | 11 | Wider quantile band q05/q95 | median 4.14 | — | band 72→**81%** | **KEPT (option)** — ceiling well-calibrated; floor still high |
+| 12 | FPA as an explicit post-projection multiplier | 4.21–4.41 | — | +0.004 → +0.21 | **REJECTED** — monotonically worse; best setting is "off" |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -73,6 +74,16 @@ for q10/q90) with the ceiling well-calibrated (q95 empirical 0.909). The floor
 stays too high (q5 empirical 0.21 vs 0.05) — the model still won't foresee 0-pt
 busts, worst for QB (72% band coverage). Reasonable default for a floor/ceiling
 range; pass `quantiles=(0.05,0.5,0.95)`.
+
+## FPA / matchup — tested three ways, all negative (#4, #5, #12)
+"Fantasy points allowed to a position" is the opponent feature set. It has now
+failed to help the single-game point projection through three independent
+mechanisms: as a model input feature (coarse #4 and pbp-scheme #5), and as an
+explicit post-projection multiplier (#12, the way analysts apply it — worse at
+every strength, best at "off"). Consistent conclusion: at single-game
+granularity the matchup signal is dominated by week-to-week variance, and the
+player's own recent usage already carries the predictable part. FPA is noisy and
+not strength-of-schedule adjusted. Not a mean-accuracy lever here.
 
 ## Where things stand
 Point projection is at MAE ~4.17 (rolling features, #2) and looks near the
