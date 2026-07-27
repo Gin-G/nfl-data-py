@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nfl-projections"
+version = "1.2.0"
+description = "NFL fantasy projections pipeline: next-week player stats and FanDuel points, with floor/median/ceiling ranges and a DFS optimizer."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Gin-G" }]
+keywords = ["nfl", "fantasy", "projections", "dfs", "nflverse"]
+
+# Everything needed to build data, train, and run ProjectionService.
+dependencies = [
+    "nflreadpy",
+    "pandas",
+    "numpy",
+    "pyarrow",
+    "scikit-learn",
+    "tensorflow",
+    "joblib",
+    "tqdm",
+    "requests",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]        # learning-curve PNGs (off by default in the service)
+dev = ["pytest", "pytest-cov"]
+
+[project.scripts]
+nfl-projections = "nfl_projections.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Gin-G/nfl-data-py"
+
+[tool.setuptools]
+packages = ["nfl_projections"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

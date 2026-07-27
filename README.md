@@ -18,6 +18,12 @@ tracked in [`EXPERIMENTS.md`](EXPERIMENTS.md).
 pip install -r requirements.txt
 ```
 
+Or install the package (e.g. to import `nfl_projections` from another service):
+
+```bash
+pip install "nfl-projections @ git+https://github.com/Gin-G/nfl-data-py.git"
+```
+
 Injury data comes free from nflverse (no API key). A Sportradar key is optional
 (`export SPORTRADAR_API_KEY=...`, then `--injury-source sportradar`).
 
