@@ -29,6 +29,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 10 | Component-derived FP (score predicted stat components) | 4.83 | 0.555 | +0.63 | **REJECTED** — QB catastrophic (6.9→13.1); skill marginally better |
 | 11 | Wider quantile band q05/q95 | median 4.14 | — | band 72→**81%** | **KEPT (option)** — ceiling well-calibrated; floor still high |
 | 12 | FPA as an explicit post-projection multiplier | 4.21–4.41 | — | +0.004 → +0.21 | **REJECTED** — monotonically worse; best setting is "off" |
+| 13 | Lineup backtest: ceiling vs mean objective | — | — | ceiling −7 pts/wk | **mean wins** — ceiling scored lower, same variance |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -84,6 +85,19 @@ every strength, best at "off"). Consistent conclusion: at single-game
 granularity the matchup signal is dominated by week-to-week variance, and the
 player's own recent usage already carries the predictable part. FPA is noisy and
 not strength-of-schedule adjusted. Not a mean-accuracy lever here.
+
+## Lineup backtest (#13)
+Built mean- vs ceiling-optimized skill lineups for 2025 wk4-18 (salaries priced
+off each player's trailing avg_fppg, leakage-free) and scored them by actual
+results. Mean objective won on every metric: top-1 lineup 81.5 vs 74.5, best-of-5
+97.8 vs 92.2, and identical score volatility (std 20.6 vs 20.7). Ceiling beat mean
+in only ~6/15 weeks. So the ceiling objective is just a noisier mean here — no
+upside payoff. Root cause ties back to the quantile model differentiating player
+variance only weakly (ceiling ~0.9 correlated with the median), so "ceiling" ≈
+"noisy mean". **Default the optimizer to `mean`.** Caveats: proxy salaries
+(priced off form) can't show the real-market mispricings a ceiling strategy might
+exploit, and it's a single season/seed — real FanDuel salaries could change the
+GPP picture. Keep floor/ceiling available as options.
 
 ## Where things stand
 Point projection is at MAE ~4.17 (rolling features, #2) and looks near the

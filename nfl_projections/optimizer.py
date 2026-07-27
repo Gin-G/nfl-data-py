@@ -95,7 +95,7 @@ def _check_usage_limit(nickname, current_lineups, num_lineups, max_usage_percent
 
 
 def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
-                     max_usage_percentage=50, objective="mean"):
+                     max_usage_percentage=50, objective="mean", roster_slots=None):
     """Build diverse FanDuel lineups from a merged salary+projection frame.
 
     Args:
@@ -111,6 +111,7 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
 
     Returns a list of lineup DataFrames.
     """
+    roster_slots = roster_slots or ROSTER_SLOTS
     df = df.copy()
 
     df["Injury Indicator"] = df.get("Injury Indicator", pd.Series("", index=df.index)).fillna("")
@@ -149,11 +150,11 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
             current_df = df.copy()
             lineup = [focus_player]
             remaining_salary = salary_cap - focus_player["Salary"]
-            positions_needed = dict(ROSTER_SLOTS)
+            positions_needed = dict(roster_slots)
             positions_needed[focus_player["Roster Position"]] -= 1
 
             lineup_complete = True
-            for position in ROSTER_SLOTS:
+            for position in roster_slots:
                 if position == focus_player["Roster Position"]:
                     continue
 
