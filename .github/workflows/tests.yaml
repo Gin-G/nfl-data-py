@@ -14,7 +14,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dependencies
-        run: pip install pandas numpy pytest pytest-cov
+        # The suite runs on pure logic (TF / sklearn / nflreadpy are imported
+        # lazily and not exercised), so only these lightweight deps are needed.
+        # `requests` is required because importing the package pulls in the
+        # service -> predict -> injuries chain.
+        run: pip install pandas numpy requests pytest pytest-cov
       - name: Run pytest
         run: pytest --cov=nfl_projections --cov-report=xml
       - name: Upload results to Codecov
