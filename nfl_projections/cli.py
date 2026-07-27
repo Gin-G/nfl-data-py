@@ -78,9 +78,20 @@ def build_parser():
     p.add_argument("--output-dir", type=str, default=config.POOLS_DIR)
     p.add_argument("--no-combined", action="store_true")
 
-    p = sub.add_parser("optimize", help="Build FanDuel lineups from a merged CSV")
-    p.add_argument("--csv", type=str, required=True,
-                   help="Merged FanDuel salary + projections CSV")
+    p = sub.add_parser("optimize", help="Build FanDuel lineups from projections")
+    p.add_argument("--csv", type=str, default=None,
+                   help="Pre-merged FanDuel salary + projections CSV")
+    p.add_argument("--fanduel", type=str, default=None,
+                   help="FanDuel salary export; project --season/--week and merge automatically")
+    p.add_argument("--season", type=int, default=config.CURRENT_SEASON)
+    p.add_argument("--week", type=int, default=None,
+                   help="Week to project (required with --fanduel)")
+    p.add_argument("--objective", choices=["mean", "floor", "median", "ceiling"],
+                   default="mean",
+                   help="What to optimize: mean (default), ceiling (GPP), floor (cash)")
+    p.add_argument("--data", type=str, default=config.DATASET_PATH)
+    p.add_argument("--model-dir", type=str, default=None)
+    p.add_argument("--epochs", type=int, default=100)
     p.add_argument("--lineups", type=int, default=5)
     p.add_argument("--salary-cap", type=int, default=60000)
     p.add_argument("--exclude", nargs="+", default=None, help="Players to exclude")
@@ -201,10 +212,26 @@ def main(argv=None):
     elif args.command == "optimize":
         from . import optimizer
 
-        lineups = optimizer.optimize_from_csv(
-            args.csv, num_lineups=args.lineups, salary_cap=args.salary_cap,
-            exclude_players=args.exclude, max_usage_percentage=args.max_usage,
-        )
+        if args.fanduel:
+            if args.week is None:
+                raise SystemExit("--fanduel requires --week (and --season)")
+            from .service import optimize_week
+
+            lineups, _ = optimize_week(
+                args.season, args.week, args.fanduel,
+                objective=args.objective, num_lineups=args.lineups,
+                salary_cap=args.salary_cap, exclude_players=args.exclude,
+                max_usage_percentage=args.max_usage,
+                model_dir=args.model_dir, data_path=args.data, epochs=args.epochs,
+            )
+        elif args.csv:
+            lineups = optimizer.optimize_from_csv(
+                args.csv, num_lineups=args.lineups, salary_cap=args.salary_cap,
+                exclude_players=args.exclude, max_usage_percentage=args.max_usage,
+                objective=args.objective,
+            )
+        else:
+            raise SystemExit("optimize needs --csv (pre-merged) or --fanduel + --week")
         optimizer.display_lineups(lineups)
 
     elif args.command == "backtest":

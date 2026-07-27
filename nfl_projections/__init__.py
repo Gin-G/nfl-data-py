@@ -29,8 +29,18 @@ Command line:
     python -m nfl_projections backtest --season 2025 --weeks 1-17
 """
 
-from .service import ProjectionService, project_week, results_to_frame
+from .service import (
+    ProjectionService,
+    optimize_week,
+    project_week,
+    results_to_frame,
+)
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
-__all__ = ["ProjectionService", "project_week", "results_to_frame"]
+__all__ = [
+    "ProjectionService",
+    "project_week",
+    "optimize_week",
+    "results_to_frame",
+]

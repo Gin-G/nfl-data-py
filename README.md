@@ -104,7 +104,29 @@ external CSV are auto-detected (`Player`/`FPTS` etc.); override with
 
 ## Lineup optimization
 
-Merge a FanDuel salary export with projections and build lineups:
+End-to-end from a FanDuel salary export (projects the week, merges, and builds
+lineups in one step):
+
+```bash
+python -m nfl_projections optimize --fanduel FanDuel-players-list.csv \
+    --season 2025 --week 3 --objective ceiling --lineups 10
+```
+
+`--objective` picks what each lineup maximizes: `mean` (default, expected
+points), `ceiling` (tournament upside), `floor` (cash-game safety), or `median`.
+The non-mean options use the quantile model, which is trained automatically.
+Lineups print with their floor–ceiling range.
+
+From Python:
+
+```python
+from nfl_projections import optimize_week
+
+lineups, merged = optimize_week(2025, 3, "FanDuel-players-list.csv",
+                                objective="ceiling", num_lineups=10)
+```
+
+Or keep the two steps separate with a pre-merged CSV:
 
 ```python
 from nfl_projections import optimizer
@@ -112,13 +134,13 @@ import pandas as pd
 
 merged = optimizer.merge_fanduel_salaries(
     pd.read_csv("FanDuel-players-list.csv"),
-    pd.read_csv("predictions/all_predictions.csv"),
+    pd.read_csv("predictions/all_predictions.csv"),   # or ProjectionService output
 )
 merged.to_csv("merged.csv", index=False)
 ```
 
 ```bash
-python -m nfl_projections optimize --csv merged.csv --lineups 10 --salary-cap 60000
+python -m nfl_projections optimize --csv merged.csv --objective floor --lineups 10
 ```
 
 ## Package layout

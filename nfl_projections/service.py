@@ -115,6 +115,31 @@ class ProjectionService:
         )
         return projector.predict_player(player_name)
 
+    def optimize(self, season, week, fanduel_csv, objective="mean", num_lineups=5,
+                 salary_cap=60000, exclude_players=None, max_usage_percentage=50,
+                 positions=None, use_injuries=True):
+        """Project the week, merge with a FanDuel salary export, build lineups.
+
+        Args:
+            fanduel_csv: path to (or DataFrame of) a FanDuel main-slate export
+            objective: "mean" (default), "ceiling", "floor", or "median" —
+                needs a quantile model loaded for the non-mean options.
+        Returns (lineups, merged_frame).
+        """
+        from . import optimizer
+
+        projections = self.project(
+            season, week, positions=positions, use_injuries=use_injuries, as_frame=True
+        )
+        fanduel_df = fanduel_csv if isinstance(fanduel_csv, pd.DataFrame) else pd.read_csv(fanduel_csv)
+        merged = optimizer.merge_fanduel_salaries(fanduel_df, projections)
+        lineups = optimizer.optimize_lineups(
+            merged, num_lineups=num_lineups, salary_cap=salary_cap,
+            exclude_players=exclude_players, max_usage_percentage=max_usage_percentage,
+            objective=objective,
+        )
+        return lineups, merged
+
 
 def project_week(season, week, *, quantiles=False, opponent=False, model_dir=None,
                  quantile_model_dir=None, data_path=config.DATASET_PATH, dataset=None,
@@ -133,4 +158,26 @@ def project_week(season, week, *, quantiles=False, opponent=False, model_dir=Non
     return svc.project(
         season, week, positions=positions, players=players,
         use_injuries=use_injuries, save=save, output_dir=output_dir, as_frame=as_frame,
+    )
+
+
+def optimize_week(season, week, fanduel_csv, *, objective="mean", num_lineups=5,
+                  salary_cap=60000, exclude_players=None, max_usage_percentage=50,
+                  model_dir=None, quantile_model_dir=None, data_path=config.DATASET_PATH,
+                  dataset=None, epochs=100, use_injuries=True):
+    """One-shot: project a week, merge FanDuel salaries, build lineups.
+
+    A quantile model is trained automatically when ``objective`` is floor/median/
+    ceiling (needed for those columns). Returns (lineups, merged_frame).
+    """
+    svc = ProjectionService(
+        dataset=dataset, data_path=data_path, model_dir=model_dir,
+        quantile_model_dir=quantile_model_dir,
+        quantiles=objective in ("floor", "median", "ceiling"),
+        epochs=epochs,
+    )
+    return svc.optimize(
+        season, week, fanduel_csv, objective=objective, num_lineups=num_lineups,
+        salary_cap=salary_cap, exclude_players=exclude_players,
+        max_usage_percentage=max_usage_percentage, use_injuries=use_injuries,
     )

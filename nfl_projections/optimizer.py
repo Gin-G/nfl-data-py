@@ -22,6 +22,26 @@ ROSTER_SLOTS = {
 FLEX_ELIGIBLE = ["RB/FLEX", "WR/FLEX", "TE/FLEX"]
 EXCLUDED_INJURY_STATUSES = ["IR", "O", "D"]
 
+# Which projection column drives lineup value. "mean" is the expected-points
+# projection; floor/median/ceiling come from the quantile model (use ceiling for
+# tournament upside, floor for cash-game safety).
+OBJECTIVE_COLUMNS = {
+    "mean": "fanduel_fantasy_points",
+    "median": "projection_median",
+    "floor": "floor",
+    "ceiling": "ceiling",
+}
+
+
+def _objective_column(df, objective):
+    """Resolve the objective to a present column, falling back to the mean."""
+    col = OBJECTIVE_COLUMNS.get(objective, "fanduel_fantasy_points")
+    if col not in df.columns:
+        if objective not in (None, "mean"):
+            print(f"'{objective}' column not found; using mean projection instead")
+        return "fanduel_fantasy_points"
+    return col
+
 
 def normalize_name(name):
     """Normalize FanDuel nicknames for matching against our projections."""
@@ -75,7 +95,7 @@ def _check_usage_limit(nickname, current_lineups, num_lineups, max_usage_percent
 
 
 def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
-                     max_usage_percentage=50):
+                     max_usage_percentage=50, objective="mean"):
     """Build diverse FanDuel lineups from a merged salary+projection frame.
 
     Args:
@@ -85,6 +105,9 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
         salary_cap: FanDuel salary cap
         exclude_players: nicknames to leave out entirely
         max_usage_percentage: cap on how often one player appears
+        objective: which projection drives value - "mean" (default),
+            "ceiling" (GPP upside), "floor" (cash safety), or "median".
+            Non-mean objectives need a projection made with the quantile model.
 
     Returns a list of lineup DataFrames.
     """
@@ -98,8 +121,10 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
     if exclude_players:
         df = df[~df["Nickname"].isin(set(exclude_players))]
 
-    # DEF has no model projection; use FanDuel's FPPG
-    df["lineup_points"] = df["fanduel_fantasy_points"]
+    # Optimize toward the chosen projection; DEF has no model projection so it
+    # always falls back to FanDuel's FPPG.
+    proj_col = _objective_column(df, objective)
+    df["lineup_points"] = df[proj_col].fillna(df["fanduel_fantasy_points"]).fillna(0)
     df.loc[df["Roster Position"] == "DEF", "lineup_points"] = df.loc[
         df["Roster Position"] == "DEF", "FPPG"
     ]
@@ -173,12 +198,13 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
 
 
 def optimize_from_csv(csv_file, num_lineups=5, salary_cap=60000, exclude_players=None,
-                      max_usage_percentage=50):
+                      max_usage_percentage=50, objective="mean"):
     """Optimize lineups from a merged salary+projection CSV file."""
     df = pd.read_csv(csv_file)
     return optimize_lineups(df, num_lineups=num_lineups, salary_cap=salary_cap,
                             exclude_players=exclude_players,
-                            max_usage_percentage=max_usage_percentage)
+                            max_usage_percentage=max_usage_percentage,
+                            objective=objective)
 
 
 def display_lineups(lineups):
@@ -189,10 +215,13 @@ def display_lineups(lineups):
     for i, lineup in enumerate(lineups, 1):
         print(f"\nLineup {i}:")
         cols = [c for c in ["Roster Position", "Nickname", "Salary", "lineup_points",
-                            "Injury Indicator"] if c in lineup.columns]
+                            "floor", "ceiling", "Injury Indicator"] if c in lineup.columns]
         print(lineup[cols])
         print(f"Total Salary: ${lineup['Salary'].sum():,.0f}")
         print(f"Projected Points: {lineup['lineup_points'].sum():.2f}")
+        if {"floor", "ceiling"} <= set(lineup.columns):
+            print(f"Range: floor {lineup['floor'].sum():.1f} - "
+                  f"ceiling {lineup['ceiling'].sum():.1f}")
 
     print("\nTop 20 most used players:")
     print(calculate_player_usage(lineups).head(20))
