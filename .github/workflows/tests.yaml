@@ -16,12 +16,17 @@ jobs:
       - name: Install dependencies
         # The suite runs on pure logic (TF / sklearn / nflreadpy are imported
         # lazily and not exercised), so only these lightweight deps are needed.
-        # `requests` is required because importing the package pulls in the
-        # service -> predict -> injuries chain.
-        run: pip install pandas numpy requests pytest pytest-cov
+        # `requests` is pulled in by importing the package (service -> predict
+        # -> injuries). Install the package itself with --no-deps so it's
+        # importable without dragging in TensorFlow.
+        run: |
+          pip install pandas numpy requests pytest pytest-cov
+          pip install -e . --no-deps
       - name: Run pytest
         run: pytest --cov=nfl_projections --cov-report=xml
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v4
+        continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
