@@ -444,11 +444,15 @@ class Projector:
         player_name = player_info["player_name"]
         position = player_info["position"]
         team = _extract_team(player_info)
+        player_id = player_info.get("player_id", player_info.get("gsis_id", ""))
+        if pd.isna(player_id):
+            player_id = ""
 
         # Injured players are zeroed before anything else
         if self.injury_analyzer.should_zero_out_player(player_name):
             adjustment = self.injury_analyzer.get_adjustment_info(player_name)
             return {
+                "player_id": player_id,
                 "player_name": player_name,
                 "position": position,
                 "team": team,
@@ -457,10 +461,6 @@ class Projector:
                 "injury_status": "OUT",
                 "injury_reason": adjustment["reason"],
             }
-
-        player_id = player_info.get("player_id", player_info.get("gsis_id", ""))
-        if pd.isna(player_id):
-            player_id = ""
 
         player_data = self.history[
             self.history["player_display_name"].str.contains(player_name, case=False, na=False)
@@ -477,6 +477,7 @@ class Projector:
                 )
                 if rookie_pred:
                     return {
+                        "player_id": player_id,
                         "player_name": player_name,
                         "position": position,
                         "team": team,
@@ -510,6 +511,7 @@ class Projector:
 
         rookie = features.is_rookie(player_name, player_id, self.history, self.season)
         result.update({
+            "player_id": player_id,
             "player_name": player_name,
             "position": position,
             "team": team,
@@ -567,6 +569,7 @@ class Projector:
                 adjustment = self.injury_analyzer.get_adjustment_info(player_name)
                 processed.add(player_name)
                 predictions.append({
+                    "player_id": player.get("player_id", player.get("gsis_id", "")),
                     "player_name": player_name,
                     "position": position,
                     "team": _extract_team(player),
