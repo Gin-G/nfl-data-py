@@ -1,4 +1,0 @@
-nflreadpy
-pandas
-numpy
-pyarrow
