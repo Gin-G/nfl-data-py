@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Feature groups pulled straight from the dataset when present
 CORE_OFFENSIVE = [
-    "passing_yards", "passing_tds", "interceptions", "completions", "attempts",
+    "passing_yards", "passing_tds", "passing_interceptions", "completions", "attempts",
     "rushing_yards", "rushing_tds", "carries", "rushing_fumbles", "rushing_fumbles_lost",
     "receiving_yards", "receiving_tds", "receptions", "targets", "receiving_fumbles",
     "receiving_fumbles_lost", "sacks", "sack_yards", "sack_fumbles", "sack_fumbles_lost",
@@ -49,6 +49,64 @@ DERIVED_FEATURES = [
 ]
 
 VALID_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"]
+
+# Trailing-window (rolling) features: a player's recent level, usage, and trend.
+# A single last game is noisy and makes the model regress to the mean; averaging
+# the last few games gives a stronger signal of the player's true level/role.
+ROLLING_BASE = [
+    "fanduel_fantasy_points",
+    "offensive_snap_pct",
+    "targets", "carries", "receptions",
+    "passing_yards", "rushing_yards", "receiving_yards",
+    "attempts", "target_share",
+    # pbp usage tendencies (present only when pbp features are merged in)
+    "ten_outside_run_share", "ten_adot", "ten_deep_rate",
+]
+ROLLING_WINDOWS = (3, 5)
+ROLLING_TREND = ["fppg_trend", "snap_trend"]
+
+
+def rolling_feature_names():
+    """Names of the columns add_rolling_features produces."""
+    names = [f"{c}_roll{w}" for c in ROLLING_BASE for w in ROLLING_WINDOWS]
+    return names + ROLLING_TREND
+
+
+def add_rolling_features(df, windows=ROLLING_WINDOWS):
+    """Add trailing-window means, usage, and trend per player.
+
+    Each row gets the mean of the last N games (including the row's own game,
+    which is known at projection time) for a curated set of level/volume/usage
+    stats, plus short-vs-long trend features. Leakage-free: the target is the
+    *next* game, and these only summarize the current game and earlier ones.
+    """
+    if "player_id" not in df.columns or "week" not in df.columns:
+        return df.copy()
+
+    out = df.copy()
+    out["_week_num"] = pd.to_numeric(out["week"], errors="coerce")
+    out = out.sort_values(["player_id", "season", "_week_num"])
+    grouped = out.groupby("player_id", sort=False)
+
+    for col in ROLLING_BASE:
+        if col not in out.columns:
+            continue
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+        for w in windows:
+            out[f"{col}_roll{w}"] = grouped[col].transform(
+                lambda s, w=w: s.rolling(w, min_periods=1).mean()
+            )
+
+    fp, sp = "fanduel_fantasy_points", "offensive_snap_pct"
+    if f"{fp}_roll3" in out.columns and f"{fp}_roll5" in out.columns:
+        out["fppg_trend"] = out[f"{fp}_roll3"] - out[f"{fp}_roll5"]
+    if f"{sp}_roll3" in out.columns and f"{sp}_roll5" in out.columns:
+        out["snap_trend"] = out[f"{sp}_roll3"] - out[f"{sp}_roll5"]
+
+    out = out.drop(columns=["_week_num"])
+    fill_cols = [c for c in rolling_feature_names() if c in out.columns]
+    out[fill_cols] = out[fill_cols].fillna(0)
+    return out
 
 
 def clean_training_data(df, min_season=config.TRAINING_MIN_SEASON, min_games=3):
@@ -190,15 +248,22 @@ def add_derived_features(df):
 
 def select_feature_columns(df):
     """Return (numerical_features, categorical_features) available in df."""
+    from .opponent import OPPONENT_FEATURES
+
     numerical = [c for c in get_base_features(df) if c in df.columns]
     numerical += [c for c in DERIVED_FEATURES if c in df.columns]
+    numerical += [c for c in rolling_feature_names() if c in df.columns]
+    numerical += [c for c in OPPONENT_FEATURES if c in df.columns]
 
     categorical = []
     position_col = _position_column(df)
     if position_col:
         categorical.append(position_col)
+    # The dataset carries `team`; older frames used `recent_team`
     if "recent_team" in df.columns:
         categorical.append("recent_team")
+    elif "team" in df.columns:
+        categorical.append("team")
 
     return numerical, categorical
 
@@ -255,6 +320,7 @@ def prepare_prediction_base(df, min_season=config.TRAINING_MIN_SEASON):
     (no next-week-target requirement), so a player's true latest game is used.
     """
     cleaned = clean_training_data(df, min_season=min_season)
-    with_features = add_derived_features(cleaned)
+    with_rolling = add_rolling_features(cleaned)
+    with_features = add_derived_features(with_rolling)
     _, categorical = select_feature_columns(with_features)
     return clean_categorical_features(with_features, categorical)

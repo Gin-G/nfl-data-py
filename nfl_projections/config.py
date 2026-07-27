@@ -42,7 +42,7 @@ FANDUEL_SCORING = {
 
 # Stats the model predicts for next week
 TARGET_COLS = [
-    "passing_yards", "passing_tds", "interceptions",
+    "passing_yards", "passing_tds", "passing_interceptions",
     "rushing_yards", "rushing_tds",
     "receiving_yards", "receptions", "receiving_tds",
     "fanduel_fantasy_points",  # primary target

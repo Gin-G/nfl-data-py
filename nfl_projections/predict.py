@@ -16,7 +16,7 @@ import os
 import pandas as pd
 
 from . import config, features
-from .injuries import integrate_sportradar_injuries
+from .injuries import integrate_injuries
 from .utils import to_pandas
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,8 @@ class DepthChartAnalyzer:
 
         self.player_roles = {}
         for _, row in self.offensive_depth.iterrows():
+            if not isinstance(row["player_name"], str):
+                continue
             self.player_roles[row["player_name"]] = {
                 "team": row["team"],
                 "position": row["pos_abb"],
@@ -121,6 +123,8 @@ class DepthChartAnalyzer:
 
     @staticmethod
     def _names_similar(name1, name2):
+        if not isinstance(name1, str) or not isinstance(name2, str):
+            return False
         parts1, parts2 = name1.lower().split(), name2.lower().split()
         if len(parts1) >= 2 and len(parts2) >= 2:
             return parts1[-1] == parts2[-1] and (
@@ -352,8 +356,11 @@ class Projector:
 
     def __init__(self, dataset, trained, season, week,
                  use_injuries=True, rookie_fallback=False,
-                 rosters=None, depth_charts=None):
+                 rosters=None, depth_charts=None, schedule=None,
+                 injury_source="nflverse", scheme_form=None, include_coarse=True,
+                 quantile_model=None):
         self.trained = trained
+        self.quantile_model = quantile_model
         self.season = season
         self.week = week
 
@@ -369,10 +376,26 @@ class Projector:
         self.depth_charts = depth_charts
         self.depth_analyzer = DepthChartAnalyzer(depth_charts)
 
+        # Opponent-defense features, only when the model was trained with them
+        from .opponent import OPPONENT_FEATURES
+
+        self.week_features = None
+        if any(c in OPPONENT_FEATURES for c in trained.numerical_features):
+            from . import opponent
+
+            schedule_map = opponent.build_schedule_map([season], schedule=schedule)
+            matchup_table = opponent.build_matchup_table(
+                dataset, schedule_map, scheme_form=scheme_form,
+                include_coarse=include_coarse,
+            )
+            self.week_features = opponent.lookup_week_features(matchup_table, season, week)
+            print(f"Loaded opponent matchup features for {len(self.week_features)} "
+                  f"team-position slots in week {week}")
+
         if use_injuries:
-            overrides, backups = integrate_sportradar_injuries(
+            overrides, backups = integrate_injuries(
                 week=week, roster_data=self.rosters,
-                depth_charts=depth_charts, season=season,
+                depth_charts=depth_charts, season=season, source=injury_source,
             )
         else:
             overrides, backups = {}, {}
@@ -386,6 +409,22 @@ class Projector:
             RookiePredictor(self.history, self.depth_analyzer, season)
             if rookie_fallback else None
         )
+
+    def _opponent_features(self, team, position):
+        """One-row DataFrame of upcoming-opponent features, or None if the model
+        doesn't use them / the team has no game this week (neutral fallback)."""
+        if self.week_features is None:
+            return None
+        from .opponent import NEUTRAL_VALUES, OPPONENT_FEATURES
+
+        opp_cols = [c for c in OPPONENT_FEATURES if c in self.week_features.columns]
+        try:
+            row = self.week_features.loc[(team, position)]
+            if isinstance(row, pd.DataFrame):  # duplicate key: take first
+                row = row.iloc[0]
+            return pd.DataFrame([row[opp_cols].to_dict()])
+        except KeyError:
+            return pd.DataFrame([{c: NEUTRAL_VALUES[c] for c in opp_cols}])
 
     # -- single player ----------------------------------------------------
 
@@ -447,8 +486,10 @@ class Projector:
             return None
 
         recent_stats = recent_data.sort_values(["season", "week"]).iloc[[-1]]
+        opp_features = self._opponent_features(team, position)
         input_df = model_mod.build_input_rows(
-            self.trained, recent_stats, [position], [team]
+            self.trained, recent_stats, [position], [team],
+            opponent_features=opp_features,
         )
         prediction = model_mod.predict_batch(self.trained, input_df).iloc[0]
         result = prediction.to_dict()
@@ -477,6 +518,22 @@ class Projector:
             "depth_rank": depth_role["depth_rank"] if depth_role else "N/A",
             "role_adjustment": adjustment,
         })
+
+        # Floor / median / ceiling range from the quantile model, if provided
+        if self.quantile_model is not None:
+            from . import quantiles as q_mod
+
+            q_input = model_mod.build_input_rows(
+                self.quantile_model, recent_stats, [position], [team],
+                opponent_features=opp_features,
+            )
+            qp = q_mod.predict_quantiles(self.quantile_model, q_input).iloc[0]
+            qcols = [f"q{int(round(q * 100))}" for q in self.quantile_model.quantiles]
+            median_col = "q50" if "q50" in qcols else qcols[len(qcols) // 2]
+            result["floor"] = round(float(qp[qcols[0]]), 1)
+            result["projection_median"] = round(float(qp[median_col]), 1)
+            result["ceiling"] = round(float(qp[qcols[-1]]), 1)
+
         return result
 
     # -- position / week --------------------------------------------------
@@ -568,9 +625,14 @@ class Projector:
                 print(f"Saved {len(df)} {position} projections to {filename}")
 
             healthy = df[~df["prediction_type"].str.contains("injured", na=False)]
+            has_range = "floor" in df.columns
             print(f"\nTop {position}s for week {self.week}:")
             for _, p in healthy.head(10).iterrows():
+                range_str = ""
+                if has_range and not pd.isna(p.get("floor")):
+                    range_str = f"  range {p['floor']:.0f}-{p['ceiling']:.0f}"
                 print(f"  {p['rank']:3d}. {p['player_name']:24s} "
-                      f"{p['fanduel_fantasy_points']:5.1f} pts [{p['prediction_type']}]")
+                      f"{p['fanduel_fantasy_points']:5.1f} pts{range_str} "
+                      f"[{p['prediction_type']}]")
 
         return results

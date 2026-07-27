@@ -41,6 +41,10 @@ def build_parser():
     p.add_argument("--epochs", type=int, default=100)
     p.add_argument("--save-dir", type=str, default=config.MODELS_DIR,
                    help="Directory to save the trained model")
+    p.add_argument("--opponent", action="store_true",
+                   help="Include opponent-defense matchup features")
+    p.add_argument("--loss", choices=["mse", "huber", "mae"], default="mse",
+                   help="Training loss (default: mse)")
 
     p = sub.add_parser("predict", help="Generate weekly projections")
     _add_common_week_args(p)
@@ -52,10 +56,19 @@ def build_parser():
     p.add_argument("--model-dir", type=str, default=None,
                    help="Load a saved model instead of training fresh")
     p.add_argument("--epochs", type=int, default=100)
+    p.add_argument("--opponent", action="store_true",
+                   help="Include opponent-defense matchup features (fresh training)")
     p.add_argument("--no-injuries", action="store_true",
-                   help="Skip Sportradar injury adjustments")
+                   help="Skip injury adjustments")
+    p.add_argument("--injury-source", choices=["nflverse", "sportradar", "auto"],
+                   default="nflverse",
+                   help="Injury data source (default: nflverse, free/no key)")
     p.add_argument("--rookie-fallback", action="store_true",
                    help="Give baseline projections to rookies with no games")
+    p.add_argument("--quantiles", action="store_true",
+                   help="Also produce floor/median/ceiling via a quantile model")
+    p.add_argument("--quantile-model-dir", type=str, default=None,
+                   help="Load a saved quantile model instead of training one")
     p.add_argument("--output-dir", type=str, default=config.PREDICTIONS_DIR)
 
     p = sub.add_parser("pools", help="Build DFS player pools from predictions")
@@ -81,6 +94,10 @@ def build_parser():
     p.add_argument("--positions", nargs="+", default=None, choices=config.POSITIONS)
     p.add_argument("--data", type=str, default=config.DATASET_PATH)
     p.add_argument("--epochs", type=int, default=100)
+    p.add_argument("--opponent", action="store_true",
+                   help="Include opponent-defense matchup features")
+    p.add_argument("--loss", choices=["mse", "huber", "mae"], default="mse",
+                   help="Training loss (default: mse)")
     p.add_argument("--output", type=str, default=None,
                    help="Save per-player results CSV here")
 
@@ -98,13 +115,22 @@ def build_parser():
     return parser
 
 
+def _build_matchup_table(dataset_df):
+    from . import opponent
+
+    seasons = sorted(dataset_df["season"].unique())
+    schedule_map = opponent.build_schedule_map(seasons)
+    return opponent.build_matchup_table(dataset_df, schedule_map)
+
+
 def _get_trained_model(args, dataset_df):
     from . import model as model_mod
 
     if args.model_dir:
         print(f"Loading model from {args.model_dir}/")
         return model_mod.TrainedModel.load(args.model_dir)
-    trained, _ = model_mod.train_model(dataset_df, epochs=args.epochs)
+    matchup = _build_matchup_table(dataset_df) if getattr(args, "opponent", False) else None
+    trained, _ = model_mod.train_model(dataset_df, epochs=args.epochs, matchup_table=matchup)
     return trained
 
 
@@ -127,7 +153,9 @@ def main(argv=None):
         from . import model as model_mod
 
         df = dataset.load_dataset(args.data)
-        model_mod.train_model(df, epochs=args.epochs, save_dir=args.save_dir)
+        matchup = _build_matchup_table(df) if args.opponent else None
+        model_mod.train_model(df, epochs=args.epochs, save_dir=args.save_dir,
+                              matchup_table=matchup, loss=args.loss)
 
     elif args.command == "predict":
         from . import dataset
@@ -135,10 +163,24 @@ def main(argv=None):
 
         df = dataset.load_dataset(args.data)
         trained = _get_trained_model(args, df)
+
+        quantile_model = None
+        if args.quantiles or args.quantile_model_dir:
+            from . import quantiles as q_mod
+
+            if args.quantile_model_dir:
+                print(f"Loading quantile model from {args.quantile_model_dir}/")
+                quantile_model = q_mod.QuantileModel.load(args.quantile_model_dir)
+            else:
+                print("Training quantile model for floor/median/ceiling...")
+                quantile_model, _ = q_mod.train_quantile_model(df, epochs=args.epochs)
+
         projector = Projector(
             df, trained, season=args.season, week=args.week,
             use_injuries=not args.no_injuries,
             rookie_fallback=args.rookie_fallback,
+            injury_source=args.injury_source,
+            quantile_model=quantile_model,
         )
         projector.run(positions=args.positions, players=args.players,
                       output_dir=args.output_dir)
@@ -173,6 +215,7 @@ def main(argv=None):
         results = evaluate.backtest(
             df, season=args.season, weeks=weeks,
             positions=args.positions, epochs=args.epochs,
+            use_opponent=args.opponent, loss=args.loss,
         )
         evaluate.summarize(results)
         if args.output and not results.empty:

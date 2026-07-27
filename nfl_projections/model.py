@@ -63,7 +63,16 @@ class TrainedModel:
         )
 
 
-def build_network(input_dim, output_dim):
+def _resolve_loss(loss):
+    """Map a loss name to a keras loss. 'huber' uses delta=5 (FanDuel-point scale)."""
+    if loss == "huber":
+        from tensorflow.keras.losses import Huber
+
+        return Huber(delta=5.0)
+    return loss  # "mse", "mae", etc. pass through as keras string losses
+
+
+def build_network(input_dim, output_dim, loss="mse"):
     """Dense network with light regularization for prediction variance."""
     from tensorflow.keras.layers import BatchNormalization, Dense, Dropout, Input
     from tensorflow.keras.models import Model
@@ -85,23 +94,37 @@ def build_network(input_dim, output_dim):
     model = Model(inputs=inputs, outputs=outputs)
     model.compile(
         optimizer=Adam(learning_rate=0.0015, beta_1=0.9, beta_2=0.999),
-        loss="mse",
+        loss=_resolve_loss(loss),
         metrics=["mae"],
     )
     return model
 
 
-def prepare_training_data(df, min_season=config.TRAINING_MIN_SEASON):
+def prepare_training_data(df, min_season=config.TRAINING_MIN_SEASON, matchup_table=None):
     """Clean, target-shift, and featurize the dataset for training.
 
     Returns (X, y, frame, numerical_features, categorical_features, target_cols)
     where frame holds the rows aligned with X/y (used for the time-based split).
+
+    When ``matchup_table`` is given (from opponent.build_matchup_table), each
+    row also gets the *next* game's opponent-defense features.
     """
     df_clean = features.clean_training_data(df, min_season=min_season)
+    df_clean = features.add_rolling_features(df_clean)
     target_cols = [c for c in config.TARGET_COLS if c in df_clean.columns]
+
+    if matchup_table is not None:
+        from . import opponent
+
+        df_clean = opponent.add_next_game_keys(df_clean)
 
     df_targets = features.add_next_week_targets(df_clean, target_cols)
     df_final = features.add_derived_features(df_targets)
+
+    if matchup_table is not None:
+        from . import opponent
+
+        df_final = opponent.attach_training_features(df_final, matchup_table)
 
     numerical, categorical = features.select_feature_columns(df_final)
     df_final = features.clean_categorical_features(df_final, categorical)
@@ -121,18 +144,22 @@ def train_model(
     save_dir=None,
     plot_path=config.LEARNING_CURVES_PATH,
     verbose=1,
+    matchup_table=None,
+    loss="mse",
 ):
     """Train the projection network on the historical dataset.
 
     Returns (TrainedModel, keras History). Set save_dir to persist the model,
-    plot_path=None to skip the learning-curve PNG.
+    plot_path=None to skip the learning-curve PNG. Pass ``matchup_table`` (from
+    opponent.build_matchup_table) to train with opponent-defense features.
+    ``loss`` selects the training loss ("mse" default, or "huber", "mae").
     """
     from sklearn.compose import ColumnTransformer
     from sklearn.preprocessing import OneHotEncoder, RobustScaler
     from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
     X, y, frame, numerical, categorical, target_cols = prepare_training_data(
-        df, min_season=min_season
+        df, min_season=min_season, matchup_table=matchup_table
     )
     print(f"Training data: X={X.shape}, y={y.shape}, targets={target_cols}")
 
@@ -151,7 +178,7 @@ def train_model(
     y_train, y_val = y[train_idx], y[val_idx]
     print(f"Train set: {X_train.shape}, Validation set: {X_val.shape}")
 
-    model = build_network(X_train.shape[1], len(target_cols))
+    model = build_network(X_train.shape[1], len(target_cols), loss=loss)
 
     history = model.fit(
         X_train, y_train,
@@ -207,7 +234,7 @@ def _plot_learning_curves(history, path):
     print(f"Learning curves saved to {path}")
 
 
-def build_input_rows(trained, stat_rows, positions, teams):
+def build_input_rows(trained, stat_rows, positions, teams, opponent_features=None):
     """Assemble a model-input DataFrame from per-player latest-game stat rows.
 
     Args:
@@ -215,10 +242,27 @@ def build_input_rows(trained, stat_rows, positions, teams):
         stat_rows: DataFrame of each player's most recent game (one row each)
         positions: iterable of position strings aligned with stat_rows
         teams: iterable of team strings aligned with stat_rows
+        opponent_features: optional DataFrame/dict of opponent-defense columns
+            aligned row-for-row with stat_rows; supplies the opp_* / is_home_game
+            features for the *upcoming* matchup. Missing values fall back to
+            opponent.NEUTRAL_VALUES.
     """
+    from .opponent import NEUTRAL_VALUES, OPPONENT_FEATURES
+
+    opp = None
+    if opponent_features is not None:
+        opp = pd.DataFrame(opponent_features).reset_index(drop=True)
+
     data = {}
     for col in trained.numerical_features:
-        if col in stat_rows.columns:
+        if col in OPPONENT_FEATURES:
+            if opp is not None and col in opp.columns:
+                data[col] = pd.to_numeric(opp[col], errors="coerce").fillna(
+                    NEUTRAL_VALUES[col]
+                ).values
+            else:
+                data[col] = np.full(len(stat_rows), NEUTRAL_VALUES[col])
+        elif col in stat_rows.columns:
             data[col] = pd.to_numeric(stat_rows[col], errors="coerce").fillna(0).values
         else:
             data[col] = np.zeros(len(stat_rows))
@@ -228,7 +272,7 @@ def build_input_rows(trained, stat_rows, positions, teams):
     for cat_col in trained.categorical_features:
         if "position" in cat_col:
             data[cat_col] = positions
-        elif cat_col == "recent_team":
+        elif cat_col == "recent_team" or "team" in cat_col:
             data[cat_col] = teams
         else:
             data[cat_col] = ["Unknown"] * len(stat_rows)

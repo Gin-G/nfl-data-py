@@ -37,7 +37,7 @@ SNAP_COLUMNS = [
 PCT_COLUMNS = ["offensive_snap_pct", "defensive_snap_pct", "special_teams_snap_pct"]
 
 SEASON_AVG_COLUMNS = [
-    "passing_yards", "passing_tds", "interceptions", "attempts", "completions",
+    "passing_yards", "passing_tds", "passing_interceptions", "attempts", "completions",
     "rushing_yards", "rushing_tds", "carries", "rushing_fumbles",
     "receiving_yards", "receiving_tds", "receptions", "targets", "receiving_fumbles",
     "offensive_snaps", "defensive_snaps", "special_teams_snaps", "total_snaps",
@@ -237,7 +237,7 @@ def build_dataset(seasons=None, output_path=config.DATASET_PATH):
     df["fanduel_fantasy_points"] = fanduel_points(
         passing_yards=df.get("passing_yards", 0),
         passing_tds=df.get("passing_tds", 0),
-        interceptions=df.get("interceptions", 0),
+        interceptions=df.get("passing_interceptions", 0),
         rushing_yards=df.get("rushing_yards", 0),
         rushing_tds=df.get("rushing_tds", 0),
         receptions=df.get("receptions", 0),

@@ -75,6 +75,25 @@ class TestCompareToExternal:
         assert evaluate.compare_to_external(ours, external).empty
 
 
+class TestComponentFantasyPoints:
+    def test_recomputes_from_components(self):
+        # 1 pass TD (4) + 100 pass yds (4) + 50 rush yds (5) + 1 INT (-1) = 12.0
+        pred = pd.DataFrame({
+            "passing_yards": [100.0], "passing_tds": [1.0],
+            "passing_interceptions": [1.0], "rushing_yards": [50.0],
+            "rushing_tds": [0.0], "receptions": [0.0],
+            "receiving_yards": [0.0], "receiving_tds": [0.0],
+        })
+        out = evaluate.component_fantasy_points(pred)
+        assert round(float(out.iloc[0]), 2) == 12.0
+
+    def test_missing_columns_treated_as_zero(self):
+        pred = pd.DataFrame({"receiving_yards": [100.0], "receptions": [8.0]})
+        # 100 rec yds (10) + 8 rec (4) + 100-yd bonus (3) = 17.0
+        out = evaluate.component_fantasy_points(pred)
+        assert round(float(out.iloc[0]), 2) == 17.0
+
+
 class TestSummarize:
     def test_summary_stats(self, capsys):
         results = pd.DataFrame({

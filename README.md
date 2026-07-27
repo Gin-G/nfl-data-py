@@ -3,21 +3,46 @@
 NFL fantasy projections pipeline. Builds a historical dataset from
 [nflreadpy](https://github.com/nflverse/nflreadpy), trains a neural network to
 project next-week player stats and FanDuel fantasy points, layers in depth
-chart roles and live Sportradar injury data, and turns projections into DFS
-player pools and lineups.
+chart roles and free nflverse injury reports, and turns projections into DFS
+player pools and lineups. Can also produce a **floor / median / ceiling** range
+per player via a quantile model.
 
 All the code lives in one package, `nfl_projections/`. (Earlier iterations —
 `billb/`, `nfl_ai_work/`, `nickknowsnfl/` — were consolidated into it; see git
-history if you need them.)
+history if you need them.) Model experiments and their measured impact are
+tracked in [`EXPERIMENTS.md`](EXPERIMENTS.md).
 
 ## Setup
 
 ```bash
 pip install -r requirements.txt
-
-# Optional: live injury adjustments
-export SPORTRADAR_API_KEY='your_key_here'
 ```
+
+Injury data comes free from nflverse (no API key). A Sportradar key is optional
+(`export SPORTRADAR_API_KEY=...`, then `--injury-source sportradar`).
+
+## Use it as a library
+
+Import the projections into your own code. A `ProjectionService` loads the
+dataset and trains (or loads) the model once; project as many weeks/players as
+you like afterwards:
+
+```python
+from nfl_projections import ProjectionService
+
+svc = ProjectionService(quantiles=True)            # or model_dir=/quantile_model_dir=
+frame = svc.project(2025, 3, as_frame=True)        # DataFrame, best first
+#   -> player_name, team, fanduel_fantasy_points, floor, projection_median, ceiling, ...
+rbs   = svc.project(2025, 3, positions=["RB"])     # {position: DataFrame}
+bijan = svc.project_player("Bijan Robinson", 2025, 3)   # dict, or None
+
+# One-shot (builds a service, projects one week):
+from nfl_projections import project_week
+df = project_week(2025, 3, quantiles=True)
+```
+
+Importing the package does **not** load TensorFlow — that happens only when you
+train or predict.
 
 ## Weekly workflow
 
@@ -27,6 +52,9 @@ python -m nfl_projections build-data
 
 # 2. Project a week (trains the model, then predicts every rostered QB/RB/WR/TE)
 python -m nfl_projections predict --season 2025 --week 13
+
+# ...with a floor/median/ceiling range per player
+python -m nfl_projections predict --season 2025 --week 13 --quantiles
 
 # 3. Build DFS player pools from those predictions
 python -m nfl_projections pools --season 2025 --week 13
@@ -45,8 +73,9 @@ python -m nfl_projections predict --season 2025 --week 13 --players "Bijan Robin
 python -m nfl_projections train --save-dir models
 python -m nfl_projections predict --season 2025 --week 13 --model-dir models
 
-# Skip Sportradar injury calls (e.g. no API key)
+# Skip injury adjustments, or use Sportradar instead of nflverse
 python -m nfl_projections predict --season 2025 --week 13 --no-injuries
+python -m nfl_projections predict --season 2025 --week 13 --injury-source sportradar
 ```
 
 ## Backtesting and comparing to other projections
@@ -101,11 +130,15 @@ python -m nfl_projections optimize --csv merged.csv --lineups 10 --salary-cap 60
 | `nfl_projections/scoring.py` | FanDuel fantasy point calculation |
 | `nfl_projections/features.py` | Feature engineering, target creation, rookie detection |
 | `nfl_projections/model.py` | Network definition, training, save/load, batch predict |
-| `nfl_projections/injuries.py` | Sportradar injury fetch + backup elevation |
+| `nfl_projections/quantiles.py` | Floor/median/ceiling quantile model |
+| `nfl_projections/injuries.py` | nflverse (default) / Sportradar injuries + backup elevation |
+| `nfl_projections/opponent.py` | Opponent-defense matchup features (opt-in) |
+| `nfl_projections/pbp.py` | Play-by-play scheme splits + usage tendencies (opt-in) |
 | `nfl_projections/predict.py` | Weekly projection engine (Projector) |
+| `nfl_projections/service.py` | Importable API: `ProjectionService`, `project_week` |
 | `nfl_projections/pools.py` | DFS player pool CSVs |
 | `nfl_projections/optimizer.py` | FanDuel lineup builder |
-| `nfl_projections/evaluate.py` | Season backtests + external comparison |
+| `nfl_projections/evaluate.py` | Season backtests, quantile calibration, external comparison |
 | `nfl_projections/cli.py` | `python -m nfl_projections ...` commands |
 
 ## Tests

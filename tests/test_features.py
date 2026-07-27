@@ -87,6 +87,49 @@ class TestDerivedFeatures:
         assert len(out) == 1
 
 
+class TestRollingFeatures:
+    def test_trailing_mean_includes_current_game(self):
+        df = pd.DataFrame({
+            "player_id": ["a"] * 4,
+            "season": [2024] * 4,
+            "week": [1, 2, 3, 4],
+            "fanduel_fantasy_points": [10.0, 20.0, 30.0, 40.0],
+        })
+        out = features.add_rolling_features(df).sort_values("week")
+        # roll3 at week 3 = mean(10,20,30)=20; week 4 = mean(20,30,40)=30
+        r3 = out["fanduel_fantasy_points_roll3"].tolist()
+        assert r3[0] == 10.0  # only game 1
+        assert r3[1] == 15.0  # mean(10,20)
+        assert r3[2] == 20.0  # mean(10,20,30)
+        assert r3[3] == 30.0  # mean(20,30,40) -- window slides
+
+    def test_rolling_is_per_player(self):
+        df = pd.DataFrame({
+            "player_id": ["a", "b", "a"],
+            "season": [2024] * 3,
+            "week": [1, 1, 2],
+            "fanduel_fantasy_points": [10.0, 99.0, 20.0],
+        })
+        out = features.add_rolling_features(df)
+        a_wk2 = out[(out["player_id"] == "a") & (out["week"] == 2)]
+        # player a's rolling should not see player b's 99
+        assert a_wk2["fanduel_fantasy_points_roll3"].iloc[0] == 15.0
+
+    def test_trend_and_selection(self):
+        df = pd.DataFrame({
+            "player_id": ["a"] * 6,
+            "season": [2024] * 6,
+            "week": [1, 2, 3, 4, 5, 6],
+            "fanduel_fantasy_points": [5.0, 5.0, 5.0, 20.0, 20.0, 20.0],
+        })
+        out = features.add_rolling_features(df)
+        # recent (roll3) above longer (roll5) once the hot streak lands
+        assert out.sort_values("week")["fppg_trend"].iloc[-1] > 0
+        numerical, _ = features.select_feature_columns(out)
+        assert "fanduel_fantasy_points_roll3" in numerical
+        assert "fppg_trend" in numerical
+
+
 class TestTargets:
     def test_next_week_shift(self):
         df = pd.DataFrame({

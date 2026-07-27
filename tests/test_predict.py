@@ -39,6 +39,15 @@ class TestDepthChartAnalyzer:
         analysis = analyzer.analyze_rookie_opportunity("Backup Runner", "DAL", "RB")
         assert analysis["opportunity"] == "medium"
 
+    def test_handles_nan_player_names(self):
+        # Real depth charts sometimes carry NaN player names; must not crash
+        charts = make_depth_charts()
+        charts.loc[len(charts)] = {"team": "NYG", "pos_abb": "WR",
+                                   "pos_rank": 3, "player_name": float("nan")}
+        analyzer = DepthChartAnalyzer(charts)
+        assert analyzer.get_player_role("Star Runner")["role"] == "starter"
+        assert analyzer.get_player_role(float("nan")) is None
+
 
 class TestInjuryStatusAnalyzer:
     def _analyzer(self):

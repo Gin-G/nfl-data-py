@@ -178,3 +178,9 @@ models/
 *.keras
 *.pkl
 model_debug.log
+
+# Reference files rescued from the improvements_v1 stash (superseded by opponent.py/pbp.py)
+.rescued_from_stash/
+
+# Claude Code local settings
+.claude/
