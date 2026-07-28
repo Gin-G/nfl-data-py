@@ -141,9 +141,40 @@ The most important measurement so far — it recalibrates every prior claim.
   `fantasy_per_snap`, `opportunity_score`, `target_share_roll5` — recent scoring
   + snap/usage trend. Validates ROADMAP's "move expected volume/usage" thesis.
 
+## Roadmap follow-up — component-first models (the fair test)
+
+The stronger version of experiment #10: train models on the component stats
+ONLY (no fanduel_fantasy_points target competing for capacity), then compute FP
+from the predicted stats via the FanDuel formula. 5-seed ensembles vs the direct
+5-seed ensemble, 2025 wk1-18.
+
+| position | direct-FP | component-first | delta |
+|---|---:|---:|---:|
+| **ALL** | **4.201** | 4.329 | +0.128 |
+| QB | 7.067 | 7.287 | +0.219 |
+| RB | 4.333 | 4.416 | +0.083 |
+| WR | 3.929 | 4.062 | +0.133 |
+| TE | 3.097 | 3.220 | +0.124 |
+
+**Verdict: direct-FP wins at every position — decisively.** And the component
+model is ~5x more seed-sensitive (single-seed 4.529 ± 0.236 vs direct
+4.237 ± 0.052), because component errors compound through the scoring weights
+(TDs ×4–6, yardage bonuses) instead of cancelling. This *strengthens* #10: the
+earlier "skill positions slightly better" was single-seed noise — with proper
+5-seed ensembles the component approach is worse everywhere, position-routing
+(direct QB + component skill) included (4.305). Corr identical (0.618).
+
+**BUT the component predictions still have value we should use**: the model is
+already multi-output (it predicts the stats too), so EXPOSE the per-stat
+projections for props (over/under yards, receptions, anytime-TD) and to let
+matchup/coaching features target the right component — while keeping direct-FP
+as the headline fantasy projection. Predicting-stats-then-scoring is not the way
+to compute the FP headline; it's the way to serve everything *around* it.
+
 ## Where things stand
 Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
-but small edge. Point projection (rolling features, #2) looks near the
+but small edge. Direct-FP beats component-first extrapolation at every position.
+Point projection (rolling features, #2) looks near the
 practical ceiling for this data/architecture: opponent/scheme (#4/#5),
 volatility (#7), and component-scoring (#10) all failed to beat it. Quantile
 floor/median/ceiling works and is wired in; the median matches the mean model,
