@@ -99,8 +99,51 @@ variance only weakly (ceiling ~0.9 correlated with the median), so "ceiling" ≈
 exploit, and it's a single season/seed — real FanDuel salaries could change the
 GPP picture. Keep floor/ceiling available as options.
 
+## Roadmap item 1 — naive baselines, GBDT, multi-seed (2025 wk1-18)
+
+The most important measurement so far — it recalibrates every prior claim.
+
+**Naive baselines** (no model, just look up the player's number):
+| baseline | MAE | corr |
+|---|---:|---:|
+| predict last game | 4.976 | 0.478 |
+| predict last-3 avg | 4.338 | 0.573 |
+| predict season avg | 4.336 | 0.598 |
+| **predict last-5 avg** | **4.255** | 0.595 |
+
+**Model vs that floor:**
+| model | MAE | corr |
+|---|---:|---:|
+| GBDT (LightGBM, same features) | 4.240 | 0.605 |
+| NN, mean of 5 seeds | 4.237 ± 0.052 | — |
+| NN, 5-seed **ensemble** | **4.201** | 0.618 |
+| 0.5·NN-ensemble + 0.5·GBDT | 4.197 | 0.618 |
+
+**Findings that change how we work:**
+- **The whole model beats "average the last 5 games" by only ~0.05 MAE** (typical
+  seed 4.24 vs naive 4.255; the ensemble stretches it to ~0.05). Single-game
+  fantasy scoring is near-irreducibly noisy — this is the real denominator, and
+  it means new features must add genuinely NEW info (Vegas, xFP, role changes)
+  to move the needle, not just re-encode recent form.
+- **The "4.17" we kept quoting was a lucky seed.** Seeds range 4.17–4.30
+  (4.237 ± 0.052). So single-seed deltas of ±0.05 in earlier experiments were
+  noise — the ledger's caveat was right; treat past small wins/losses as ties.
+- **Adopt seed-ensembling as the default** — a reliable ~0.04 MAE gain over a
+  typical single seed and it kills the seed lottery. The production model should
+  be an ensemble.
+- **GBDT is a strong production candidate**: 4.240, trains in ~3s, **no
+  TensorFlow** (would let the NFL-API projections job drop the runtime TF
+  install), and gives feature importances. Blending it with the NN ensemble is
+  marginally best (4.197).
+- **Top GBDT importances** confirm the backbone: `fppg_trend`,
+  `fanduel_fantasy_points_roll5`, `avg_fppg`, `fanduel_fantasy_points_roll3`,
+  `performance_vs_average`, `snap_trend`, `offensive_snap_pct_roll5`,
+  `fantasy_per_snap`, `opportunity_score`, `target_share_roll5` — recent scoring
+  + snap/usage trend. Validates ROADMAP's "move expected volume/usage" thesis.
+
 ## Where things stand
-Point projection is at MAE ~4.17 (rolling features, #2) and looks near the
+Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
+but small edge. Point projection (rolling features, #2) looks near the
 practical ceiling for this data/architecture: opponent/scheme (#4/#5),
 volatility (#7), and component-scoring (#10) all failed to beat it. Quantile
 floor/median/ceiling works and is wired in; the median matches the mean model,
