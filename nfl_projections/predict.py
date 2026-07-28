@@ -209,6 +209,21 @@ class InjuryStatusAnalyzer:
         return None
 
 
+def _pick_tier(pick):
+    """Draft-capital label for a pick number (None/0 = undrafted)."""
+    if not pick or pick <= 0:
+        return "undrafted"
+    if pick <= 10:
+        return "elite"
+    if pick <= 32:
+        return "high"
+    if pick <= 64:
+        return "medium"
+    if pick <= 100:
+        return "late"
+    return "very_late"
+
+
 class RookiePredictor:
     """Baseline projections for rookies with no NFL games, scaled by draft
     capital and depth chart opportunity. Off by default (Projector's
@@ -220,6 +235,17 @@ class RookiePredictor:
         self.current_season = current_season
         self.draft_data = self._load_draft_data()
         self.rookie_baselines = self._calculate_baselines()
+        # Draft-capital prior (measured win over the old multiplier heuristic;
+        # EXPERIMENTS.md). Fit on rookies drafted strictly before this season.
+        self.rookie_prior = self._fit_prior()
+
+    def _fit_prior(self):
+        from .rookies import RookiePrior
+        try:
+            return RookiePrior.fit(max_year=self.current_season - 1)
+        except Exception as e:
+            logger.warning("Could not fit rookie draft-capital prior: %s", e)
+            return None
 
     def _load_draft_data(self):
         import nflreadpy as nfl
@@ -282,12 +308,23 @@ class RookiePredictor:
         }
 
     def predict_rookie(self, player_name, position, team):
+        draft_info = self.get_draft_info(player_name)
+
+        # Preferred path: calibrated draft-capital prior (pick -> expected PPG +
+        # floor/ceiling + component estimates). Falls back to the legacy multiplier
+        # heuristic below only when the prior is unavailable for this position.
+        if self.rookie_prior is not None:
+            pick = draft_info["draft_position"] if draft_info else None
+            projected = self.rookie_prior.project(position, pick)
+            if projected is not None:
+                projected["draft_tier"] = _pick_tier(pick)
+                return projected
+
         baseline = self.rookie_baselines.get(position)
         if not baseline:
             return None
         base_points = baseline["avg_fppg"]
 
-        draft_info = self.get_draft_info(player_name)
         if draft_info:
             pick = draft_info["draft_position"]
             if pick <= 10:

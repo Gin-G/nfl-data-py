@@ -171,6 +171,138 @@ matchup/coaching features target the right component — while keeping direct-FP
 as the headline fantasy projection. Predicting-stats-then-scoring is not the way
 to compute the FP headline; it's the way to serve everything *around* it.
 
+## Coaching / new-HC regime change (probe, 2025) — bias not MAE
+
+Question: does the model mis-project players on teams with a NEW head coach (old-system
+history no longer applies)? Identified 7 new-HC teams in 2025 (CHI Ben Johnson, DAL
+Schottenheimer, JAX Coen, LV Carroll, NE Vrabel, NO Moore, NYJ Glenn) vs 25 continuity,
+scored the 5-seed NN ensemble split by new-HC × early(wk1-4)/late.
+
+| slice | n | MAE | bias (pred−act) |
+|---|--:|--:|--:|
+| new-HC wk1-4 | 283 | **4.071** | **−0.451** |
+| continuity wk1-4 | 1037 | 4.175 | −0.007 |
+| new-HC wk5-18 | 993 | 4.153 | −0.201 |
+| continuity wk5-18 | 3536 | 4.232 | −0.267 |
+| new-HC wk1-4 **QB** | 32 | 7.378 | **−1.729** |
+| new-HC wk1-4 TE | 61 | 2.823 | −0.413 |
+
+**Verdict: no MAE degradation** — new-HC teams are if anything slightly *more* accurate
+early (excess-early-gap attributable to the new coach = **−0.025 ≈ 0**). The rolling
+last-3/last-5 features already adapt to the new system within a few games. **BUT a real
+directional BIAS**: the model *under-projects* new-HC offenses early (−0.45 overall,
+−1.73 for QB) — 2025's new coaches ran more productive systems than old-system history
+implied, and the history-anchored model shoots low. Same pattern as opponent/scheme/FPA
+(#4/#5/#12): a genuine signal that can't beat variance-dominated single-game MAE, so it's
+**not an accuracy lever**. Its real value is a *targeted early-season prior* for the ONE
+use case where rolling features are useless — **week 1 of a season for a new-coach team**
+(2026 wk1: features still carry 2025's system). Thin sample (7 teams, 32 QB obs); treat as
+a small bias correction / informative prior, not a model-wide feature. Would apply only to
+new-HC teams, only wk1-~4, decaying as real usage accrues.
+
+## Coaching — do prior-job tendencies carry over? (foundation test)
+
+Before building a wk1 coach prior, tested its core assumption: do a new coach's
+PRIOR-job team tendencies predict his NEW team's 2025 behavior better than the
+outgoing coach's tendencies (the old system the model is anchored to)? Curated
+play-calling history for the 6 new-2025 HCs with offensive history (Glenn/NYJ is
+defensive -> no offense prior), computed neutral-situation tendencies from PBP.
+
+| tendency | |prior−actual| | |old−actual| | prior wins? |
+|---|--:|--:|:--|
+| pass_rate (run/pass balance) | 0.022 | 0.027 | YES |
+| te_tgt_share | 0.042 | 0.059 | YES |
+| top_rb_share (bellcow vs committee) | 0.148 | 0.204 | YES |
+| plays_pg (pace) | 2.48 | 3.39 | YES |
+| qb_rush_share | 0.045 | 0.033 | **no** |
+
+Pooled normalized error: prior 1.087 vs old-system 1.300 (~16% better); prior beats
+old on 57% of coach-metric cells. **Verdict: the premise holds for SCHEME traits —
+run/pass balance, TE usage, RB committee split, pace carry over from a coach's prior
+jobs. QB rush share does NOT** (it's personnel-driven — the coach adapts to his QB;
+never apply a coach prior to QB rushing). Big caveat: tiny sample (6 coaches) and much
+2025 deviation is PERSONNEL the coach acquired (LV top_rb_share 0.87 = rookie bellcow
+Jeanty), which a scheme prior can't model. So a wk1 prior is justified for pass
+rate / TE share / RB split / pace, applied only to new-coach teams, only wk1-~2,
+decaying as rolling usage accrues; fall back to league avg (+ Vegas total for scoring
+level) when a coach has no play-calling history. Modest, niche (wk1-only) — a bias
+corrector for the one case rolling features can't cover, not an MAE lever.
+Scripts: scratchpad/coaching_probe.py, coach_tendencies.py.
+
+## Coaching — wk1 scheme prior applied (nfl_projections/coaching.py) — near-neutral
+
+Built the prior the foundation test justified: per-team volume multipliers from a new
+coach's prior-job tendencies (pass/rush balance, TE share, RB-committee, pace; QB rush
+excluded), applied to new-coach teams' wk1-2 component projections, adding only the FP
+*delta* to the direct-FP headline (decay wk1=1.0, wk2=0.5). Tested on 2025 wk1-2,
+3-seed ensemble, teams with a play-calling prior (6, ex-NYJ).
+
+| | n | MAE | bias |
+|---|--:|--:|--:|
+| baseline | 116 | 4.136 | −0.488 |
+| coach-adjusted | 116 | 4.128 | −0.424 |
+
+**Verdict: WASH — not shipped as default.** MAE −0.008 (noise); bias improved the right
+direction but only ~13% of it (−0.49 → −0.42). Same wall as #4/#5/#7/#12: the ~0.45
+systematic bias is trivial against ~4.1 single-game MAE, and correctly-scaled scheme
+multipliers (league baseline near 1.0) move volume too little to matter. **Debugging
+note:** a first run showed MAE +0.09 / bias −1.6 — an ARTIFACT of loading 2024 PBP twice
+(coach history already contains 2024 seasons), which doubled the league-baseline
+`plays_pg` (64 vs 32) and drove every multiplier to the 0.6 clip. Dedup the PBP load
+(one row per game_id/play_id) — real baseline plays_pg ≈ 32. Lesson: always sanity-check
+the reference-frame scale before trusting a multiplier feature.
+`coaching.py` stays in the repo, **opt-in / diagnostic only** (like opponent) — its
+tendency engine is genuinely useful as *analytics* (how a new coach's system differs),
+just not as a point-projection lever. The rookie draft-capital angle (below) targets the
+PERSONNEL effects this scheme prior explicitly can't (LV top_rb_share 0.87 = Jeanty) and
+is the more promising untested lever for the new-regime wk1 problem.
+
+## Rookie draft-capital prior — foundation is STRONG (unlike coaching)
+
+Rookies are excluded from the standard backtest (no prior game) and the Projector falls
+back to a crude ×0.15/0.4 hack. Tested whether draft capital predicts rookie early-season
+(wk1-4) FanDuel PPG, 2011-2024 rookies:
+
+| pos | R1 | R2 | R3 | R4-7 | corr(pick#, early ppg) |
+|---|--:|--:|--:|--:|--:|
+| QB | 14.4 | 9.4 | 8.2 | 7.7 | −0.41 |
+| RB | 11.9 | 7.8 | 7.0 | 3.6 | −0.48 |
+| WR | 9.4 | 5.6 | 4.0 | 2.4 | −0.50 |
+| TE | 6.4 | 3.6 | 3.3 | 1.9 | −0.48 |
+
+**Clean monotonic gradient every position; corr −0.41…−0.50 (strong for single-game FP).**
+A 1st-round RB scores 3.3x a Day-3 back early. This is the opposite of the coaching wash:
+coaching tried to shave a 0.45 bias off players the model already handles (drowned by
+variance); rookies have NO history, so this replaces a guess with a calibrated
+expectation — a large signal for a group the model currently punts on. 1st-round RB analog
+class (Saquon 20.0, Zeke 18.1, Fournette 18.5, Bijan 16.7 early) is the reference for
+projecting a 2026 first-rounder (e.g. Jeanty). draft_picks (nflreadpy) has round/pick/
+gsis_id and already includes the 2026 class. NEXT: build a rookie prior (expected PPG +
+component split by position × draft capital, refine by depth-chart role) and test it vs
+the current rookie hack on 2023/2024 rookies (calibrate on earlier years).
+Script: scratchpad/rookie_foundation.py.
+
+## Rookie draft-capital prior — BUILT & WINS (nfl_projections/rookies.py)
+
+RookiePrior.fit fits per-position ppg ≈ a + b·log(pick) on historical rookies (wk1-4),
+with a q10/q90 residual band and a typical rookie component mix. Out-of-sample test
+(fit on years < test, evaluate on rookies who played), vs a no-pick position mean and
+the old tier-multiplier heuristic:
+
+| year | draft-capital prior | position mean | tier heuristic |
+|---|--:|--:|--:|
+| 2023 (n=58) | **3.518** | 4.232 | 3.607 |
+| 2024 (n=48) | **3.026** | 3.966 | 3.399 |
+
+**KEPT — a real ~0.7-0.9 MAE win over ignoring draft capital, and beats the current
+Projector hack.** Wins on RB/WR/TE every year; QB is noisy (n=4-6, starting job is
+binary — weakest signal). Band (q10/q90 residuals) covers 60%/69% of actual (nominal
+~60%, well-calibrated). This is the opposite of the coaching wash BECAUSE rookies have
+no history — the prior replaces a guess, not a small bias on an already-good estimate.
+Honest limits: can't foresee a 7th-round breakout or a 1st-round bust; it's the expected
+value given draft capital, a starting picture to be superseded by real usage. Next: wire
+into Projector.predict_rookie (replace the ×draft/depth/position multiplier hack).
+
 ## Where things stand
 Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
 but small edge. Direct-FP beats component-first extrapolation at every position.

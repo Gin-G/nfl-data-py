@@ -45,7 +45,7 @@ def component_fantasy_points(pred_df):
 def backtest(dataset, season, weeks=None, positions=None, trained=None,
              epochs=100, min_season=config.TRAINING_MIN_SEASON, use_opponent=False,
              schedule=None, loss="mse", scheme_form=None, include_coarse=True,
-             target_cols=None):
+             target_cols=None, include_components=False):
     """Backtest the model over a season. Returns a results DataFrame with one
     row per player-week: predicted vs. actual FanDuel points.
 
@@ -177,6 +177,13 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
             "derived": derived,
             "actual": week_games["fanduel_fantasy_points"].values,
         })
+        if include_components:
+            team_vals = (week_games["team"].values if "team" in week_games.columns
+                         else stat_rows.get("team", stat_rows.get("recent_team")).values)
+            week_result["team"] = team_vals
+            for c in config.TARGET_COLS:
+                if c != "fanduel_fantasy_points" and c in predicted.columns:
+                    week_result[c] = predicted[c].values
         results.append(week_result)
         print(f"Week {int(week)}: predicted {len(week_result)} players")
 
