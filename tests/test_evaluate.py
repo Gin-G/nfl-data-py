@@ -93,6 +93,14 @@ class TestComponentFantasyPoints:
         out = evaluate.component_fantasy_points(pred)
         assert round(float(out.iloc[0]), 2) == 17.0
 
+    def test_no_component_columns_keeps_row_count(self):
+        # A single-target model predicts only fanduel_fantasy_points: the
+        # derived column must still have one row per prediction (all zeros).
+        pred = pd.DataFrame({"fanduel_fantasy_points": [12.0, 8.0, 20.0]})
+        out = evaluate.component_fantasy_points(pred)
+        assert len(out) == 3
+        assert out.tolist() == [0.0, 0.0, 0.0]
+
 
 class TestSummarize:
     def test_summary_stats(self, capsys):

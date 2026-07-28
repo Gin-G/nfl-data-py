@@ -21,11 +21,17 @@ logger = logging.getLogger(__name__)
 
 def component_fantasy_points(pred_df):
     """FanDuel points recomputed from predicted stat components (vs the model's
-    direct fantasy-points output). Fumbles aren't predicted, so treated as 0."""
+    direct fantasy-points output). Fumbles aren't predicted, so treated as 0.
+
+    Missing components broadcast as zero-arrays so the result always has one
+    row per prediction (a single-target model predicts no components at all).
+    """
     from .scoring import fanduel_points
 
     def g(col):
-        return pred_df[col].values if col in pred_df.columns else 0
+        if col in pred_df.columns:
+            return pred_df[col].values
+        return np.zeros(len(pred_df))
 
     return pd.Series(fanduel_points(
         passing_yards=g("passing_yards"), passing_tds=g("passing_tds"),
