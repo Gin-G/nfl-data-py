@@ -100,7 +100,8 @@ def build_network(input_dim, output_dim, loss="mse"):
     return model
 
 
-def prepare_training_data(df, min_season=config.TRAINING_MIN_SEASON, matchup_table=None):
+def prepare_training_data(df, min_season=config.TRAINING_MIN_SEASON, matchup_table=None,
+                          target_cols=None):
     """Clean, target-shift, and featurize the dataset for training.
 
     Returns (X, y, frame, numerical_features, categorical_features, target_cols)
@@ -108,10 +109,14 @@ def prepare_training_data(df, min_season=config.TRAINING_MIN_SEASON, matchup_tab
 
     When ``matchup_table`` is given (from opponent.build_matchup_table), each
     row also gets the *next* game's opponent-defense features.
+
+    ``target_cols`` overrides which stats the model predicts (default:
+    config.TARGET_COLS). Pass the component stats only (no
+    fanduel_fantasy_points) to train a component-first model.
     """
     df_clean = features.clean_training_data(df, min_season=min_season)
     df_clean = features.add_rolling_features(df_clean)
-    target_cols = [c for c in config.TARGET_COLS if c in df_clean.columns]
+    target_cols = [c for c in (target_cols or config.TARGET_COLS) if c in df_clean.columns]
 
     if matchup_table is not None:
         from . import opponent
@@ -146,6 +151,7 @@ def train_model(
     verbose=1,
     matchup_table=None,
     loss="mse",
+    target_cols=None,
 ):
     """Train the projection network on the historical dataset.
 
@@ -153,13 +159,14 @@ def train_model(
     plot_path=None to skip the learning-curve PNG. Pass ``matchup_table`` (from
     opponent.build_matchup_table) to train with opponent-defense features.
     ``loss`` selects the training loss ("mse" default, or "huber", "mae").
+    ``target_cols`` overrides the predicted stats (default config.TARGET_COLS).
     """
     from sklearn.compose import ColumnTransformer
     from sklearn.preprocessing import OneHotEncoder, RobustScaler
     from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
     X, y, frame, numerical, categorical, target_cols = prepare_training_data(
-        df, min_season=min_season, matchup_table=matchup_table
+        df, min_season=min_season, matchup_table=matchup_table, target_cols=target_cols
     )
     print(f"Training data: X={X.shape}, y={y.shape}, targets={target_cols}")
 

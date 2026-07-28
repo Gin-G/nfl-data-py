@@ -44,7 +44,8 @@ def component_fantasy_points(pred_df):
 
 def backtest(dataset, season, weeks=None, positions=None, trained=None,
              epochs=100, min_season=config.TRAINING_MIN_SEASON, use_opponent=False,
-             schedule=None, loss="mse", scheme_form=None, include_coarse=True):
+             schedule=None, loss="mse", scheme_form=None, include_coarse=True,
+             target_cols=None):
     """Backtest the model over a season. Returns a results DataFrame with one
     row per player-week: predicted vs. actual FanDuel points.
 
@@ -82,7 +83,7 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
         print(f"Training backtest model on seasons < {season}...")
         trained, _ = model_mod.train_model(
             train_df, epochs=epochs, min_season=min_season, plot_path=None,
-            matchup_table=train_matchup, loss=loss,
+            matchup_table=train_matchup, loss=loss, target_cols=target_cols,
         )
 
     uses_opponent = any(c in OPPONENT_FEATURES for c in trained.numerical_features)
@@ -155,6 +156,15 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
         )
         predicted = model_mod.predict_batch(trained, input_df)
 
+        # FanDuel points recomputed from the predicted stat components. For a
+        # component-only model (no direct fanduel_fantasy_points target) this
+        # IS the projection; for the standard model it's a comparison column.
+        derived = component_fantasy_points(predicted).values
+        if "fanduel_fantasy_points" in predicted.columns:
+            headline = predicted["fanduel_fantasy_points"].values
+        else:
+            headline = derived
+
         week_result = pd.DataFrame({
             "player_id": week_games["player_id"].values,
             "player_name": week_games["player_display_name"].values
@@ -163,9 +173,8 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
             "position": week_games["position"].values,
             "season": season,
             "week": week,
-            "predicted": predicted["fanduel_fantasy_points"].values,
-            # FanDuel points recomputed from the predicted stat components
-            "derived": component_fantasy_points(predicted).values,
+            "predicted": headline,
+            "derived": derived,
             "actual": week_games["fanduel_fantasy_points"].values,
         })
         results.append(week_result)
