@@ -340,6 +340,25 @@ team-scoring anchor for matchup-varying SEASON projections, but it won't add muc
 player accuracy on the defense side. 2025 grades sane (off 21-79, def 15-78; top off
 LA/SEA/IND/BUF/JAX, top def SEA/HOU/PHI/MIN/DEN). Script: scratchpad/team_ratings.py.
 
+## Player grades — opportunity-weighted, validated (nfl_projections/player_grades.py)
+
+Foundation (2022-2025, split-half stability + predicts-rest-of-season-FP by position):
+OPPORTUNITY metrics are both the most stable AND most predictive — WR target_share/wopr
+~0.85 stable / ~0.76 predict; RB carries 0.83/0.75; TE wopr 0.85/0.72; QB carries
+0.79/0.44 & epa 0.41/0.40. EFFICIENCY (EPA/play, RACR, YAC) is noise for skill positions
+(stability ~0). Production (fp) predicts 0.71-0.79 but is less stable than opportunity.
+→ grade = opportunity 0.45 / production 0.45 / efficiency 0.10, z-scored WITHIN position
+→ 0-100 (50=avg), preseason-prior-blended (last yr regressed 60% to 50, worth ~5 games).
+
+Validation (grade thru wk9 → wk10-18 FP, WITHIN position — the fair test; the pooled "ALL"
+number is deflated because grades are position-relative by design, removing cross-position
+scale): WR grade 0.78 vs raw-FP 0.73; TE 0.81 vs 0.74 (grade WINS both); RB 0.86 vs 0.84;
+QB comparable. So the grade predicts as well as/better than raw production AND is more
+stable + position-comparable. Face validity excellent (2025: RB CMC 87/Bijan 84/Gibbs 80;
+WR Puka 87/JSN 86/Chase 82; TE McBride 91/Bowers 82; QB Allen 72/Hurts 67). Scripts:
+scratchpad/player_grade_foundation.py, player_grades_test.py. Snap-share (offense_pct) is a
+natural add but needs a gsis↔pfr crosswalk; wopr/target_share already proxy participation.
+
 ## Where things stand
 Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
 but small edge. Direct-FP beats component-first extrapolation at every position.
