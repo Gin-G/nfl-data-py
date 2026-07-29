@@ -303,6 +303,43 @@ Honest limits: can't foresee a 7th-round breakout or a 1st-round bust; it's the 
 value given draft capital, a starting picture to be superseded by real usage. Next: wire
 into Projector.predict_rookie (replace the ×draft/depth/position multiplier hack).
 
+## Why opponent/matchup keeps failing — defense-vs-position is weak & unstable
+
+Foundation test for a proposed Monte-Carlo game simulator: is "defense vs position" a
+stable, predictable team trait (Dolphins reliably softer than Texans) or week-to-week
+noise? FP allowed by each defense to each position, 2022-2025:
+
+| pos | split-half r (early→late DvP) | defense spread CV | player game-FP R² from defense |
+|---|--:|--:|--:|
+| QB | 0.224 | 0.131 | 0.045 |
+| RB | 0.254 | 0.159 | 0.019 |
+| WR | 0.057 | 0.125 | 0.009 |
+| TE | 0.073 | 0.191 | 0.019 |
+
+**Root-cause for #4/#5/#12:** (1) defense-vs-position barely persists within a season
+(split-half r 0.06-0.25; WR/TE ≈ noise) — injuries, scheme, and offenses-faced wash the
+ranking out; (2) defenses differ only ~13-19%; (3) the defense faced explains just
+1-4.5% of a player's single-game FP. So a from-scratch simulator estimating defense
+strength from PBP history would manufacture confident-looking noise on the MEAN — the
+matchup signal is real over a full season but tiny and unstable per game. A simulator's
+surviving value is **distributions + player correlation (stacks)** for DFS, not mean
+accuracy. The reliable way to get matchup-dependent team scoring is **Vegas implied
+totals/spreads** (market prices defense/injuries/weather/pace, far more stable than our
+DvP) — anchor team scoring to the total, distribute by usage share, optional MC layer for
+tails/correlation. Script: scratchpad/defense_stability.py.
+
+**Correction — opponent-ADJUSTED TEAM grades (the fair test):** the DvP test above was
+unadjusted for schedule. Opponent-adjusted SRS-style TEAM ratings (2021-2025) split-half
+stability: offense **0.489**, defense **0.264** (raw defense 0.141 — adjustment ~doubles
+it). **Offense is a stable, predictable team trait; defense is noisier but adjustment
+helps.** A team's own offense is already in a player's rolling form; the opponent-*defense*
+side is the weak matchup link (r 0.26, ~1-4.5% of player FP). Verdict: a 0-100
+opponent-adjusted team grade (50=avg), updated weekly with regression to a preseason
+prior, is a LEGIT interpretable rating — valuable for UI, game context, and as a
+team-scoring anchor for matchup-varying SEASON projections, but it won't add much per-game
+player accuracy on the defense side. 2025 grades sane (off 21-79, def 15-78; top off
+LA/SEA/IND/BUF/JAX, top def SEA/HOU/PHI/MIN/DEN). Script: scratchpad/team_ratings.py.
+
 ## Where things stand
 Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
 but small edge. Direct-FP beats component-first extrapolation at every position.
