@@ -385,6 +385,25 @@ player correlation (a usage-based simulator, for DFS), or per-position models (u
 because it includes more low-usage players; the A/B is valid — same harness both arms.)
 Script: scratchpad/vegas_test.py.
 
+## Per-position models — shared model wins (last mean lever, closed)
+
+Trained separate QB/RB/WR/TE models (each on only its position's history) vs the shared
+multi-output model, 2025, 3 seeds:
+
+| pos | shared | per-position | delta |
+|---|--:|--:|--:|
+| QB | 7.165 | 7.167 | +0.002 (tie) |
+| RB | 4.312 | 4.359 | +0.048 |
+| WR | 3.845 | 3.957 | +0.112 |
+| TE | 3.045 | 3.229 | +0.184 |
+
+**Shared model wins or ties everywhere — keep it.** Per-position models are worse (less data
++ no shared cross-position representation; TE, the lowest-data position, suffers most). This
+closes the last untested mean lever. Combined with the Vegas wash, the shared rolling-form
+model is confirmed at the practical ceiling for single-game MEAN projection. Remaining value
+is distributions + player correlation (usage-based simulator, for DFS), not the mean.
+Script: scratchpad/per_position_test.py.
+
 ## Where things stand
 Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
 but small edge. Direct-FP beats component-first extrapolation at every position.
