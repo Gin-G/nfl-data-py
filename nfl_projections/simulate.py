@@ -120,6 +120,46 @@ def simulate(players: pd.DataFrame, n_sims: int = 1000, seed: int | None = None,
     return summary, sims
 
 
+_STAT_COLS = ["targets", "carries", "attempts", "receiving_yards", "rushing_yards",
+              "passing_yards", "receiving_tds", "rushing_tds", "passing_tds",
+              "passing_interceptions"]
+
+
+def project_distributions(proj_frame: pd.DataFrame, history: pd.DataFrame, *, n_sims: int = 1000,
+                          seed: int = 0, trailing: int = 6, anchor_col: str = "fanduel_fantasy_points"):
+    """Simulator-based distributions for an existing projection frame, anchored to the
+    model's mean. For each player, expectations come from their `trailing` most recent
+    games in `history`; the simulation is rescaled so its mean matches the model
+    projection (`anchor_col`) while its shape + team correlation come from the sim.
+
+    Returns (summary, sims) covering only players with enough history to simulate
+    (rookies / no-history players are omitted — keep their model/prior band). `summary`
+    has player_id/position/team + mean/floor/median/ceiling/p_boom_20.
+    """
+    need = [c for c in _STAT_COLS if c in history.columns]
+    hist = history.sort_values(["season", "week"]).groupby("player_id")
+    exps, keep = [], []
+    for _, r in proj_frame.iterrows():
+        pid = r["player_id"]
+        try:
+            pg = hist.get_group(pid).tail(trailing)
+        except KeyError:
+            continue
+        if len(pg) < 2:
+            continue
+        e = build_expectations(pg[need])
+        if e is None or sum(abs(e[k]) for k in ("exp_targets", "exp_carries", "exp_att")) < 0.5:
+            continue  # no usable opportunity signal
+        e.update(player_id=pid, team=r.get("team"), position=r.get("position"),
+                 player_name=r.get("player_name"), proj=float(r[anchor_col]))
+        exps.append(e)
+        keep.append(pid)
+    if not exps:
+        return pd.DataFrame(), np.zeros((0, n_sims))
+    pl = pd.DataFrame(exps)
+    return simulate(pl, n_sims=n_sims, seed=seed, mean_anchor="proj")
+
+
 def stack_distribution(sims: np.ndarray, idxs: list[int]) -> np.ndarray:
     """Combined per-sim points for a set of players (e.g. a QB + WR stack) — sums the SAME
     simulations so their correlation is preserved."""

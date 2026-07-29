@@ -84,22 +84,28 @@ class ProjectionService:
                 )
 
     def _projector(self, season, week, use_injuries=True, injury_source="nflverse",
-                   rosters=None, depth_charts=None, schedule=None):
+                   rosters=None, depth_charts=None, schedule=None, rookie_fallback=False):
         return Projector(
             self.dataset, self.model, season=season, week=week,
             use_injuries=use_injuries, injury_source=injury_source,
-            quantile_model=self.quantile_model,
+            quantile_model=self.quantile_model, rookie_fallback=rookie_fallback,
             rosters=rosters, depth_charts=depth_charts, schedule=schedule,
         )
 
     def project(self, season, week, positions=None, players=None, use_injuries=True,
                 injury_source="nflverse", save=False, output_dir=config.PREDICTIONS_DIR,
-                as_frame=False, rosters=None, depth_charts=None, schedule=None):
+                as_frame=False, rosters=None, depth_charts=None, schedule=None,
+                rookie_fallback=False):
         """Project a week. Returns {position: DataFrame}, or one DataFrame if
         ``as_frame``. Each row has fanduel_fantasy_points and, when a quantile
-        model is loaded, floor / projection_median / ceiling."""
+        model is loaded, floor / projection_median / ceiling.
+
+        `rosters` / `depth_charts`: pass externally (e.g. from ESPN for a season
+        nflreadpy hasn't published yet). `rookie_fallback`: also project rookies with no
+        NFL history via the draft-capital prior."""
         projector = self._projector(
-            season, week, use_injuries, injury_source, rosters, depth_charts, schedule
+            season, week, use_injuries, injury_source, rosters, depth_charts, schedule,
+            rookie_fallback=rookie_fallback,
         )
         results = projector.run(
             positions=positions, players=players, save=save, output_dir=output_dir
