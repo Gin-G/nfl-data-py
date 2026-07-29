@@ -359,6 +359,32 @@ WR Puka 87/JSN 86/Chase 82; TE McBride 91/Bowers 82; QB Allen 72/Hurts 67). Scri
 scratchpad/player_grade_foundation.py, player_grades_test.py. Snap-share (offense_pct) is a
 natural add but needs a gsis↔pfr crosswalk; wopr/target_share already proxy participation.
 
+## Vegas implied team total — the definitive matchup test — WASH (not kept)
+
+The most-cited untested lever: does the MARKET's implied team total (total_line/spread_line
+from schedules, 100% populated 2015-2025, leakage-free) improve the player point
+projection? Added implied_team_total/game_total_line/team_spread as features, trained with
+them, INJECTED the current week's line at eval (not the prior game's), A/B vs baseline,
+3 seeds, 2025 wk1-18:
+
+| | MAE |
+|---|--:|
+| baseline | 3.642 ± 0.033 |
+| + Vegas implied total | 3.655 ± 0.032 |
+
+**+0.013 — wash/slightly worse. Not kept** (reverted the features.py scaffolding). Even the
+best possible matchup signal — the market prices in offense/defense/injuries/weather/pace —
+can't beat the player's own rolling form at the single-game player level. Structural reason:
+implied total predicts TEAM points, but player FP = team pts × share × efficiency × TD luck,
+and the share/efficiency/TD variance is player-specific noise no game-level signal resolves.
+**This closes the matchup avenue: DvP (#4/#5), FPA (#12), coaching, team-grade multiplier,
+and now Vegas ALL fail on the mean.** The rolling-form model is at the practical ceiling for
+MEAN single-game point projection. Remaining value is NOT in the mean: distributions +
+player correlation (a usage-based simulator, for DFS), or per-position models (untested).
+(Note: this custom harness's absolute MAE ~3.64 is lower than the standard 4.24 backtest
+because it includes more low-usage players; the A/B is valid — same harness both arms.)
+Script: scratchpad/vegas_test.py.
+
 ## Where things stand
 Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
 but small edge. Direct-FP beats component-first extrapolation at every position.
