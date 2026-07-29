@@ -404,7 +404,32 @@ model is confirmed at the practical ceiling for single-game MEAN projection. Rem
 is distributions + player correlation (usage-based simulator, for DFS), not the mean.
 Script: scratchpad/per_position_test.py.
 
-## Where things stand
+## Usage-based Monte-Carlo simulator (nfl_projections/simulate.py) — distributions + stacks
+
+Since the mean is at ceiling, built the simulator for what the mean can't give:
+DISTRIBUTIONS and player CORRELATION. Each sim draws a shared team scoring environment
+split into team/pass/rush factors (the PASS factor, shared by QB + pass-catchers, is what
+stacks them), samples opportunity (Poisson×env×per-player idio), converts to yards
+(Normal) and TDs (Poisson), scores FanDuel. Calibrated on 2025 (leakage-free, trailing-5
+expectations, 1000 sims):
+
+| pos | [p10,p90] coverage (target ~80) | mean bias |
+|---|--:|--:|
+| ALL | 75% | +0.37 |
+| QB | 69% | +1.39 |
+| RB | 74% | +0.19 |
+| WR | 77% | +0.40 |
+| TE | 79% | +0.03 |
+
+QB<->WR1 correlation: **modeled +0.317 vs empirical +0.359** — the stacking signal is
+captured. Skill-position bands are near-calibrated; QB bands are tightest (highest-variance
+position) and QB shows a +1.4 mean bias = regression-to-mean from raw trailing expectations.
+**Fix + production architecture: `simulate(..., mean_anchor="proj")` rescales each player's
+sims so the MEAN matches the point model's (accurate, at-ceiling) projection, while the
+simulator supplies the shape + correlation** — best of both. stack_distribution() sums the
+same sims for QB+WR stack queries (correlation preserved). Refinements left: explicit
+passing-TD→receiving-TD coupling (would push corr toward 0.36), QB downside (benchings).
+Scripts: scratchpad/sim_calibration.py.
 Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
 but small edge. Direct-FP beats component-first extrapolation at every position.
 Point projection (rolling features, #2) looks near the
