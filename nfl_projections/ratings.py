@@ -71,6 +71,28 @@ def to_grade(rating: pd.Series, invert: bool = False) -> pd.Series:
     return (50 + _GRADE_SCALE * z).clip(0, 100)
 
 
+def league_avg_points(season: int, schedule=None) -> float:
+    """Average points per team per game for a season (the matchup baseline)."""
+    gf = _game_frame([season], schedule=schedule)
+    return float(gf["pf"].mean()) if len(gf) else 22.5
+
+
+def scoring_multiplier(off_team: float, def_opp: float, league_avg: float,
+                       damp: float = 0.75, lo: float = 0.85, hi: float = 1.15) -> float:
+    """Matchup scoring multiplier for a team (offense rating `off_team`) facing an
+    opponent defense (`def_opp`), relative to that team vs an average defense.
+
+    Ratings are in points (mean 0); def_opp > 0 means the opponent allows more than
+    average, so the multiplier > 1. `damp` shrinks toward 1 for the estimation error /
+    weak-signal reality of the defense side (EXPERIMENTS.md); clipped to [lo, hi] so no
+    single matchup swings a projection more than ~15%."""
+    neutral = league_avg + off_team
+    if neutral <= 0:
+        return 1.0
+    raw = (league_avg + off_team + def_opp) / neutral
+    return float(min(hi, max(lo, 1.0 + damp * (raw - 1.0))))
+
+
 def preseason_prior(prior_season: int, schedule=None) -> pd.DataFrame:
     """Preseason grades for the season after `prior_season`: last year's opponent-adjusted
     ratings regressed toward the mean (teams keep ~65% of their edge year to year)."""
