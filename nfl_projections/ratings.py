@@ -119,19 +119,33 @@ def game_environments(season: int, *, grades: pd.DataFrame | None = None,
         import nflreadpy as nfl
         schedule = nfl.load_schedules(seasons=[season]).to_pandas()
     sch = schedule[schedule["season"] == season] if "season" in schedule.columns else schedule
+    has_vegas = "total_line" in sch.columns
     rows = []
     for _, gm in sch.iterrows():
         h, a = gm.get("home_team"), gm.get("away_team")
         if pd.isna(h) or pd.isna(a):
             continue
-        exp_h = league_avg + off.get(h, 0.0) + dff.get(a, 0.0)
-        exp_a = league_avg + off.get(a, 0.0) + dff.get(h, 0.0)
-        total = exp_h + exp_a
+        # Prefer the real Vegas total (market-priced, ~0.5 corr with actual) when a line is
+        # posted; fall back to the grade-based estimate (~0.2) for games without one yet.
+        grade_total = (2 * league_avg) + off.get(h, 0.0) + off.get(a, 0.0) \
+            + dff.get(a, 0.0) + dff.get(h, 0.0)
+        vegas = gm.get("total_line") if has_vegas else None
+        total = float(vegas) if (vegas is not None and not pd.isna(vegas)) else grade_total
+        source = "vegas" if (vegas is not None and not pd.isna(vegas)) else "grades"
+        # split by the spread when we have a line (favored team scores more)
+        spread = gm.get("spread_line") if has_vegas else None
+        if source == "vegas" and spread is not None and not pd.isna(spread):
+            exp_h = total / 2 - float(spread) / 2
+            exp_a = total / 2 + float(spread) / 2
+        else:
+            exp_h = league_avg + off.get(h, 0.0) + dff.get(a, 0.0)
+            exp_a = league_avg + off.get(a, 0.0) + dff.get(h, 0.0)
         env = float(min(hi, max(lo, 1.0 + damp * (total / avg_total - 1.0))))
         for team, opp, exp in [(h, a, exp_h), (a, h, exp_a)]:
             rows.append({"season": season, "week": int(gm["week"]), "team": team,
                          "opponent": opp, "expected_team_points": round(exp, 1),
-                         "expected_total": round(total, 1), "env_mult": round(env, 3)})
+                         "expected_total": round(total, 1), "env_mult": round(env, 3),
+                         "total_source": source})
     return pd.DataFrame(rows)
 
 
