@@ -53,23 +53,32 @@ class RookiePrior:
     """Per-position pick→PPG curve (ppg ≈ a + b·log(pick)) with a residual band and
     typical rookie component mix. Fit on rookies drafted <= ``max_year``."""
 
-    def __init__(self, coeffs: dict, resid: dict, comp_mix: dict, min_ppg=0.5, max_ppg=26.0):
+    # Shrink the fitted pick-curve toward the positional rookie mean. The raw curve is
+    # survivorship-inflated at the very top (busts get benched and don't accumulate), so
+    # a pick-1 QB / pick-3 RB otherwise out-projects established veterans in wk1. Shrinking
+    # regresses genuinely-uncertain rookies toward a realistic below-elite expectation.
+    SHRINK = 0.6
+
+    def __init__(self, coeffs: dict, resid: dict, comp_mix: dict, pos_mean: dict | None = None,
+                 min_ppg=0.5, max_ppg=26.0):
         self.coeffs = coeffs        # position -> (a, b) for early-season ppg
-        self.resid = resid          # position -> (q20, q80) residual offsets
+        self.resid = resid          # position -> (q10, q90) residual offsets
         self.comp_mix = comp_mix    # position -> {component: per-point fraction}
+        self.pos_mean = pos_mean or {}  # position -> mean rookie early ppg (shrink target)
         self.min_ppg, self.max_ppg = min_ppg, max_ppg
 
     @classmethod
     def fit(cls, max_year: int, min_year: int = 2008, early_weeks: int = 4) -> "RookiePrior":
         rk = _load_history(max_year, min_year)
         early = rk[rk["week"] <= early_weeks]
-        coeffs, resid, comp_mix = {}, {}, {}
+        coeffs, resid, comp_mix, pos_mean = {}, {}, {}, {}
         for pos in SKILL:
             g = (early[early["position"] == pos]
                  .groupby(["gsis_id", "pick"])
                  .agg(ppg=("fp", "mean"), **{c: (c, "mean") for c in _COMPONENTS})
                  .reset_index())
             g = g[g["pick"] >= 1]
+            pos_mean[pos] = float(g["ppg"].mean()) if len(g) else 5.0
             if len(g) < 12:
                 coeffs[pos], resid[pos] = (g["ppg"].mean() if len(g) else 5.0, 0.0), (-2.0, 2.0)
                 comp_mix[pos] = {}
@@ -85,7 +94,7 @@ class RookiePrior:
             # component mix: mean per-game component per unit of ppg (for props)
             ppg_mean = max(g["ppg"].mean(), 1e-6)
             comp_mix[pos] = {c: float(g[c].mean() / ppg_mean) for c in _COMPONENTS}
-        return cls(coeffs, resid, comp_mix)
+        return cls(coeffs, resid, comp_mix, pos_mean=pos_mean)
 
     def project(self, position: str, pick: int | None) -> dict | None:
         """Projected rookie fantasy points (+ floor/ceiling + component estimates).
@@ -95,6 +104,9 @@ class RookiePrior:
         a, b = self.coeffs[position]
         p = float(pick) if pick and pick > 0 else 260.0
         ppg = a + b * np.log(p)
+        # regress toward the positional rookie mean (survivorship-inflated top end)
+        mean = self.pos_mean.get(position, ppg)
+        ppg = mean + self.SHRINK * (ppg - mean)
         lo, hi = self.resid[position]
         clip = lambda v: float(min(self.max_ppg, max(self.min_ppg, v)))
         proj, floor, ceil = clip(ppg), clip(ppg + lo), clip(ppg + hi)

@@ -295,7 +295,12 @@ the old tier-multiplier heuristic:
 | 2024 (n=48) | **3.026** | 3.966 | 3.399 |
 
 **KEPT — a real ~0.7-0.9 MAE win over ignoring draft capital, and beats the current
-Projector hack.** Wins on RB/WR/TE every year; QB is noisy (n=4-6, starting job is
+Projector hack.** (Update: added `SHRINK=0.6` regression toward the positional rookie mean
+— the raw log-pick curve is survivorship-inflated at the very top, so a pick-1 QB (17.4)
+and pick-3 RB (17.1) out-projected elite veterans in 2026 wk1. Shrunk: Mendoza 14.8 < Allen
+16.1, Love 12.5 < Saquon 13.2. Costs ~0.2 rookie MAE (2024 3.03→3.23, still >> no-pick 3.97)
+for realistic cross-population ranking — the right trade for uncertain rookies.)
+Wins on RB/WR/TE every year; QB is noisy (n=4-6, starting job is
 binary — weakest signal). Band (q10/q90 residuals) covers 60%/69% of actual (nominal
 ~60%, well-calibrated). This is the opposite of the coaching wash BECAUSE rookies have
 no history — the prior replaces a guess, not a small bias on an already-good estimate.
