@@ -93,6 +93,56 @@ def scoring_multiplier(off_team: float, def_opp: float, league_avg: float,
     return float(min(hi, max(lo, 1.0 + damp * (raw - 1.0))))
 
 
+def game_environments(season: int, *, grades: pd.DataFrame | None = None,
+                      league_avg: float | None = None, schedule=None,
+                      damp: float = 0.5, lo: float = 0.85, hi: float = 1.20) -> pd.DataFrame:
+    """Per-game scoring-environment multiplier from the expected game total.
+
+    For each matchup, expected points for each side come from the SRS prediction
+    (offense vs opponent defense); their sum is the expected game total. A game whose
+    expected total exceeds the league-average game gets an environment multiplier > 1
+    (shootout — boosts BOTH teams' players), below-average gets < 1. Measured: shootout
+    games (51+ total) see ~4x the boom rate and ~60% higher ceilings, so this mainly
+    lifts the DISTRIBUTION/ceiling; `damp` keeps the mean shift conservative (predicted
+    totals correlate with actuals ~0.2). Returns rows (season, week, team, opponent,
+    expected_team_points, expected_total, env_mult).
+    """
+    if grades is None:
+        g = grades_for(season, schedule=schedule)
+        grades = g if not g.empty else preseason_prior(season - 1, schedule=schedule)
+    if league_avg is None:
+        league_avg = league_avg_points(season - 1, schedule=schedule)
+    off = grades["off_rating"].to_dict()
+    dff = grades["def_rating"].to_dict()
+    avg_total = 2.0 * league_avg
+    if schedule is None:
+        import nflreadpy as nfl
+        schedule = nfl.load_schedules(seasons=[season]).to_pandas()
+    sch = schedule[schedule["season"] == season] if "season" in schedule.columns else schedule
+    rows = []
+    for _, gm in sch.iterrows():
+        h, a = gm.get("home_team"), gm.get("away_team")
+        if pd.isna(h) or pd.isna(a):
+            continue
+        exp_h = league_avg + off.get(h, 0.0) + dff.get(a, 0.0)
+        exp_a = league_avg + off.get(a, 0.0) + dff.get(h, 0.0)
+        total = exp_h + exp_a
+        env = float(min(hi, max(lo, 1.0 + damp * (total / avg_total - 1.0))))
+        for team, opp, exp in [(h, a, exp_h), (a, h, exp_a)]:
+            rows.append({"season": season, "week": int(gm["week"]), "team": team,
+                         "opponent": opp, "expected_team_points": round(exp, 1),
+                         "expected_total": round(total, 1), "env_mult": round(env, 3)})
+    return pd.DataFrame(rows)
+
+
+# alias so game_environments can fall back to in-season grades when available
+def grades_for(season, **kw):
+    try:
+        return grades(season, **kw)
+    except Exception:
+        return pd.DataFrame()
+
+
 def preseason_prior(prior_season: int, schedule=None) -> pd.DataFrame:
     """Preseason grades for the season after `prior_season`: last year's opponent-adjusted
     ratings regressed toward the mean (teams keep ~65% of their edge year to year)."""
