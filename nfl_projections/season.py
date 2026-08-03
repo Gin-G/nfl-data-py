@@ -18,8 +18,27 @@ from __future__ import annotations
 import pandas as pd
 
 from . import ratings as ratings_mod
+from . import roles as roles_mod
 
 _TEAM_COLS = ("team", "recent_team", "team_abbr", "club_code")
+
+
+def _snap_factor(snap_share, player_id, player_name) -> float:
+    """Look up a manual snap-share factor (two-way / part-time players) by id or
+    name. ``snap_share`` maps a player id or name to a factor in (0, 1]; returns
+    1.0 when absent. Used for cases with no data to learn from — e.g. a rookie
+    expected to split snaps between offense and defense (Travis Hunter)."""
+    if not snap_share:
+        return 1.0
+    for key in (player_id, player_name):
+        if key is not None and key in snap_share:
+            return float(snap_share[key])
+    if player_name:
+        low = str(player_name).lower()
+        for k, v in snap_share.items():
+            if isinstance(k, str) and k.lower() == low:
+                return float(v)
+    return 1.0
 
 
 def _team_col(df: pd.DataFrame) -> str:
@@ -46,23 +65,37 @@ def _schedule_opponents(season: int, schedule=None) -> pd.DataFrame:
 
 
 def assemble_season(base_projections: pd.DataFrame, season: int, *, grades=None,
-                    league_avg=None, schedule=None, damp: float = 0.75) -> pd.DataFrame:
+                    league_avg=None, schedule=None, damp: float = 0.75,
+                    use_roles: bool = True, budgets=None, snap_share=None) -> pd.DataFrame:
     """Expand matchup-neutral base projections into a per-game season projection.
 
     Args:
-        base_projections: one row per player with a team column and
-            ``fanduel_fantasy_points`` (and optionally floor/ceiling).
+        base_projections: one row per player with a team column, ``position``,
+            ``depth_rank`` and ``fanduel_fantasy_points`` (and optionally floor/ceiling).
         grades: a ratings.grades() frame (off_rating/def_rating by team); built from the
             prior season's preseason prior if omitted.
         league_avg: league avg points/team/game; derived from the prior season if omitted.
+        use_roles: apply depth-chart role corrections (roles.py) — availability
+            (``expected_games``) so non-starters play fewer games, and a finite
+            per-team-position budget so teammates SHARE a pool instead of each
+            projecting for a full workload. On by default; set False for the raw
+            (every player, 17 full games) behaviour.
+        budgets: per-position per-game team fantasy-point pool for the finite cap;
+            defaults to roles.DEFAULT_BUDGETS. Pass roles.position_budgets(dataset)
+            to derive from history.
+        snap_share: optional {player id or name: factor in (0,1]} to hand-cap
+            part-time / two-way players (no data exists to learn this).
 
     Returns a long DataFrame: one row per player per scheduled game with base_projection,
-    matchup_multiplier, opponent, and the adjusted projection (+ floor/ceiling if present).
+    matchup_multiplier, opponent, the (role/budget-adjusted) projection, an ``exp_games``
+    weight per row (sums to the player's expected games), and floor/ceiling if present.
     """
     if grades is None:
         grades = ratings_mod.grades(season, schedule=schedule)
     if league_avg is None:
         league_avg = ratings_mod.league_avg_points(season - 1, schedule=schedule)
+    if use_roles and budgets is None:
+        budgets = dict(roles_mod.DEFAULT_BUDGETS)
 
     off = grades["off_rating"].to_dict()
     dff = grades["def_rating"].to_dict()
@@ -74,51 +107,104 @@ def assemble_season(base_projections: pd.DataFrame, season: int, *, grades=None,
     for _, p in base_projections.iterrows():
         team = p[tcol]
         games = sched[sched["team"] == team]
+        n_games = len(games)
         base = float(p["fanduel_fantasy_points"])
+        position = p.get("position")
+        depth_rank = p.get("depth_rank")
+
+        # Availability: fraction of scheduled games this depth role actually plays,
+        # times any manual snap-share cap. Multiplies each game so the season TOTAL
+        # reflects expected games while per-game matchup variation is preserved.
+        if use_roles and n_games:
+            exp_games = roles_mod.expected_games(position, depth_rank, scheduled_games=n_games)
+            play_w = (exp_games / n_games) * _snap_factor(
+                snap_share, p.get("player_id"),
+                p.get("player_name") or p.get("player_display_name"))
+        else:
+            play_w = 1.0
+
         for _, g in games.iterrows():
             mult = ratings_mod.scoring_multiplier(
                 off.get(team, 0.0), dff.get(g["opp"], 0.0), league_avg, damp=damp)
+            eff = mult * play_w
             row = {
                 "player_id": p.get("player_id"),
                 "player_name": p.get("player_name") or p.get("player_display_name"),
-                "position": p.get("position"),
+                "position": position,
                 "team": team,
+                "depth_rank": roles_mod.norm_rank(depth_rank),
                 "week": int(g["week"]),
                 "opponent": g["opp"],
                 "home": bool(g["home"]),
                 "base_projection": round(base, 2),
                 "matchup_multiplier": round(mult, 3),
-                "projection": round(base * mult, 2),
+                "exp_games": round(play_w, 4),
+                "projection": round(base * eff, 2),
             }
             if have_band:
-                row["floor"] = round(float(p["floor"]) * mult, 2)
-                row["ceiling"] = round(float(p["ceiling"]) * mult, 2)
+                row["floor"] = round(float(p["floor"]) * eff, 2)
+                row["ceiling"] = round(float(p["ceiling"]) * eff, 2)
             out.append(row)
-    return pd.DataFrame(out)
+
+    weekly = pd.DataFrame(out)
+    if use_roles and not weekly.empty:
+        weekly = _apply_team_budget(weekly, budgets, have_band)
+    return weekly
+
+
+def _apply_team_budget(weekly: pd.DataFrame, budgets: dict, have_band: bool) -> pd.DataFrame:
+    """Enforce a finite team-position pool per (team, position, week) so teammates
+    SHARE — two RBs on one team can't both project as bell cows. See
+    roles.apply_team_budget; only ever scales DOWN, preserving the role-based split."""
+    cols = ["projection"] + (["floor", "ceiling"] if have_band else [])
+    roles_mod.apply_team_budget(
+        weekly, budgets, points_col="projection",
+        group_cols=("team", "position", "week"), scale_cols=cols)
+    for c in cols:
+        weekly[c] = weekly[c].round(2)
+    return weekly
 
 
 def season_totals(weekly: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate a per-game season projection to per-player totals + games played."""
-    agg = {"projection": "sum", "base_projection": "mean"}
+    """Aggregate a per-game season projection to per-player totals.
+
+    ``proj_total`` is the season sum; ``exp_games`` the expected games actually
+    played (role-weighted, so a backup QB reads ~1-2, not 17); ``proj_per_game``
+    is per game actually played (proj_total / exp_games), i.e. the rate when on
+    the field, not diluted by the games they sit."""
+    aggs = {"proj_total": ("projection", "sum"),
+            "games": ("week", "count")}
+    if "exp_games" in weekly.columns:
+        aggs["exp_games"] = ("exp_games", "sum")
     if "floor" in weekly.columns:
-        agg["floor"] = "sum"
-        agg["ceiling"] = "sum"
+        aggs["floor_total"] = ("floor", "sum")
+        aggs["ceiling_total"] = ("ceiling", "sum")
     g = (weekly.groupby(["player_id", "player_name", "position", "team"], dropna=False)
-         .agg(**{"proj_total": ("projection", "sum"),
-                 "proj_per_game": ("projection", "mean"),
-                 "games": ("week", "count")})
-         .reset_index()
-         .sort_values("proj_total", ascending=False))
-    return g
+         .agg(**aggs)
+         .reset_index())
+    if "exp_games" in g.columns:
+        g["exp_games"] = g["exp_games"].round(1)
+        g["proj_per_game"] = (g["proj_total"] / g["exp_games"].where(g["exp_games"] > 0)).round(2)
+    else:
+        g["proj_per_game"] = (g["proj_total"] / g["games"]).round(2)
+    return g.sort_values("proj_total", ascending=False).reset_index(drop=True)
 
 
 def project_season(service, season: int, *, base_week: int = 1, grades=None,
                    league_avg=None, schedule=None, damp: float = 0.75,
-                   positions=None, use_injuries: bool = False) -> pd.DataFrame:
+                   positions=None, use_injuries: bool = False,
+                   use_roles: bool = True, budgets=None, snap_share=None) -> pd.DataFrame:
     """Convenience: build matchup-neutral base projections from a ProjectionService
     (projecting `base_week` for current form) and assemble the season. Returns the
-    per-game long DataFrame; call season_totals() for per-player totals."""
+    per-game long DataFrame; call season_totals() for per-player totals.
+
+    Role corrections (``use_roles``) are on by default; team-position budgets are
+    derived from the service's historical dataset. Pass ``snap_share`` to hand-cap
+    part-time / two-way players (e.g. {"Travis Hunter": 0.5})."""
     base = service.project(season, base_week, positions=positions,
                            use_injuries=use_injuries, as_frame=True, schedule=schedule)
+    if use_roles and budgets is None:
+        budgets = roles_mod.position_budgets(getattr(service, "dataset", None))
     return assemble_season(base, season, grades=grades, league_avg=league_avg,
-                           schedule=schedule, damp=damp)
+                           schedule=schedule, damp=damp, use_roles=use_roles,
+                           budgets=budgets, snap_share=snap_share)

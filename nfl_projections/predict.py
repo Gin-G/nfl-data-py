@@ -532,18 +532,22 @@ class Projector:
         prediction = model_mod.predict_batch(self.trained, input_df).iloc[0]
         result = prediction.to_dict()
 
-        # Depth chart adjustment: penalize low-production backups
+        # Depth-chart role adjustment: scale the per-game number to a snap-share
+        # proxy for the player's depth rank, so a non-starter isn't read at a
+        # starter's rate. This uses the full rank (not just role == "backup", so
+        # deep backups no longer escape) and does NOT gate on production (the old
+        # avg_fppg < 8.0 gate let inflated injury fill-ins through — exactly the
+        # players we most want to discount). See roles.py.
+        from . import roles
+
         depth_role = self.depth_analyzer.get_player_role(player_name)
-        adjustment = "no adjustment"
-        if depth_role and depth_role["role"] == "backup":
-            row = recent_stats.iloc[0]
-            avg_fppg = row["avg_fppg"] if "avg_fppg" in row.index else 0
-            if position == "QB":
-                result["fanduel_fantasy_points"] *= 0.15
-                adjustment = "backup QB penalty"
-            elif avg_fppg < 8.0:
-                result["fanduel_fantasy_points"] *= 0.4
-                adjustment = f"backup {position} penalty"
+        depth_rank = depth_role["depth_rank"] if depth_role else None
+        role_mult = roles.per_game_role_multiplier(position, depth_rank)
+        if role_mult < 1.0:
+            result["fanduel_fantasy_points"] *= role_mult  # floor/ceiling scaled below too
+            adjustment = f"{position} depth-rank {roles.norm_rank(depth_rank)} x{role_mult:.2f}"
+        else:
+            adjustment = "no adjustment"
         result["fanduel_fantasy_points"] = round(result["fanduel_fantasy_points"], 1)
 
         rookie = features.is_rookie(player_name, player_id, self.history, self.season)
@@ -569,9 +573,10 @@ class Projector:
             qp = q_mod.predict_quantiles(self.quantile_model, q_input).iloc[0]
             qcols = [f"q{int(round(q * 100))}" for q in self.quantile_model.quantiles]
             median_col = "q50" if "q50" in qcols else qcols[len(qcols) // 2]
-            result["floor"] = round(float(qp[qcols[0]]), 1)
-            result["projection_median"] = round(float(qp[median_col]), 1)
-            result["ceiling"] = round(float(qp[qcols[-1]]), 1)
+            # Same depth-rank snap-share scaling as the mean, so the band stays consistent.
+            result["floor"] = round(float(qp[qcols[0]]) * role_mult, 1)
+            result["projection_median"] = round(float(qp[median_col]) * role_mult, 1)
+            result["ceiling"] = round(float(qp[qcols[-1]]) * role_mult, 1)
 
         return result
 
