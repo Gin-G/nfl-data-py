@@ -111,6 +111,29 @@ def test_use_roles_false_restores_raw_behaviour():
     assert tot.iloc[0]["proj_total"] > 250  # raw: 17 full games, no role discount
 
 
+def test_shares_redistribute_toward_the_lead_back():
+    # Two RBs projected EVENLY by form; the share model says the lead back gets most carries.
+    # Redistribution must move the fantasy total toward him while keeping the team total fixed.
+    base = pd.DataFrame([
+        {"player_id": "lead", "player_name": "Lead Back", "position": "RB", "team": "AAA",
+         "depth_rank": 1, "fanduel_fantasy_points": 12.0},
+        {"player_id": "sub", "player_name": "Committee Back", "position": "RB", "team": "AAA",
+         "depth_rank": 2, "fanduel_fantasy_points": 12.0},
+    ])
+    shares = pd.DataFrame([
+        {"player_id": "lead", "team": "AAA", "carry_share": 0.75, "target_share": 0.0},
+        {"player_id": "sub", "team": "AAA", "carry_share": 0.25, "target_share": 0.0},
+    ])
+    wk = S.assemble_season(base, 2026, grades=_neutral_grades(), league_avg=22.5,
+                           schedule=_full_sched(), use_roles=False,
+                           shares=shares, share_blend=1.0)  # full share weighting
+    tot = S.season_totals(wk).set_index("player_id")
+    # team total preserved (no points invented), split now 75/25
+    assert abs((tot.loc["lead", "proj_total"] + tot.loc["sub", "proj_total"])
+               - wk["projection"].sum()) < 1e-6
+    assert tot.loc["lead", "proj_total"] > 2.5 * tot.loc["sub", "proj_total"] - 1.0
+
+
 def test_snap_share_override_halves_a_two_way_player():
     base = pd.DataFrame([
         {"player_id": "h", "player_name": "Travis Hunter", "position": "WR", "team": "AAA",

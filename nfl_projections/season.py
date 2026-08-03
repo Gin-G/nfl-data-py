@@ -15,6 +15,7 @@ form and the grades.
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from . import ratings as ratings_mod
@@ -66,7 +67,8 @@ def _schedule_opponents(season: int, schedule=None) -> pd.DataFrame:
 
 def assemble_season(base_projections: pd.DataFrame, season: int, *, grades=None,
                     league_avg=None, schedule=None, damp: float = 0.75,
-                    use_roles: bool = True, budgets=None, snap_share=None) -> pd.DataFrame:
+                    use_roles: bool = True, budgets=None, snap_share=None,
+                    shares=None, share_blend: float = 0.5) -> pd.DataFrame:
     """Expand matchup-neutral base projections into a per-game season projection.
 
     Args:
@@ -147,8 +149,51 @@ def assemble_season(base_projections: pd.DataFrame, season: int, *, grades=None,
             out.append(row)
 
     weekly = pd.DataFrame(out)
+    if not weekly.empty and shares is not None:
+        weekly = _allocate_by_share(weekly, shares, have_band, blend=share_blend)
     if use_roles and not weekly.empty:
         weekly = _apply_team_budget(weekly, budgets, have_band)
+    return weekly
+
+
+def _volume_weight(row) -> float:
+    """A player's volume weight from predicted shares: RBs are carry-led (plus receiving),
+    WR/TE target-led. QB/unknown -> NaN (left on rolling form)."""
+    pos = row.get("position")
+    cs = float(row.get("carry_share", 0.0) or 0.0)
+    ts = float(row.get("target_share", 0.0) or 0.0)
+    if pos == "RB":
+        return cs + 0.5 * ts
+    if pos in ("WR", "TE"):
+        return ts
+    return float("nan")
+
+
+def _allocate_by_share(weekly: pd.DataFrame, shares: pd.DataFrame, have_band: bool,
+                       blend: float = 0.5) -> pd.DataFrame:
+    """Redistribute each (team, position, week) group's projected fantasy TOTAL by a blend of
+    rolling-form weight and the validated share model's volume weight (shares.py). Keeps the
+    group total unchanged (no points invented) — it only moves volume toward who the share
+    model says earns it, which fixes vacated-share / committee cases (e.g. a lead back gets his
+    ~56% instead of an even split). QB and no-share players stay on pure form."""
+    key = ["player_id", "team"]
+    cols = [c for c in ("carry_share", "target_share") if c in shares.columns]
+    w = weekly.merge(shares[key + cols].drop_duplicates(key), on=key, how="left")
+    w["_vw"] = w.apply(_volume_weight, axis=1)
+
+    grp = w.groupby(["team", "position", "week"])
+    form_sum = grp["projection"].transform("sum")
+    form_w = np.where(form_sum > 0, w["projection"] / form_sum, 0.0)
+    vw = w["_vw"].fillna(0.0)
+    vw_sum = grp["_vw"].transform("sum")
+    share_w = np.where(vw_sum > 0, vw / vw_sum, form_w)
+    # QB / positions the share model doesn't cover stay on form
+    share_w = np.where(w["position"].isin(["RB", "WR", "TE"]) & (vw_sum > 0), share_w, form_w)
+    blended = blend * share_w + (1 - blend) * form_w
+    scale = np.where(form_w > 0, blended / np.where(form_w > 0, form_w, 1.0), 1.0)
+
+    for c in ["projection"] + (["floor", "ceiling"] if have_band else []):
+        weekly[c] = (weekly[c].to_numpy() * scale).round(2)
     return weekly
 
 
