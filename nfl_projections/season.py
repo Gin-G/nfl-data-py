@@ -68,7 +68,8 @@ def _schedule_opponents(season: int, schedule=None) -> pd.DataFrame:
 def assemble_season(base_projections: pd.DataFrame, season: int, *, grades=None,
                     league_avg=None, schedule=None, damp: float = 0.75,
                     use_roles: bool = True, budgets=None, snap_share=None,
-                    shares=None, share_blend: float = 0.2) -> pd.DataFrame:
+                    shares=None, share_blend: float = 0.2,
+                    games_model=None, prev_games=None) -> pd.DataFrame:
     """Expand matchup-neutral base projections into a per-game season projection.
 
     Args:
@@ -118,7 +119,13 @@ def assemble_season(base_projections: pd.DataFrame, season: int, *, grades=None,
         # times any manual snap-share cap. Multiplies each game so the season TOTAL
         # reflects expected games while per-game matchup variation is preserved.
         if use_roles and n_games:
-            exp_games = roles_mod.expected_games(position, depth_rank, scheduled_games=n_games)
+            if games_model is not None:
+                from . import games as games_mod
+                pg = (prev_games or {}).get(p.get("player_id"))
+                exp_games = games_mod.expected_games(
+                    position, depth_rank, pg, games_model, scheduled_games=n_games)
+            else:
+                exp_games = roles_mod.expected_games(position, depth_rank, scheduled_games=n_games)
             play_w = (exp_games / n_games) * _snap_factor(
                 snap_share, p.get("player_id"),
                 p.get("player_name") or p.get("player_display_name"))
@@ -243,18 +250,27 @@ def season_totals(weekly: pd.DataFrame) -> pd.DataFrame:
 def project_season(service, season: int, *, base_week: int = 1, grades=None,
                    league_avg=None, schedule=None, damp: float = 0.75,
                    positions=None, use_injuries: bool = False,
-                   use_roles: bool = True, budgets=None, snap_share=None) -> pd.DataFrame:
+                   use_roles: bool = True, budgets=None, snap_share=None,
+                   use_games_model: bool = True) -> pd.DataFrame:
     """Convenience: build matchup-neutral base projections from a ProjectionService
     (projecting `base_week` for current form) and assemble the season. Returns the
     per-game long DataFrame; call season_totals() for per-player totals.
 
     Role corrections (``use_roles``) are on by default; team-position budgets are
-    derived from the service's historical dataset. Pass ``snap_share`` to hand-cap
-    part-time / two-way players (e.g. {"Travis Hunter": 0.5})."""
+    derived from the service's historical dataset. ``use_games_model`` replaces the
+    flat depth-role games assumption with the availability model (games.py) for
+    established players. Pass ``snap_share`` to hand-cap part-time / two-way players."""
     base = service.project(season, base_week, positions=positions,
                            use_injuries=use_injuries, as_frame=True, schedule=schedule)
+    ds = getattr(service, "dataset", None)
     if use_roles and budgets is None:
-        budgets = roles_mod.position_budgets(getattr(service, "dataset", None))
+        budgets = roles_mod.position_budgets(ds)
+    games_model = prev_games = None
+    if use_games_model and ds is not None:
+        from . import games as games_mod
+        games_model = games_mod.fit_games_model(ds, max_season=season - 1)
+        prev_games = games_mod.prev_games_map(ds, season)
     return assemble_season(base, season, grades=grades, league_avg=league_avg,
                            schedule=schedule, damp=damp, use_roles=use_roles,
-                           budgets=budgets, snap_share=snap_share)
+                           budgets=budgets, snap_share=snap_share,
+                           games_model=games_model, prev_games=prev_games)
