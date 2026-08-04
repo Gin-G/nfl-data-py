@@ -27,8 +27,11 @@ _YPT_SD, _YPC_SD, _YPA_SD = 4.5, 2.4, 2.3
 # team scoring environment split into a shared team factor plus pass-/rush-specific factors.
 # The pass factor is shared by the QB and his pass-catchers -> that's what drives the
 # QB<->WR stack correlation; the rush factor couples the QB's legs with the backfield.
-_ENV_TEAM, _ENV_PASS, _ENV_RUSH = 0.20, 0.30, 0.28
-_ENV_IDIO = 0.22  # per-player, per-sim role fluctuation (widens the marginal band)
+# Calibrated 2024-25 (EXPERIMENTS.md) alongside TD coupling to QB<->WR corr ~0.36.
+_ENV_TEAM, _ENV_PASS, _ENV_RUSH = 0.20, 0.36, 0.34
+_ENV_IDIO = 0.27  # per-player, per-sim role fluctuation (widens the marginal band)
+# QB downside: small per-sim chance of an early exit / benching that guts the game.
+_QB_BENCH_P, _QB_BENCH_MULT = 0.04, 0.35
 
 
 def build_expectations(prior_games: pd.DataFrame) -> dict | None:
@@ -55,13 +58,41 @@ def _env_factor(sigma, n, rng):
     return rng.lognormal(mean=-0.5 * sigma ** 2, sigma=sigma, size=n)  # mean 1
 
 
+def _couple_pass_tds(exps, pass_env, rng):
+    """Draw the team's passing TDs once (from the QB's expectation x pass env) and multinomially
+    allocate them to the pass-catchers by their receiving-TD weights. Returns
+    (team_pass_td array, {player_idx: rec_td array}) — so a QB's TD games ARE his receivers' TD
+    games (the coupling the independent-Poisson version missed, which under-stacked QB<->WR)."""
+    qb_idx = [i for i, e in enumerate(exps) if e.get("position") == "QB"]
+    rec_idx = [i for i, e in enumerate(exps) if e.get("position") in ("WR", "TE", "RB")]
+    if not qb_idx:
+        return None, None
+    mu = sum(exps[i]["exp_pass_td"] for i in qb_idx)
+    team_pass_td = rng.poisson(np.clip(mu * pass_env, 0, None))
+    w = np.array([max(exps[i]["exp_rec_td"], 1e-6) for i in rec_idx])
+    alloc = {}
+    if len(rec_idx) and w.sum() > 0:
+        w = w / w.sum()
+        remaining = team_pass_td.copy()
+        for k, i in enumerate(rec_idx):
+            if k == len(rec_idx) - 1:
+                alloc[i] = remaining
+            else:
+                p = min(w[k] / w[k:].sum(), 1.0)         # conditional split = exact multinomial
+                a = rng.binomial(remaining, p)
+                alloc[i] = a
+                remaining = remaining - a
+    return team_pass_td, alloc
+
+
 def _simulate_team(exps: list[dict], n_sims: int, rng: np.random.Generator) -> np.ndarray:
     """FanDuel points, shape (n_players, n_sims), for one team. A shared team factor plus
-    shared pass-/rush-specific factors (drawn once per sim) correlate the teammates —
-    the pass factor is what stacks the QB with his receivers."""
+    shared pass-/rush-specific factors (drawn once per sim) correlate the teammates — the pass
+    factor stacks the QB with his receivers, and passing TDs are coupled to receiving TDs."""
     team_env = _env_factor(_ENV_TEAM, n_sims, rng)
     pass_env = team_env * _env_factor(_ENV_PASS, n_sims, rng)   # QB + pass-catchers
     rush_env = team_env * _env_factor(_ENV_RUSH, n_sims, rng)   # backfield + QB legs
+    team_pass_td, alloc = _couple_pass_tds(exps, pass_env, rng)
     out = np.zeros((len(exps), n_sims))
     for i, e in enumerate(exps):
         idio = _env_factor(_ENV_IDIO, n_sims, rng)  # this player's own week-to-week swing
@@ -73,14 +104,25 @@ def _simulate_team(exps: list[dict], n_sims: int, rng: np.random.Generator) -> n
         pass_y = np.maximum(0, att * rng.normal(e["ypa"], _YPA_SD, n_sims)) if e["ypa"] else np.zeros(n_sims)
         # receptions: a catch rate around ~65% of targets, bounded by targets
         rec = np.minimum(tgt, rng.binomial(np.maximum(tgt, 0), 0.65))
-        rec_td = rng.poisson(np.clip(e["exp_rec_td"] * pass_env, 0, None))
+        # TDs: coupled team passing TDs -> receiver share (falls back to independent when no QB)
+        if alloc is not None and i in alloc:
+            rec_td = alloc[i]
+        else:
+            rec_td = rng.poisson(np.clip(e["exp_rec_td"] * pass_env, 0, None))
         rush_td = rng.poisson(np.clip(e["exp_rush_td"] * rush_env, 0, None))
-        pass_td = rng.poisson(np.clip(e["exp_pass_td"] * pass_env, 0, None))
+        if e.get("position") == "QB" and team_pass_td is not None:
+            pass_td = team_pass_td
+        else:
+            pass_td = rng.poisson(np.clip(e["exp_pass_td"] * pass_env, 0, None))
         ints = rng.poisson(np.clip(e["exp_int"] * np.ones(n_sims), 0, None))
-        out[i] = fanduel_points(
+        fp = fanduel_points(
             passing_yards=pass_y, passing_tds=pass_td, interceptions=ints,
             rushing_yards=rush_y, rushing_tds=rush_td,
             receptions=rec, receiving_yards=rec_y, receiving_tds=rec_td)
+        # QB downside: a small chance of an early exit / benching gutting the game (fattens the floor)
+        if e.get("position") == "QB" and _QB_BENCH_P > 0:
+            fp = np.where(rng.random(n_sims) < _QB_BENCH_P, fp * _QB_BENCH_MULT, fp)
+        out[i] = fp
     return out
 
 
@@ -100,9 +142,11 @@ def simulate(players: pd.DataFrame, n_sims: int = 1000, seed: int | None = None,
     sims = np.zeros((len(players), n_sims))
     for _, idx in players.groupby("team").groups.items():
         idx = list(idx)
-        exps = [players.loc[i, ["exp_targets", "exp_carries", "exp_att", "exp_rec_td",
-                                "exp_rush_td", "exp_pass_td", "exp_int", "ypt", "ypc", "ypa"]].to_dict()
-                for i in idx]
+        exp_cols = ["exp_targets", "exp_carries", "exp_att", "exp_rec_td", "exp_rush_td",
+                    "exp_pass_td", "exp_int", "ypt", "ypc", "ypa"]
+        if "position" in players.columns:
+            exp_cols = exp_cols + ["position"]   # needed for TD coupling / QB downside
+        exps = [players.loc[i, exp_cols].to_dict() for i in idx]
         team_sims = _simulate_team(exps, n_sims, rng)
         for k, i in enumerate(idx):
             sims[i] = team_sims[k]

@@ -51,6 +51,21 @@ def test_stack_distribution_preserves_correlation():
     assert abs(stack.mean() - (sims[0].mean() + sims[1].mean())) < 1e-6
 
 
+def test_td_coupling_strengthens_qb_wr_stack():
+    # WR A is the QB's only TD-catching option, so coupling the team's passing TDs to the
+    # receiver produces a strong QB<->WR correlation that independent Poisson TDs could not.
+    _, sims = sim.simulate(_players(), n_sims=6000, seed=7)
+    assert np.corrcoef(sims[0], sims[1])[0, 1] > 0.25
+
+
+def test_qb_downside_fattens_the_floor():
+    # The ~4% benching term (x0.35) leaves a visible chunk of very-low QB games — a heavier
+    # low tail than a symmetric distribution would have.
+    _, sims = sim.simulate(_players(), n_sims=8000, seed=8)
+    qb = sims[0]
+    assert (qb < 0.5 * np.median(qb)).mean() > 0.04
+
+
 def test_build_expectations_from_prior_games():
     prior = pd.DataFrame({
         "targets": [8, 10, 9], "carries": [0, 0, 0], "attempts": [0, 0, 0],
