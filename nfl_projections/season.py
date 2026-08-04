@@ -68,7 +68,7 @@ def _schedule_opponents(season: int, schedule=None) -> pd.DataFrame:
 def assemble_season(base_projections: pd.DataFrame, season: int, *, grades=None,
                     league_avg=None, schedule=None, damp: float = 0.75,
                     use_roles: bool = True, budgets=None, snap_share=None,
-                    shares=None, share_blend: float = 0.5) -> pd.DataFrame:
+                    shares=None, share_blend: float = 0.2) -> pd.DataFrame:
     """Expand matchup-neutral base projections into a per-game season projection.
 
     Args:
@@ -170,12 +170,17 @@ def _volume_weight(row) -> float:
 
 
 def _allocate_by_share(weekly: pd.DataFrame, shares: pd.DataFrame, have_band: bool,
-                       blend: float = 0.5) -> pd.DataFrame:
+                       blend: float = 0.2) -> pd.DataFrame:
     """Redistribute each (team, position, week) group's projected fantasy TOTAL by a blend of
     rolling-form weight and the validated share model's volume weight (shares.py). Keeps the
     group total unchanged (no points invented) — it only moves volume toward who the share
     model says earns it, which fixes vacated-share / committee cases (e.g. a lead back gets his
-    ~56% instead of an even split). QB and no-share players stay on pure form."""
+    ~56% instead of an even split). QB and no-share players stay on pure form.
+
+    Backtested (EXPERIMENTS): a LIGHT blend ~0.15-0.20 is a modest net win on player season
+    fantasy total (MAE 43.9 vs form 44.3) whose value concentrates on ROLE-CHANGE cases
+    (changed RBs 57 vs 59); higher blends over-correct and hurt stable players. Form stays the
+    backbone — hence the low default."""
     key = ["player_id", "team"]
     cols = [c for c in ("carry_share", "target_share") if c in shares.columns]
     w = weekly.merge(shares[key + cols].drop_duplicates(key), on=key, how="left")
