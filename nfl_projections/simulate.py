@@ -30,8 +30,16 @@ _YPT_SD, _YPC_SD, _YPA_SD = 4.5, 2.4, 2.3
 # Calibrated 2024-25 (EXPERIMENTS.md) alongside TD coupling to QB<->WR corr ~0.36.
 _ENV_TEAM, _ENV_PASS, _ENV_RUSH = 0.20, 0.36, 0.34
 _ENV_IDIO = 0.27  # per-player, per-sim role fluctuation (widens the marginal band)
+# carries are heavily game-script over-dispersed (var/mean ~2.3 vs targets ~1.25 in 2018-25):
+# a back gets ~5 carries chasing, ~25 leading. Extra dispersion on carries ONLY — added to
+# attempts it would decouple the QB from his receivers and weaken the stack (EXPERIMENTS).
+_CARRY_DISP = 0.60
 # QB downside: small per-sim chance of an early exit / benching that guts the game.
 _QB_BENCH_P, _QB_BENCH_MULT = 0.04, 0.35
+# catch rate (receptions / targets) by position, measured 2018-25: RBs catch checkdowns at a
+# high rate, WRs lower (contested / deep). Was a flat 0.65 for everyone (under-credited RB PPR).
+_CATCH_RATE = {"RB": 0.77, "WR": 0.64, "TE": 0.70, "QB": 0.74}
+_CATCH_DEFAULT = 0.65
 
 
 def build_expectations(prior_games: pd.DataFrame) -> dict | None:
@@ -96,14 +104,16 @@ def _simulate_team(exps: list[dict], n_sims: int, rng: np.random.Generator) -> n
     out = np.zeros((len(exps), n_sims))
     for i, e in enumerate(exps):
         idio = _env_factor(_ENV_IDIO, n_sims, rng)  # this player's own week-to-week swing
+        car_disp = _env_factor(_CARRY_DISP, n_sims, rng)  # extra carry over-dispersion (game script)
         tgt = rng.poisson(np.clip(e["exp_targets"] * pass_env * idio, 0, None))
-        car = rng.poisson(np.clip(e["exp_carries"] * rush_env * idio, 0, None))
+        car = rng.poisson(np.clip(e["exp_carries"] * rush_env * idio * car_disp, 0, None))
         att = rng.poisson(np.clip(e["exp_att"] * pass_env * idio, 0, None))
         rec_y = np.maximum(0, tgt * rng.normal(e["ypt"], _YPT_SD, n_sims)) if e["ypt"] else np.zeros(n_sims)
         rush_y = np.maximum(0, car * rng.normal(e["ypc"], _YPC_SD, n_sims)) if e["ypc"] else np.zeros(n_sims)
         pass_y = np.maximum(0, att * rng.normal(e["ypa"], _YPA_SD, n_sims)) if e["ypa"] else np.zeros(n_sims)
-        # receptions: a catch rate around ~65% of targets, bounded by targets
-        rec = np.minimum(tgt, rng.binomial(np.maximum(tgt, 0), 0.65))
+        # receptions: a position-specific catch rate, bounded by targets
+        catch = _CATCH_RATE.get(e.get("position"), _CATCH_DEFAULT)
+        rec = np.minimum(tgt, rng.binomial(np.maximum(tgt, 0), catch))
         # TDs: coupled team passing TDs -> receiver share (falls back to independent when no QB)
         if alloc is not None and i in alloc:
             rec_td = alloc[i]

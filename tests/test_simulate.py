@@ -66,6 +66,20 @@ def test_qb_downside_fattens_the_floor():
     assert (qb < 0.5 * np.median(qb)).mean() > 0.04
 
 
+def test_position_catch_rate_rb_over_wr():
+    # Identical target volume and yards-per-target; the RB's higher catch rate (0.77 vs 0.64)
+    # means more receptions -> more PPR points on average than the WR.
+    base = dict(exp_carries=0, exp_att=0, exp_rush_td=0, exp_pass_td=0, exp_int=0,
+                exp_rec_td=0.4, ypc=0, ypa=0)
+    p = pd.DataFrame([
+        dict(player_id="rb", player_name="RB", position="RB", team="A", exp_targets=8, ypt=7.0, **base),
+        dict(player_id="wr", player_name="WR", position="WR", team="B", exp_targets=8, ypt=7.0, **base),
+    ])
+    summ, _ = sim.simulate(p, n_sims=8000, seed=11)
+    means = summ.set_index("player_id")["mean"]
+    assert means["rb"] > means["wr"]
+
+
 def test_build_expectations_from_prior_games():
     prior = pd.DataFrame({
         "targets": [8, 10, 9], "carries": [0, 0, 0], "attempts": [0, 0, 0],
