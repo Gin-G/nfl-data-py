@@ -131,6 +131,15 @@ The most important measurement so far — it recalibrates every prior claim.
 - **Adopt seed-ensembling as the default** — a reliable ~0.04 MAE gain over a
   typical single seed and it kills the seed lottery. The production model should
   be an ensemble.
+- **SHIPPED (2026-08-05):** seed-ensembling is now the default everywhere —
+  `model.train_ensemble(df, n_seeds=5)` featurizes once and fits 5 networks
+  sharing one preprocessor; `predict_batch` averages their raw outputs before
+  capping. `ProjectionService(n_seeds=...)`, `evaluate.backtest(n_seeds=...)`
+  and CLI `--seeds` all default to `config.DEFAULT_N_SEEDS` (5); `train_model`
+  stays single-network and gained a `seed` arg for reproducibility. Saved
+  ensembles carry `n_members` in metadata.json (dirs written before this load
+  as single models). Costs 5x training time. NFL-API's projections cronjob
+  picks it up via the main-tarball install; `--seeds 1` for a fast run.
 - **GBDT is a strong production candidate**: 4.240, trains in ~3s, **no
   TensorFlow** (would let the NFL-API projections job drop the runtime TF
   install), and gives feature importances. Blending it with the NN ensemble is
@@ -435,6 +444,55 @@ simulator supplies the shape + correlation** — best of both. stack_distributio
 same sims for QB+WR stack queries (correlation preserved). Refinements left: explicit
 passing-TD→receiving-TD coupling (would push corr toward 0.36), QB downside (benchings).
 Scripts: scratchpad/sim_calibration.py.
+## Standardized training targets — fixes the broken component stat lines (2026-08-06)
+
+Found in production: the stored component projections were degenerate. Every 2026 QB was
+projected for ~1.8 rushing TDs/game (Goff and Stafford, who scored 0 rushing TDs in 2025,
+got the same 1.78 as Josh Allen); the 2025 run gave every QB exactly 0.0. Season totals made
+it plain — Josh Allen 31.2 rushing TDs and 11.6 passing TDs; Derrick Henry 7.4 receiving TDs
+and 3.0 rushing TDs. A constant that changes between training runs is an untrained head.
+
+**Cause:** the multi-output net trains all 9 targets under one MSE, but their scales differ by
+orders of magnitude (passing_yards ~250 vs rushing_tds ~0.05). The yardage targets own the
+gradient; the TD/reception heads barely train and settle near a per-run constant. Same reason
+component-first models were 5x more seed-sensitive (#10 follow-up).
+
+**Fix:** `model.TargetScaler` standardizes each target to zero mean / unit variance (fit on
+train only), predictions invert through it in `predict_batch`. `scale_targets=True` default on
+`train_model` / `train_ensemble` / `evaluate.backtest`; persisted in metadata.json (models
+saved before this load with `target_scaler=None` and behave as before).
+
+**A/B, standard 2025 wk1-18 backtest, 3-seed ensembles, 60 epochs, identical both arms:**
+
+| | unscaled | scaled |
+|---|---:|---:|
+| **fantasy-point MAE (headline)** | **4.158** | **4.186** |
+| corr | 0.615 | 0.610 |
+| QB / RB / WR / TE MAE | 7.10 / 4.28 / 3.87 / 3.06 | 7.11 / 4.27 / 3.92 / 3.11 |
+| FP recomputed from components | 4.279 | 4.189 |
+| receiving_tds corr | **−0.016** | **0.253** |
+| receiving_tds MAE | 0.244 | 0.202 |
+| passing_interceptions MAE | 0.098 | 0.073 |
+| receptions MAE / corr | 1.152 / 0.658 | 1.106 / 0.675 |
+| QB rushing_tds mean (actual 0.164) | **0.030** | **0.141** |
+| QB receiving_tds (nonsense stat) | 0.42–0.59 | 0.0 |
+| passing_yards / rushing_yards MAE | 8.02 / 7.08 | 8.30 / 7.20 |
+
+**Verdict: keep.** The headline moves +0.028 MAE — inside the noise band for 3-seed arms, so
+read it as unchanged, not as a win or a loss. What clearly improves is everything the fix
+targeted: no more hallucinated QB receiving TDs, QB rushing TDs go from collapsed-to-zero
+(0.030) to about right (0.141 vs 0.164 actual), receiving_tds goes from *uncorrelated with
+reality* to 0.25, and points recomputed from the components (4.189) now match the direct head
+(4.186) instead of trailing it. Yardage MAEs are a hair worse.
+
+**What it does NOT fix:** component *differentiation* is still compressed in both arms — the
+predicted runner-vs-pocket QB rushing gap is +16.6 yds/g against an actual +27.3, rushing-TD
+gap +0.14 vs +0.36, RB catcher-vs-ground receptions +1.89 vs +3.38. And it does nothing for
+the headline QB problem (QB MAE 7.10 → 7.11): rushing production still isn't separating QBs in
+the fantasy-point projection. Untried follow-up: standardize as now but weight the
+fanduel_fantasy_points target higher in the loss, to buy back the headline delta.
+Scripts: scratchpad/target_scaling_ab.py, ab_report.py.
+
 Naive last-5-avg is 4.255; our best (NN-ensemble + GBDT blend) is 4.197 — a real
 but small edge. Direct-FP beats component-first extrapolation at every position.
 Point projection (rolling features, #2) looks near the

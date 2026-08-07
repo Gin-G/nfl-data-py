@@ -23,6 +23,13 @@ def _add_common_week_args(parser):
     parser.add_argument("--week", type=int, required=True, help="Week number")
 
 
+def _add_seeds_arg(parser):
+    parser.add_argument("--seeds", type=int, default=config.DEFAULT_N_SEEDS,
+                        help=f"Networks in the seed ensemble, averaged at prediction "
+                             f"time (default: {config.DEFAULT_N_SEEDS}; 1 trains "
+                             f"{config.DEFAULT_N_SEEDS}x faster but is a seed lottery)")
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="nfl_projections",
@@ -45,6 +52,7 @@ def build_parser():
                    help="Include opponent-defense matchup features")
     p.add_argument("--loss", choices=["mse", "huber", "mae"], default="mse",
                    help="Training loss (default: mse)")
+    _add_seeds_arg(p)
 
     p = sub.add_parser("predict", help="Generate weekly projections")
     _add_common_week_args(p)
@@ -70,6 +78,7 @@ def build_parser():
     p.add_argument("--quantile-model-dir", type=str, default=None,
                    help="Load a saved quantile model instead of training one")
     p.add_argument("--output-dir", type=str, default=config.PREDICTIONS_DIR)
+    _add_seeds_arg(p)
 
     p = sub.add_parser("pools", help="Build DFS player pools from predictions")
     _add_common_week_args(p)
@@ -97,6 +106,7 @@ def build_parser():
     p.add_argument("--exclude", nargs="+", default=None, help="Players to exclude")
     p.add_argument("--max-usage", type=float, default=50,
                    help="Max %% of lineups any one player can appear in")
+    _add_seeds_arg(p)
 
     p = sub.add_parser("backtest", help="Backtest the model over a season")
     p.add_argument("--season", type=int, required=True)
@@ -111,6 +121,7 @@ def build_parser():
                    help="Training loss (default: mse)")
     p.add_argument("--output", type=str, default=None,
                    help="Save per-player results CSV here")
+    _add_seeds_arg(p)
 
     p = sub.add_parser("compare", help="Compare projections to an external source")
     p.add_argument("--results", type=str, required=True,
@@ -141,7 +152,10 @@ def _get_trained_model(args, dataset_df):
         print(f"Loading model from {args.model_dir}/")
         return model_mod.TrainedModel.load(args.model_dir)
     matchup = _build_matchup_table(dataset_df) if getattr(args, "opponent", False) else None
-    trained, _ = model_mod.train_model(dataset_df, epochs=args.epochs, matchup_table=matchup)
+    trained, _ = model_mod.train_ensemble(
+        dataset_df, n_seeds=getattr(args, "seeds", config.DEFAULT_N_SEEDS),
+        epochs=args.epochs, matchup_table=matchup,
+    )
     return trained
 
 
@@ -165,8 +179,9 @@ def main(argv=None):
 
         df = dataset.load_dataset(args.data)
         matchup = _build_matchup_table(df) if args.opponent else None
-        model_mod.train_model(df, epochs=args.epochs, save_dir=args.save_dir,
-                              matchup_table=matchup, loss=args.loss)
+        model_mod.train_ensemble(df, n_seeds=args.seeds, epochs=args.epochs,
+                                 save_dir=args.save_dir, matchup_table=matchup,
+                                 loss=args.loss)
 
     elif args.command == "predict":
         from . import dataset
@@ -223,6 +238,7 @@ def main(argv=None):
                 salary_cap=args.salary_cap, exclude_players=args.exclude,
                 max_usage_percentage=args.max_usage,
                 model_dir=args.model_dir, data_path=args.data, epochs=args.epochs,
+                n_seeds=args.seeds,
             )
         elif args.csv:
             lineups = optimizer.optimize_from_csv(
@@ -241,7 +257,7 @@ def main(argv=None):
         weeks = parse_weeks(args.weeks) if args.weeks else None
         results = evaluate.backtest(
             df, season=args.season, weeks=weeks,
-            positions=args.positions, epochs=args.epochs,
+            positions=args.positions, epochs=args.epochs, n_seeds=args.seeds,
             use_opponent=args.opponent, loss=args.loss,
         )
         evaluate.summarize(results)

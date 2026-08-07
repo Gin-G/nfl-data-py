@@ -7,6 +7,12 @@ CURRENT_SEASON = 2025
 # Only train on seasons from this year forward (older football is less relevant)
 TRAINING_MIN_SEASON = 2020
 
+# Networks averaged in the default seed ensemble. Measured (EXPERIMENTS.md,
+# roadmap item 1): a single seed scores 4.237 +/- 0.052 MAE on the 2025
+# backtest, the 5-seed ensemble 4.201 — a real gain, and it removes the seed
+# lottery that made single-seed A/B deltas of +/-0.05 meaningless.
+DEFAULT_N_SEEDS = 5
+
 # Offensive skill positions we project
 POSITIONS = ["QB", "RB", "WR", "TE"]
 

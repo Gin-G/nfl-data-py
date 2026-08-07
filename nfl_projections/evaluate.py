@@ -45,7 +45,8 @@ def component_fantasy_points(pred_df):
 def backtest(dataset, season, weeks=None, positions=None, trained=None,
              epochs=100, min_season=config.TRAINING_MIN_SEASON, use_opponent=False,
              schedule=None, loss="mse", scheme_form=None, include_coarse=True,
-             target_cols=None, include_components=False):
+             target_cols=None, include_components=False, n_seeds=None,
+             scale_targets=True):
     """Backtest the model over a season. Returns a results DataFrame with one
     row per player-week: predicted vs. actual FanDuel points.
 
@@ -57,6 +58,10 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
         trained: reuse an existing TrainedModel; when None, a model is
             trained on seasons strictly before `season`
         epochs: training epochs when training here
+        n_seeds: seed-ensemble size when training here (default
+            config.DEFAULT_N_SEEDS, matching production). Use 1 only for quick
+            probes — single-seed results carry a +/-0.05 MAE seed lottery, so
+            A/B deltas smaller than that are not readable.
     """
     from . import model as model_mod
     from .opponent import OPPONENT_FEATURES
@@ -80,10 +85,12 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
                 include_coarse=include_coarse,
             )
 
-        print(f"Training backtest model on seasons < {season}...")
-        trained, _ = model_mod.train_model(
-            train_df, epochs=epochs, min_season=min_season, plot_path=None,
-            matchup_table=train_matchup, loss=loss, target_cols=target_cols,
+        n_seeds = config.DEFAULT_N_SEEDS if n_seeds is None else n_seeds
+        print(f"Training backtest model on seasons < {season} ({n_seeds} seed(s))...")
+        trained, _ = model_mod.train_ensemble(
+            train_df, n_seeds=n_seeds, epochs=epochs, min_season=min_season,
+            plot_path=None, matchup_table=train_matchup, loss=loss,
+            target_cols=target_cols, scale_targets=scale_targets,
         )
 
     uses_opponent = any(c in OPPONENT_FEATURES for c in trained.numerical_features)

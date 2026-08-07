@@ -23,13 +23,19 @@ changes, low-sample). Rank everything against that lens.
 3. **GBDT baseline** — LightGBM/XGBoost on the same features. Tabular data this
    size usually favors GBDTs; if one hits ≤4.17 it's a better production model
    (seconds to train, no TF in the job image) and gives feature importances.
-4. **Multi-seed + seed-ensembling** — all results are single-seed; 5 seeds give
-   error bars, and averaging them is routinely worth 1–3% MAE.
+4. ~~**Multi-seed + seed-ensembling**~~ — DONE, and **shipped 2026-08-05**:
+   single seed 4.237 ± 0.052, 5-seed ensemble 4.201. `train_ensemble` is the
+   default everywhere (`config.DEFAULT_N_SEEDS`, CLI `--seeds`).
 5. **Per-position models** — QB (MAE ~7, corr ~0.4) is the weak spot with
    distinct dynamics; a dedicated QB model is the plausible first split.
-6. **Prospective accuracy tracking** — NFL-API now stores projections with
-   `computed_at`; score them against actuals when each week completes
-   (`/projections/accuracy`). True out-of-sample eval accruing forever.
+6. ~~**Prospective accuracy tracking**~~ — BUILT 2026-08-05 in NFL-API:
+   `scripts.score_projections` (daily cron) scores each week's stored
+   projections against actuals into the frozen `projection_accuracy` table and
+   `GET /projections/accuracy` reports MAE / bias / correlation / band
+   coverage, split by position and week, **against the naive trailing-5
+   baseline** so the skill-over-naive margin (gap 1) accrues prospectively too.
+   Rows are never rewritten and projections computed after kickoff are refused,
+   so the record stays honest. Nothing to read until 2026 wk1 games are played.
 7. **Quantile floor calibration** — ceiling is calibrated, floor isn't (q10
    empirical 0.24). Untried: per-position conformal offsets; asymmetric
    trained quantiles (q02/q50/q90).

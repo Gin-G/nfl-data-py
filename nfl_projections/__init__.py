@@ -19,7 +19,7 @@ Lower-level building blocks:
 
     from nfl_projections import dataset, model, predict
     df = dataset.build_dataset()
-    trained, _ = model.train_model(df)
+    trained, _ = model.train_ensemble(df)      # 5 seeds averaged; train_model = 1
     results = predict.Projector(df, trained, season=2025, week=13).run()
 
 Command line:
@@ -36,7 +36,7 @@ from .service import (
     results_to_frame,
 )
 
-__version__ = "1.2.1"
+__version__ = "1.3.0"
 
 __all__ = [
     "ProjectionService",
