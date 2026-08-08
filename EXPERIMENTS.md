@@ -444,6 +444,68 @@ simulator supplies the shape + correlation** — best of both. stack_distributio
 same sims for QB+WR stack queries (correlation preserved). Refinements left: explicit
 passing-TD→receiving-TD coupling (would push corr toward 0.36), QB downside (benchings).
 Scripts: scratchpad/sim_calibration.py.
+## QB separation — the board was flat for two independent reasons (2026-08-07)
+
+Symptom: on the 2026 board Josh Allen (16.95) and Jared Goff (16.94) project within
+0.01 points of each other, when the real 2025 gap was 23.4 vs 18.9.
+
+**Cause 1 — the model shrinks, and it shrinks QBs twice as hard.** Player-season means
+on the 2025 backtest, predicted spread as a fraction of actual spread:
+
+| pos | spread ratio | calibration slope (actual~pred) | season-mean corr | naive-5 corr |
+|---|---:|---:|---:|---:|
+| QB | **0.33** | **2.18** | 0.711 | **0.782** |
+| RB | 0.69 | 1.38 | 0.950 | **0.980** |
+| WR | 0.67 | 1.38 | 0.926 | **0.961** |
+| TE | 0.70 | 1.35 | 0.943 | **0.961** |
+
+The model beats "average his last five games" on per-game MAE at every position — and
+LOSES to it at *ranking players*, everywhere. MSE on a target this noisy is minimized by
+shrinking toward the positional mean; that is right for per-game error and wrong for every
+comparison between players. QB is worst because its single-game variance is the largest.
+
+**Cause 2 — the team-position budget cap was set at the league MEAN.** 40-46% of real
+team-games exceed it at every position, so any above-average offense was truncated to
+average. Applied to 2025 projections it scaled down 28.6% of rows and cut the Allen-Goff
+gap from 4.18 to **0.68**. At QB one starter carries the whole group, so the cap acted as a
+flat ~17-point ceiling on every good QB — exactly the reported symptom.
+
+**Fix 1 (nfl_projections/blend.py): blend the network with the player's own form.**
+Weights fitted on the 2024 backtest, applied unchanged to 2025 (never tuned there):
+
+| pos | MAE model -> blend | corr model -> blend | spread model -> blend |
+|---|---:|---:|---:|
+| QB | 6.960 -> **6.798** | 0.711 -> **0.779** | 0.33 -> **0.65** |
+| RB | 4.343 -> **4.315** | 0.950 -> **0.980** | 0.69 -> **0.92** |
+| WR | 3.885 -> 3.908 | 0.926 -> **0.961** | 0.67 -> **0.89** |
+| TE | 3.143 -> **3.122** | 0.943 -> **0.963** | 0.70 -> **0.78** |
+
+Overall 2025 week MAE **4.178 -> 4.124** — a bigger gain than seed-ensembling — while
+ranking and spread improve at the same time. Shipped weights (QB/RB/WR .5, TE .6) sit
+between each season's own optimum and land within 0.02 MAE of both. The blend partner,
+`fanduel_fantasy_points_roll5`, is already one of the network's input features: the model
+has this information and under-weights it.
+
+**Fix 2: preseason mode.** Before a season there is no current form, and the prior season's
+FULL average beats its last five games at predicting the next season (corr 0.919 vs 0.886,
+2022-25). Preseason-board test (2025 wk1 projections, which see only 2024, scored against
+2025 season averages, n=253): blending against the season average cut MAE **QB 4.18 ->
+3.29, WR 2.54 -> 2.10, RB 2.66 -> 2.39, TE 1.98 -> 1.82**, and QB correlation 0.157 ->
+0.321. Projector switches automatically when the projected season has no games in history.
+
+**Fix 3: budget cap at the p90 team-season average, not the league mean** (QB 17.3 -> 22.4,
+RB 23.0 -> 31.0, WR 31.3 -> 41.9, TE 10.3 -> 14.4). Rows scaled down 28.6% -> 5.2%; the
+Allen-Goff gap goes 0.68 -> **3.70** (actual 2.80). The cap still binds on its real target
+(two RB1s on one team) without truncating good offenses.
+
+**Honest limits.** The blend only *ties* the naive baseline on QB ranking (0.779 vs 0.782)
+— it buys the naive predictor's discrimination while keeping the model's better per-game
+MAE, rather than beating both. Spread is 0.65, still short of 1.0, so the board remains
+somewhat compressed. And the p90 cap costs ~0.09 QB MAE vs the old one (6.657 -> 6.747):
+tighter shrinkage always flatters MAE. Every stage of this pipeline had been trading
+discrimination for MAE; these changes trade some back deliberately.
+Scripts: scratchpad/blend_validate.py, board_check.py.
+
 ## Standardized training targets — fixes the broken component stat lines (2026-08-06)
 
 Found in production: the stored component projections were degenerate. Every 2026 QB was

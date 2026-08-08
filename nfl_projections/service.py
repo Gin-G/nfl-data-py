@@ -50,15 +50,19 @@ class ProjectionService:
             (default 5 — measured ~0.04 MAE better than a typical single seed
             and immune to the seed lottery). Costs n_seeds x the training time;
             pass 1 for a quick run.
+        blend_form: blend projections with trailing-5 scoring form (blend.py).
+            On by default: it improves per-game MAE, cross-player ranking and
+            spread at once. Pass False for raw network output.
     """
 
     def __init__(self, dataset=None, data_path=config.DATASET_PATH, model_dir=None,
                  quantile_model_dir=None, quantiles=False, opponent=False, epochs=100,
-                 n_seeds=None):
+                 n_seeds=None, blend_form=True):
         from . import dataset as dataset_mod
         from . import model as model_mod
 
         self.dataset = dataset if dataset is not None else dataset_mod.load_dataset(data_path)
+        self.blend_form = blend_form
 
         matchup = None
         if opponent:
@@ -97,6 +101,7 @@ class ProjectionService:
             use_injuries=use_injuries, injury_source=injury_source,
             quantile_model=self.quantile_model, rookie_fallback=rookie_fallback,
             rosters=rosters, depth_charts=depth_charts, schedule=schedule,
+            blend_form=self.blend_form,
         )
 
     def project(self, season, week, positions=None, players=None, use_injuries=True,

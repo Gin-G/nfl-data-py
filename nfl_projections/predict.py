@@ -389,17 +389,23 @@ class Projector:
         rookie_fallback: give baseline projections to rookies with no games
         rosters / depth_charts: pass pre-loaded frames (mainly for tests);
             loaded from nflreadpy when omitted
+        blend_form: blend each projection with the player's trailing-5 scoring
+            form (see blend.py). On by default — measured to improve per-game
+            MAE, cross-player ranking and spread at the same time. Pass False
+            for the raw network output.
     """
 
     def __init__(self, dataset, trained, season, week,
                  use_injuries=True, rookie_fallback=False,
                  rosters=None, depth_charts=None, schedule=None,
                  injury_source="nflverse", scheme_form=None, include_coarse=True,
-                 quantile_model=None):
+                 quantile_model=None, blend_form=True):
         self.trained = trained
         self.quantile_model = quantile_model
         self.season = season
         self.week = week
+        self.blend_form = blend_form
+        self._preseason = None  # resolved lazily from the history
 
         if rosters is None or depth_charts is None:
             import nflreadpy as nfl
@@ -475,6 +481,16 @@ class Projector:
             return None
         return self._predict_roster_row(matches.iloc[0])
 
+    def _is_preseason(self):
+        """True when the season being projected has no games in the history —
+        a preseason board (e.g. projecting 2026 off 2025 data). Those blend
+        against the prior season's average rather than its last five games."""
+        if self._preseason is None:
+            seasons = pd.to_numeric(self.history.get("season"), errors="coerce")
+            self._preseason = bool(seasons.notna().any()
+                                   and (seasons == self.season).sum() == 0)
+        return self._preseason
+
     def _predict_roster_row(self, player_info):
         from . import model as model_mod
 
@@ -532,6 +548,30 @@ class Projector:
         prediction = model_mod.predict_batch(self.trained, input_df).iloc[0]
         result = prediction.to_dict()
 
+        # Blend with the player's own recent scoring form. The network shrinks
+        # hard toward the positional mean (it is minimizing per-game error on a
+        # very noisy target), which flattens the board — Josh Allen and Jared
+        # Goff land within 0.01 points of each other. See blend.py.
+        blend_ratio = 1.0
+        if self.blend_form:
+            from . import blend as blend_mod
+
+            preseason = self._is_preseason()
+            form = blend_mod.recent_form_from_rows(
+                recent_stats, preseason=preseason
+            ).iloc[0]
+            blended = blend_mod.blend_value(
+                result["fanduel_fantasy_points"], form, position,
+                weights=blend_mod.weights_for_mode(preseason),
+            )
+            # Keep the component stat line consistent with the blended total
+            if result["fanduel_fantasy_points"]:
+                blend_ratio = blended / result["fanduel_fantasy_points"]
+            for stat in result:
+                if stat != "fanduel_fantasy_points":
+                    result[stat] = result[stat] * blend_ratio
+            result["fanduel_fantasy_points"] = blended
+
         # Depth-chart role adjustment: scale the per-game number to a snap-share
         # proxy for the player's depth rank, so a non-starter isn't read at a
         # starter's rate. This uses the full rank (not just role == "backup", so
@@ -573,10 +613,12 @@ class Projector:
             qp = q_mod.predict_quantiles(self.quantile_model, q_input).iloc[0]
             qcols = [f"q{int(round(q * 100))}" for q in self.quantile_model.quantiles]
             median_col = "q50" if "q50" in qcols else qcols[len(qcols) // 2]
-            # Same depth-rank snap-share scaling as the mean, so the band stays consistent.
-            result["floor"] = round(float(qp[qcols[0]]) * role_mult, 1)
-            result["projection_median"] = round(float(qp[median_col]) * role_mult, 1)
-            result["ceiling"] = round(float(qp[qcols[-1]]) * role_mult, 1)
+            # Same depth-rank and form-blend scaling as the mean, so the band
+            # travels with the projection instead of drifting away from it.
+            band_mult = role_mult * blend_ratio
+            result["floor"] = round(float(qp[qcols[0]]) * band_mult, 1)
+            result["projection_median"] = round(float(qp[median_col]) * band_mult, 1)
+            result["ceiling"] = round(float(qp[qcols[-1]]) * band_mult, 1)
 
         return result
 

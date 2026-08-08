@@ -46,7 +46,7 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
              epochs=100, min_season=config.TRAINING_MIN_SEASON, use_opponent=False,
              schedule=None, loss="mse", scheme_form=None, include_coarse=True,
              target_cols=None, include_components=False, n_seeds=None,
-             scale_targets=True):
+             scale_targets=True, blend_form=True):
     """Backtest the model over a season. Returns a results DataFrame with one
     row per player-week: predicted vs. actual FanDuel points.
 
@@ -62,6 +62,8 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
             config.DEFAULT_N_SEEDS, matching production). Use 1 only for quick
             probes — single-seed results carry a +/-0.05 MAE seed lottery, so
             A/B deltas smaller than that are not readable.
+        blend_form: blend the network output with trailing-5 form, as the
+            Projector does (blend.py). Pass False to score the raw network.
     """
     from . import model as model_mod
     from .opponent import OPPONENT_FEATURES
@@ -171,6 +173,18 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
             headline = predicted["fanduel_fantasy_points"].values
         else:
             headline = derived
+
+        # Same recent-form blend the Projector applies, so the backtest scores
+        # what production actually serves (see blend.py)
+        if blend_form:
+            from . import blend as blend_mod
+
+            form = blend_mod.recent_form_from_rows(stat_rows).values
+            positions = week_games["position"].values
+            headline = np.array([
+                blend_mod.blend_value(h, f, p)
+                for h, f, p in zip(headline, form, positions)
+            ])
 
         week_result = pd.DataFrame({
             "player_id": week_games["player_id"].values,

@@ -67,7 +67,10 @@ _EXPECTED_GAMES_DEEP = {"QB": 0.3, "RB": 4.0, "WR": 5.0, "TE": 4.0}
 # Fallback per-game team totals (fantasy points) for the finite-pool cap, used
 # when no historical dataset is supplied. Position group ~= a realistic single
 # game's combined output for that position on one team.
-DEFAULT_BUDGETS = {"QB": 22.0, "RB": 22.0, "WR": 34.0, "TE": 11.0}
+# Fallback pools when no dataset is available: the p90 team-season average
+# per-game output at each position (2024-25), matching what position_budgets
+# computes. A budget at the league MEAN truncates every good offense.
+DEFAULT_BUDGETS = {"QB": 22.4, "RB": 31.0, "WR": 41.9, "TE": 14.4}
 
 _SKILL = ("RB", "WR", "TE")
 
@@ -148,13 +151,23 @@ def apply_team_budget(frame: pd.DataFrame, budgets: dict, *, points_col: str,
 
 
 def position_budgets(dataset: pd.DataFrame | None = None, *, recent_seasons: int = 2,
-                     fp_col: str = "fanduel_fantasy_points") -> dict:
+                     fp_col: str = "fanduel_fantasy_points",
+                     quantile: float | None = 0.90) -> dict:
     """Per-game team fantasy-point pool by position, for the finite-pool cap.
 
-    Computed from history as the mean over (season, week, team) of the summed
-    position group's fantasy points in the most recent ``recent_seasons`` seasons.
-    Falls back to :data:`DEFAULT_BUDGETS` when the dataset is missing the columns
-    or has no rows for a position.
+    The reference is each TEAM-SEASON's average per-game pool, and the budget is
+    the ``quantile`` of that across team-seasons — i.e. "what a top offense
+    averages at this position". The cap is applied to projections, which are
+    means, so the ceiling has to allow for a genuinely good offense.
+
+    This used to be the league mean over (season, week, team), which was far too
+    tight: 40-46% of real team-games exceeded it at every position, so every
+    above-average offense was truncated to average. That silently flattened the
+    board — most visibly at QB, where one starter carries the whole group and
+    the elite QBs all landed pinned just under a 17.3-point ceiling.
+
+    Pass ``quantile=None`` for the old mean behaviour. Falls back to
+    :data:`DEFAULT_BUDGETS` when the dataset lacks the columns or a position.
     """
     budgets = dict(DEFAULT_BUDGETS)
     if dataset is None:
@@ -176,8 +189,13 @@ def position_budgets(dataset: pd.DataFrame | None = None, *, recent_seasons: int
 
     per_game = (df.groupby(["season", "week", tcol, "position"])[fp_col]
                   .sum().reset_index())
-    means = per_game.groupby("position")[fp_col].mean()
-    for pos, val in means.items():
+    if quantile is None:
+        levels = per_game.groupby("position")[fp_col].mean()
+    else:
+        team_season = (per_game.groupby(["season", tcol, "position"])[fp_col]
+                               .mean().reset_index())
+        levels = team_season.groupby("position")[fp_col].quantile(quantile)
+    for pos, val in levels.items():
         if pd.notna(val) and val > 0:
             budgets[pos] = float(val)
     return budgets
