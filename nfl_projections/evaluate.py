@@ -213,6 +213,91 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
     return pd.concat(results, ignore_index=True)
 
 
+def season_totals_from_backtest(results, min_weeks=8):
+    """Collapse a weekly backtest to per-player season totals.
+
+    Projected and actual are summed over the SAME player-weeks, so the two sides
+    share a denominator and availability differences cancel — this measures
+    ordering of scoring rate, not of durability.
+
+    ``min_weeks`` keeps players with a real sample. Note the survivorship this
+    introduces: a player is included on the strength of having played, which is
+    itself an outcome. Treat the actual-side spreads as a directional reference,
+    not a target.
+    """
+    if results.empty:
+        return results
+    g = (results.groupby(["player_id", "player_name", "position"], dropna=False)
+         .agg(weeks=("week", "count"),
+              proj_total=("predicted", "sum"),
+              act_total=("actual", "sum"))
+         .reset_index())
+    return g[g["weeks"] >= min_weeks].copy()
+
+
+def _spearman(a, b):
+    """Rank correlation without a scipy dependency."""
+    if len(a) < 3:
+        return float("nan")
+    return pd.Series(a).rank().corr(pd.Series(b).rank())
+
+
+def _spread_ratio(values, top, lower):
+    """value at rank `top` divided by value at rank `lower`, descending."""
+    s = pd.Series(values).sort_values(ascending=False).reset_index(drop=True)
+    if len(s) < lower or s.iloc[lower - 1] <= 0:
+        return float("nan")
+    return s.iloc[top - 1] / s.iloc[lower - 1]
+
+
+def rank_metrics(results, min_weeks=8, positions=None, verbose=True):
+    """Ordering quality per position — what MAE structurally cannot see.
+
+    MAE over ~180k player-weeks is dominated by low-usage players, and shrinking
+    everyone toward the positional mean improves it. A board consumer uses only
+    the within-position ORDER, so score that directly:
+
+      * spearman   — rank correlation of projected vs actual season totals
+      * top12/top24 — set overlap with the actual finish (fraction)
+      * r_1_5, r_1_24 — spread of the projected board vs the actual one. A
+        projection SHOULD be flatter than outcomes (the actual #1 is partly
+        whoever got lucky), so these are diagnostic, not targets: a ratio far
+        below the actual one means the elite tail is being compressed.
+    """
+    totals = season_totals_from_backtest(results, min_weeks=min_weeks)
+    if totals.empty:
+        return pd.DataFrame()
+    positions = positions or config.POSITIONS
+
+    rows = []
+    for pos in positions:
+        s = totals[totals["position"] == pos]
+        if len(s) < 5:
+            continue
+        by_proj = s.sort_values("proj_total", ascending=False)
+        by_act = s.sort_values("act_total", ascending=False)
+        row = {
+            "position": pos,
+            "n": len(s),
+            "spearman": _spearman(s["proj_total"].values, s["act_total"].values),
+        }
+        for k in (12, 24):
+            if len(s) >= k:
+                overlap = len(set(by_proj.head(k)["player_id"])
+                              & set(by_act.head(k)["player_id"])) / k
+                row[f"top{k}"] = overlap
+        for lower in (5, 24):
+            row[f"r_1_{lower}_proj"] = _spread_ratio(s["proj_total"], 1, lower)
+            row[f"r_1_{lower}_act"] = _spread_ratio(s["act_total"], 1, lower)
+        rows.append(row)
+
+    out = pd.DataFrame(rows)
+    if verbose and not out.empty:
+        print(f"\n=== RANK METRICS (season totals, players with >= {min_weeks} weeks) ===")
+        print(out.round(3).to_string(index=False))
+    return out
+
+
 def summarize(results):
     """Summarize backtest results: MAE/RMSE/correlation overall & by position."""
     if results.empty:
@@ -368,12 +453,18 @@ def _prior_latest(history_games, season, week):
 
 
 def backtest_quantiles(dataset, season, quantiles=None, weeks=None, positions=None,
-                       qmodel=None, epochs=100, min_season=config.TRAINING_MIN_SEASON):
+                       qmodel=None, epochs=100, min_season=config.TRAINING_MIN_SEASON,
+                       n_seeds=None, trained=None):
     """Backtest floor/median/ceiling projections over a season (leakage-free).
 
     Trains a quantile model on seasons < ``season`` (unless one is supplied),
     then for each week predicts every player's quantiles from their latest prior
     game. Returns one row per player-week with the quantile columns + actual.
+
+    ``trained``: the mean model. When given, the band is scaled by the same
+    recent-form blend ratio production applies (predict.py), so the measured
+    calibration is the calibration that ships. Without it you are measuring the
+    raw quantile network, which is no longer what anyone sees.
     """
     from . import model as model_mod
     from . import quantiles as q_mod
@@ -388,7 +479,8 @@ def backtest_quantiles(dataset, season, quantiles=None, weeks=None, positions=No
             raise ValueError(f"No data before season {season} to train on")
         print(f"Training quantile model {quantiles} on seasons < {season}...")
         qmodel, _ = q_mod.train_quantile_model(
-            train_df, quantiles=quantiles, epochs=epochs, min_season=min_season
+            train_df, quantiles=quantiles, epochs=epochs, min_season=min_season,
+            n_seeds=n_seeds,
         )
 
     history = features.prepare_prediction_base(dataset, min_season=min_season)
@@ -421,6 +513,27 @@ def backtest_quantiles(dataset, season, quantiles=None, weeks=None, positions=No
             teams=team_series.values,
         )
         qpreds = q_mod.predict_quantiles(qmodel, input_df)
+
+        # Production scales the whole band by the same ratio the recent-form
+        # blend applied to the point projection (predict.py), so measure the
+        # band that actually ships, not the raw quantile net's.
+        if trained is not None:
+            from . import blend as blend_mod
+
+            mean_input = model_mod.build_input_rows(
+                trained, stat_rows, positions=stat_rows[position_col].values,
+                teams=team_series.values,
+            )
+            base = model_mod.predict_batch(trained, mean_input)["fanduel_fantasy_points"].values
+            form = blend_mod.recent_form_from_rows(stat_rows).values
+            positions_arr = week_games["position"].values
+            blended = np.array([
+                blend_mod.blend_value(b, f, p) for b, f, p in zip(base, form, positions_arr)
+            ])
+            ratios = np.divide(blended, base, out=np.ones_like(blended, dtype=float),
+                               where=np.asarray(base) != 0)
+            for c in qcols:
+                qpreds[c] = qpreds[c].values * ratios
 
         name_col = "player_display_name" if "player_display_name" in week_games.columns else "player_name"
         week_result = pd.DataFrame({

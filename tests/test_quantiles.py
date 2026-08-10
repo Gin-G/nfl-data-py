@@ -47,6 +47,37 @@ class TestPredictQuantiles:
         assert out.iloc[0].tolist() == [1.0, 8.0, 10.0]
 
 
+class TestQuantileEnsemble:
+    def _qm(self, *outs, **kw):
+        nets = [_StubModel(o) for o in outs]
+        return q_mod.QuantileModel(
+            model=nets[0], preprocessor=_StubPre(),
+            numerical_features=[], categorical_features=[],
+            quantiles=[0.1, 0.5, 0.9], extra_models=nets[1:], **kw
+        )
+
+    def test_single_model_has_one_member(self):
+        qm = self._qm([[2.0, 5.0, 9.0]])
+        assert qm.n_members == 1
+        assert qm.members == [qm.model]
+
+    def test_members_are_averaged(self):
+        qm = self._qm([[2.0, 4.0, 6.0]], [[4.0, 8.0, 12.0]])
+        assert qm.n_members == 2
+        out = q_mod.predict_quantiles(qm, pd.DataFrame({"a": [1]}))
+        assert out.iloc[0].tolist() == [3.0, 6.0, 9.0]
+
+    def test_averaging_precedes_the_offsets(self):
+        qm = self._qm([[2.0, 4.0, 6.0]], [[4.0, 8.0, 12.0]], offsets=[1.0, 1.0, 1.0])
+        out = q_mod.predict_quantiles(qm, pd.DataFrame({"a": [1]}))
+        assert out.iloc[0].tolist() == [4.0, 7.0, 10.0]
+
+    def test_ensemble_still_sorts_and_clips(self):
+        qm = self._qm([[9.0, -4.0, 5.0]], [[7.0, -2.0, 3.0]])
+        out = q_mod.predict_quantiles(qm, pd.DataFrame({"a": [1]}))
+        assert out.iloc[0].tolist() == [0.0, 4.0, 8.0]   # mean [8,-3,4] -> clip, sort
+
+
 class TestConformalOffsets:
     def test_offset_makes_median_unbiased(self):
         y = np.full(200, 12.0)

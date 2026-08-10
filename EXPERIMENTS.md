@@ -30,6 +30,9 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 11 | Wider quantile band q05/q95 | median 4.14 | — | band 72→**81%** | **KEPT (option)** — ceiling well-calibrated; floor still high |
 | 12 | FPA as an explicit post-projection multiplier | 4.21–4.41 | — | +0.004 → +0.21 | **REJECTED** — monotonically worse; best setting is "off" |
 | 13 | Lineup backtest: ceiling vs mean objective | — | — | ceiling −7 pts/wk | **mean wins** — ceiling scored lower, same variance |
+| 14 | Rank-aware metrics (Spearman, top-12/24 overlap, #1/#5 & #1/#24 spread) | — | — | — | **KEPT** — measurement only; MAE structurally cannot see ordering |
+| 15 | Board team-budget cap: league mean → p90 team-season | 4.138 | — | +0.044 vs mean cap | **KEPT** — buys the ordering back (see below); MAE cost accepted |
+| 16 | Is seed averaging compressing the elite tail? | 4.154 | — | members 4.130–4.181 | **REJECTED** — ensemble spread sits inside its members' range |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -444,6 +447,108 @@ simulator supplies the shape + correlation** — best of both. stack_distributio
 same sims for QB+WR stack queries (correlation preserved). Refinements left: explicit
 passing-TD→receiving-TD coupling (would push corr toward 0.36), QB downside (benchings).
 Scripts: scratchpad/sim_calibration.py.
+## #14-16 Board ordering — the cap was normalizing teams, and MAE liked it (2026-08-10)
+
+Reported symptom: the 2026 board's elite tail was flat (QB1/QB5 = 1.006) with specific
+inversions — Michael Wilson WR2 over St. Brown and Chase, Cade Otton TE1 over McBride.
+
+**Diagnosis (evidence, not inference).** On the failing board, **23 of 32 teams' WR groups
+summed to exactly 31.34** — the league-mean budget. The cap was not capping, it was
+NORMALIZING: most teams were forced to an identical position-group total, so a player's
+projection became his SHARE OF A FIXED PIE instead of his absolute expectation. ARI summed
+to 30.85, just under, and escaped scaling entirely — so Wilson kept 9.22 while St. Brown was
+compressed to 8.94 and Chase to 8.73. A WR1 on a weak corps beats a WR1 on a strong one by
+construction. Same at TE (14/32 pinned at 10.25). It also explains why the compression was
+confined to the elite tail: the cap only binds on high-output teams, which is where the
+elite players are, so #1/#24 looked fine while #1/#5 collapsed.
+
+**#14 — rank metrics, because MAE cannot see any of this.** MAE over 6k player-weeks is
+dominated by low-usage players and is *improved* by shrinking everyone toward the positional
+mean, which is precisely the failure. Added `evaluate.rank_metrics`: Spearman on season
+totals within position, top-12/24 set overlap vs the actual finish, and #1/#5 & #1/#24
+spread ratios projected vs actual. Projected and actual are summed over the SAME
+player-weeks so availability cancels. Baseline, current shipped model (3-seed, scaled
+targets, form blend), MAE 4.154:
+
+| pos | n | spearman | top12 | top24 | r_1_5 proj (act) | r_1_24 proj (act) |
+|---|--:|--:|--:|--:|--:|--:|
+| QB | 36 | 0.949 | 0.917 | 0.958 | 1.257 (1.203) | 1.999 (2.313) |
+| RB | 98 | 0.984 | 0.833 | 0.917 | 1.228 (1.246) | 1.922 (2.325) |
+| WR | 162 | 0.978 | 0.750 | 0.750 | 1.392 (1.598) | 1.794 (2.374) |
+| TE | 89 | 0.975 | 0.750 | 0.833 | 1.438 (1.585) | 2.208 (2.728) |
+
+The MODEL was never the problem: QB projected #1/#5 is 1.257 against a realized 1.203, i.e.
+slightly WIDER than outcomes. Flatness at #1/#24 is legitimate shrinkage.
+
+**#15 — the cap trade, measured.** Applying each cap to the 2025 backtest by
+(team, position, week):
+
+| cap | MAE | QB r_1_5 | TE r_1_5 | TE top12 | TE spearman | rows scaled |
+|---|--:|--:|--:|--:|--:|--:|
+| none | 4.154 | 1.257 | 1.438 | 0.750 | 0.975 | 0% |
+| league mean (old) | **4.094** | 1.183 | **1.149** | **0.667** | **0.964** | 24.7% |
+| p90 (shipped) | 4.138 | 1.241 | 1.311 | 0.750 | 0.974 | 6.0% |
+| p95 | 4.143 | 1.250 | 1.346 | 0.750 | 0.975 | 4.4% |
+
+**The old cap had the BEST MAE of any setting.** That is why it survived: every check the
+ledger ran until now would have approved it. It bought that MAE by flattening TE's top five
+from 1.438 to 1.149 (actual 1.585) and dropping TE top-12 overlap and Spearman. p90 restores
+almost all of it for +0.044 MAE. p95 is inside noise of p90 on every rank metric — not
+adopted.
+
+**#16 — seed averaging rejected as a suspect.** Trained one 3-seed ensemble and scored the
+SAME networks four ways (each member alone, and averaged), so seed noise cannot confound it.
+The ensemble's #1/#5 sits inside its members' range at every position (QB 1.257 vs members
+1.254/1.251/1.257; TE 1.438 vs 1.445/1.463/1.417), and Spearman/top-k are identical.
+Averaging does not compress the tail.
+
+**Persistence defect, reported not fixed.** Availability IS baked into `projected_points`
+(NFL-API `_apply_roles` multiplies each weekly row by expected_games/17), and `exp_games` IS
+lost at persistence — NFL-API never calls `season.assemble_season` and `PlayerProjection`
+has no column for it. `/projections/season/{season}` therefore reports `games = count(week)`
+= 17 for everyone (18 weeks minus the bye; verified on Wilson, whose stored weeks skip 14),
+and `ppg = total/17` is points per SCHEDULED game, already availability-discounted, not the
+on-field rate. Season totals are arithmetically correct and ordering is unaffected, so this
+does not cause the reported symptom — it is a reporting bug.
+Scripts: scratchpad/seed_tail_test.py, rank_baseline.py.
+
+## Quantile bands — the "floor problem" was never fixable (2026-08-09)
+
+Re-measured the band after the form blend started scaling it (predict.py), expecting the
+blend to have broken calibration. **It hadn't** — coverage 0.706 -> 0.705 (1 seed) and
+0.711 -> 0.712 (3 seeds). Scaling the band with the projection preserves calibration.
+
+**Seed-ensembling the quantile model is a wash**, unlike the mean model: band coverage
+0.706 -> 0.711, median MAE 4.093 -> 4.126 (slightly worse), both inside noise. Kept the
+capability (QuantileModel.extra_models, offsets calibrated on the ENSEMBLE's predictions,
+not one member's) for run-to-run stability, but it is not an accuracy win — don't claim it.
+
+**The real finding: the floor was never achievable.** The ledger has carried "q10 empirical
+0.24, the floor is the weak spot" as an open bug for a long time. Training wider NOMINAL
+quantiles to chase it (2025 backtest, 1 seed):
+
+| nominal | emp low | emp high | band | width | median MAE |
+|---|---:|---:|---:|---:|---:|
+| 0.10 / 0.90 | 0.249 | 0.865 | 0.706 | 11.0 | 4.093 |
+| **0.05 / 0.95** | **0.205** | **0.903** | **0.803** | 13.9 | 4.110 |
+| 0.02 / 0.98 | 0.196 | 0.948 | 0.899 | 17.9 | 4.081 |
+
+The floor barely moves — 0.249 -> 0.205 -> 0.196 — while the ceiling tracks its nominal
+almost exactly. Cause: **19.1% of player-weeks score ZERO or less** (WR 23%, TE 20%, RB 16%,
+QB 8%) and predictions are clipped at 0, so no non-negative floor can cover better than
+~0.19. The measured 0.196 is essentially AT that bound. This was never a model defect and
+no amount of recalibration was going to fix it — which also explains why the earlier
+conformal attempts came out as no-ops.
+
+**Shipped: DEFAULT_QUANTILES = (0.05, 0.5, 0.95)**, the first honest 80% band (0.803) with a
+calibrated ceiling (0.903 vs 0.865 before), median MAE unchanged. The floor should be read
+as roughly a 20th percentile, and that is the structural limit, not a to-do.
+
+Note on where bands are used: the NFL-API board path REPLACES floor/median/ceiling with the
+Monte-Carlo simulator for players with enough history (538 of 888 rows in the 2026 run), so
+this matters most for the in-season weekly path, which uses quantile bands for every row.
+Scripts: scratchpad/band_check.py, wider_bands.py.
+
 ## QB separation — the board was flat for two independent reasons (2026-08-07)
 
 Symptom: on the 2026 board Josh Allen (16.95) and Jared Goff (16.94) project within

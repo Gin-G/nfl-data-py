@@ -36,9 +36,12 @@ changes, low-sample). Rank everything against that lens.
    baseline** so the skill-over-naive margin (gap 1) accrues prospectively too.
    Rows are never rewritten and projections computed after kickoff are refused,
    so the record stays honest. Nothing to read until 2026 wk1 games are played.
-7. **Quantile floor calibration** — ceiling is calibrated, floor isn't (q10
-   empirical 0.24). Untried: per-position conformal offsets; asymmetric
-   trained quantiles (q02/q50/q90).
+7. ~~**Quantile floor calibration**~~ — CLOSED 2026-08-09, and not the way this
+   entry assumed. The band now ships at 5/95 nominal, giving an honest 80.3%
+   interval with a calibrated ceiling (0.903). The FLOOR is not fixable: 19.1%
+   of player-weeks score zero or less and predictions clip at 0, so no
+   non-negative floor can cover better than ~0.19 — the measured 0.196 is at
+   that bound. Read it as a ~20th percentile. Stop treating it as a defect.
 
 ## New features, ranked
 

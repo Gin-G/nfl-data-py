@@ -91,7 +91,8 @@ class ProjectionService:
                 self.quantile_model = q_mod.QuantileModel.load(quantile_model_dir)
             else:
                 self.quantile_model, _ = q_mod.train_quantile_model(
-                    self.dataset, epochs=epochs, matchup_table=matchup
+                    self.dataset, epochs=epochs, matchup_table=matchup,
+                    n_seeds=n_seeds,
                 )
 
     def _projector(self, season, week, use_injuries=True, injury_source="nflverse",
