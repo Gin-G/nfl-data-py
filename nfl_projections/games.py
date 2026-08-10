@@ -35,10 +35,20 @@ _MIN_ROLE_GAMES = 8  # "had a role" threshold for fitting
 
 
 def games_history(dataset: pd.DataFrame) -> pd.DataFrame:
-    """Per (season, player_id, position) games played, with the prior season's games."""
+    """Per (season, player_id, position) REGULAR-SEASON games played, with the
+    prior season's games.
+
+    Postseason games are excluded on purpose. Counting them made "games played"
+    partly a measure of the team's playoff run: a Super Bowl quarterback showed
+    21 games and drew a 0.99 availability weight, while a quarterback who
+    started all 17 regular-season games for an eliminated team showed 17 and
+    drew 0.83 — a 20% penalty for his team losing, dressed up as durability.
+    """
     df = dataset.copy()
     if "week" in df.columns:
         df = df[df["week"] != "AVG"]
+    if "season_type" in df.columns:
+        df = df[(df["season_type"] == "REG") | df["season_type"].isna()]
     df = df[df["position"].isin(SKILL)]
     df["fp"] = pd.to_numeric(df["fanduel_fantasy_points"], errors="coerce")
     h = (df.groupby(["season", "player_id", "position"]).agg(games=("fp", "size")).reset_index()
