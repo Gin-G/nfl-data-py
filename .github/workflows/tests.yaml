@@ -16,11 +16,15 @@ jobs:
       - name: Install dependencies
         # The suite runs on pure logic (TF / sklearn / nflreadpy are imported
         # lazily and not exercised), so only these lightweight deps are needed.
-        # `requests` is pulled in by importing the package (service -> predict
-        # -> injuries). Install the package itself with --no-deps so it's
-        # importable without dragging in TensorFlow.
+        # Because the package is installed with --no-deps (to avoid dragging in
+        # TensorFlow), anything it imports at runtime has to be listed here:
+        #   requests — pulled in by importing the package (service -> predict
+        #              -> injuries)
+        #   joblib   — TrainedModel/QuantileModel .save()/.load() persist the
+        #              preprocessor through it, and the tests exercise that
+        # Both are small and pure Python, so the job stays fast.
         run: |
-          pip install pandas numpy requests pytest pytest-cov
+          pip install pandas numpy requests joblib pytest pytest-cov
           pip install -e . --no-deps
       - name: Run pytest
         run: pytest --cov=nfl_projections --cov-report=xml
