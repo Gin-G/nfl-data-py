@@ -564,12 +564,14 @@ class Projector:
                 result["fanduel_fantasy_points"], form, position,
                 weights=blend_mod.weights_for_mode(preseason),
             )
-            # Keep the component stat line consistent with the blended total
             if result["fanduel_fantasy_points"]:
                 blend_ratio = blended / result["fanduel_fantasy_points"]
-            for stat in result:
-                if stat != "fanduel_fantasy_points":
-                    result[stat] = result[stat] * blend_ratio
+            # Each component is blended against its OWN trailing average rather
+            # than scaled by the points ratio — the components shrink toward the
+            # positional mean independently of the total, which is how a QB who
+            # gained 1 rushing yard all season projected for ~160. See blend.py.
+            result = blend_mod.blend_components(
+                result, recent_stats, fallback_ratio=blend_ratio)
             result["fanduel_fantasy_points"] = blended
 
         # Depth-chart role adjustment: scale the per-game number to a snap-share

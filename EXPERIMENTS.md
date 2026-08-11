@@ -33,6 +33,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 14 | Rank-aware metrics (Spearman, top-12/24 overlap, #1/#5 & #1/#24 spread) | — | — | — | **KEPT** — measurement only; MAE structurally cannot see ordering |
 | 15 | Board team-budget cap: league mean → p90 team-season | 4.138 | — | +0.044 vs mean cap | **KEPT** — buys the ordering back (see below); MAE cost accepted |
 | 16 | Is seed averaging compressing the elite tail? | 4.154 | — | members 4.130–4.181 | **REJECTED** — ensemble spread sits inside its members' range |
+| 17 | Blend each component with its own trailing-5 (not the points ratio) | unchanged | — | component MAE −30–45% | **KEPT** — display-only; points untouched |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -447,6 +448,54 @@ simulator supplies the shape + correlation** — best of both. stack_distributio
 same sims for QB+WR stack queries (correlation preserved). Refinements left: explicit
 passing-TD→receiving-TD coupling (would push corr toward 0.36), QB downside (benchings).
 Scripts: scratchpad/sim_calibration.py.
+## #17 Component stat lines shrink to the positional mean too (2026-08-10)
+
+Reported: the 2026 board had Matthew Stafford at 159 rushing yards. He gained ONE rushing yard
+in 2025, at age 38. Jared Goff similar. Not a one-off — a floor.
+
+**Diagnosis.** 2025 backtest, QB rushing yards per game: predicted range 7.8-33.5 (std 7.4)
+against an actual range of 0.1-42.6 (std 11.2). **Correlation 0.922** — the ORDER is nearly
+right, the SCALE is not. The model will not project a QB below ~8 rushing yards a game when
+the true floor is zero: Stafford predicted 8.0 vs actual 0.1, Cousins 8.9 vs 0.7, Goff 7.8 vs
+2.6. Over 17 games that reads as ~160 yards for a quarterback who gained one. Same shrinkage
+as everywhere else in this ledger, but conspicuous here because the true value is ~0 and the
+prediction cannot get there.
+
+Note the components were being scaled by the POINTS blend ratio, a single scalar per player.
+That keeps a stat line proportional to its total but does nothing about each component
+shrinking toward its own positional mean.
+
+**Fix: blend every component with that player's own trailing-5 for THAT stat.** Season-level
+per-game MAE on the 2025 backtest:
+
+| | raw | 50/50 blend | affine recal | recal + 50/50 |
+|---|--:|--:|--:|--:|
+| QB passing_yards | 25.37 | 17.10 | 19.19 | **14.94** |
+| QB rushing_yards | 4.49 | 2.81 | 4.09 | **2.65** |
+| RB rushing_yards | 7.23 | 4.79 | 5.41 | **3.70** |
+| RB receiving_yards | 3.43 | 2.00 | 2.82 | **1.82** |
+| WR receiving_yards | 6.45 | **4.13** | 6.27 | 4.25 |
+| TE receiving_yards | 4.73 | 2.86 | 4.47 | **2.86** |
+
+The plain 50/50 blend cuts component MAE 30-45% at every position. A fitted affine
+recalibration per (position, component), slopes 1.3-1.9, wins a further 5-15% on 9 of 11
+components — **measured and deliberately not shipped**: it needs a calibration artifact fit on
+a holdout and carried with the model, for a second-order gain on a display-only number.
+
+End to end through the Projector (2025 wk10): Stafford 7.5 -> 4.1/game, Cousins 8.8 -> 4.2,
+Goff 6.6 -> 5.7, while Allen holds at 40.5 (actual 36.2) and Hurts at 21.6 — the real rushers
+are not flattened. Floor 1.8 -> 0.7, correlation 0.836 -> 0.864, MAE 5.30 -> 4.46.
+
+**Scope: display only.** Fantasy points are predicted directly, never assembled from these
+components, so the headline projection and every rank metric are untouched. TD components have
+no rolling feature to blend against and keep the old points-ratio scaling.
+
+**Residual, stated plainly:** Stafford still projects ~4 yards a game (~70 a season) against a
+true ~1. Half the weight still sits on a model that says 8. Pure trailing-5 would be closer
+(season MAE 2.25 vs 2.65 for QB rushing) but throws the model away entirely, which fails
+exactly where it is needed — players changing role or team, whom this ≥8-week sample cannot
+see. Scripts: scratchpad/comp_check.py.
+
 ## #14-16 Board ordering — the cap was normalizing teams, and MAE liked it (2026-08-10)
 
 Reported symptom: the 2026 board's elite tail was flat (QB1/QB5 = 1.006) with specific

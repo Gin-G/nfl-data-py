@@ -74,6 +74,57 @@ class TestPreseasonMode:
         assert blend.recent_form_from_rows(rows, preseason=False).iloc[0] == 9.0
 
 
+class TestBlendComponents:
+    def _rows(self, **cols):
+        base = {"passing_yards_roll5": [0.5], "rushing_yards_roll5": [0.1],
+                "receiving_yards_roll5": [0.0], "receptions_roll5": [0.0]}
+        base.update({k: [v] for k, v in cols.items()})
+        return pd.DataFrame(base)
+
+    def test_component_blends_toward_its_own_trailing_average(self):
+        # the reported symptom: model says 12 rushing yards, player gains 0.1
+        out = blend.blend_components(
+            {"fanduel_fantasy_points": 18.0, "rushing_yards": 12.0}, self._rows())
+        assert out["rushing_yards"] == pytest.approx(6.05)   # 0.5*12 + 0.5*0.1
+
+    def test_points_are_left_for_the_caller(self):
+        out = blend.blend_components(
+            {"fanduel_fantasy_points": 18.0, "rushing_yards": 12.0}, self._rows())
+        assert out["fanduel_fantasy_points"] == 18.0
+
+    def test_stats_without_a_trailing_column_use_the_fallback_ratio(self):
+        # TDs have no rolling feature; they follow the points blend instead
+        out = blend.blend_components(
+            {"fanduel_fantasy_points": 10.0, "rushing_tds": 0.4},
+            self._rows(), fallback_ratio=0.5)
+        assert out["rushing_tds"] == pytest.approx(0.2)
+
+    def test_never_returns_a_negative_component(self):
+        out = blend.blend_components(
+            {"fanduel_fantasy_points": 1.0, "rushing_yards": 0.2},
+            self._rows(rushing_yards_roll5=-3.0))
+        assert out["rushing_yards"] == 0.0
+
+    def test_missing_trailing_value_leaves_the_component_alone(self):
+        out = blend.blend_components(
+            {"fanduel_fantasy_points": 10.0, "rushing_yards": 12.0},
+            self._rows(rushing_yards_roll5=float("nan")))
+        assert out["rushing_yards"] == pytest.approx(12.0)
+
+    def test_a_real_rusher_is_not_dragged_down(self):
+        # blending must not flatten everyone: a QB whose trailing rushing is
+        # high keeps a high projection
+        out = blend.blend_components(
+            {"fanduel_fantasy_points": 22.0, "rushing_yards": 34.0},
+            self._rows(rushing_yards_roll5=38.0))
+        assert out["rushing_yards"] == pytest.approx(36.0)
+
+    def test_does_not_mutate_the_input(self):
+        result = {"fanduel_fantasy_points": 18.0, "rushing_yards": 12.0}
+        blend.blend_components(result, self._rows())
+        assert result["rushing_yards"] == 12.0
+
+
 class TestRecentFormFromRows:
     def test_reads_the_rolling_column(self):
         rows = pd.DataFrame({blend.RECENT_FORM_COL: [12.5, 8.0]})

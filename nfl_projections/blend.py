@@ -47,6 +47,29 @@ SEASON_FORM_COL = "avg_fppg"                       # preseason: points per game
                                                    # entering the week (expanding,
                                                    # carries over from last season)
 
+# The component stat lines shrink toward the positional mean the same way the
+# points did, and it shows most where the true value is near zero: the model
+# would not project a QB below ~8 rushing yards a game when Matthew Stafford
+# actually gained 0.1 (Cousins 0.7, Goff 2.6). Over a season that reads as ~160
+# rushing yards for a quarterback who gained one. Ordering is fine —
+# correlation 0.92 — so this is a scale problem, and blending each component
+# against that player's own trailing average for THAT stat fixes it.
+#
+# Season-level per-game MAE on the 2025 backtest, raw -> 50/50 blend:
+#   QB passing_yards 25.37 -> 17.10   QB rushing_yards 4.49 -> 2.81
+#   RB rushing_yards  7.23 ->  4.79   RB receiving_yards 3.43 -> 2.00
+#   WR receiving_yards 6.45 -> 4.13   TE receiving_yards 4.73 -> 2.86
+# A 30-45% cut at every component. (A fitted affine recalibration on top wins a
+# further ~5-15% on 9 of 11 components but needs a per-position calibration
+# artifact carried with the model — measured, deliberately not shipped.)
+COMPONENT_FORM_COLS = {
+    "passing_yards": "passing_yards_roll5",
+    "rushing_yards": "rushing_yards_roll5",
+    "receiving_yards": "receiving_yards_roll5",
+    "receptions": "receptions_roll5",
+}
+COMPONENT_MODEL_WEIGHT = 0.5
+
 
 def weights_for_mode(preseason=False):
     """Per-position model weights for the in-season or preseason blend."""
@@ -75,6 +98,41 @@ def blend_value(projection, recent_form, position, weights=None):
         return float(projection)
     w = model_weight(position, weights)
     return w * float(projection) + (1.0 - w) * float(recent_form)
+
+
+def blend_component_value(projection, form, weight=COMPONENT_MODEL_WEIGHT):
+    """Blend one component stat with the player's trailing average for it.
+
+    Clipped at 0 — a blend toward a near-zero trailing average can otherwise go
+    slightly negative, and no one rushes for -3 yards a game in expectation.
+    Missing form (no history) leaves the projection alone.
+    """
+    if form is None or (isinstance(form, float) and np.isnan(form)):
+        return float(projection)
+    return max(0.0, weight * float(projection) + (1.0 - weight) * float(form))
+
+
+def blend_components(result, stat_rows, weight=COMPONENT_MODEL_WEIGHT,
+                     fallback_ratio=1.0):
+    """Blend every component in ``result`` that has a trailing column.
+
+    ``result`` is a per-player prediction dict. Components with a rolling
+    feature (yards, receptions) are blended against their own trailing average.
+    Components without one — the TD stats, which have no rolling column — fall
+    back to ``fallback_ratio``, the scaling the points blend applied, so they
+    stay consistent with the projection they belong to.
+    """
+    out = dict(result)
+    for stat, value in result.items():
+        if stat == "fanduel_fantasy_points":
+            continue
+        col = COMPONENT_FORM_COLS.get(stat)
+        if col and col in stat_rows.columns:
+            form = pd.to_numeric(stat_rows[col], errors="coerce").iloc[0]
+            out[stat] = blend_component_value(value, form, weight)
+        else:
+            out[stat] = value * fallback_ratio
+    return out
 
 
 def recent_form_from_rows(stat_rows, col=None, preseason=False):
