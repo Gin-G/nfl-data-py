@@ -179,3 +179,35 @@ class TestBlendFrame:
     def test_missing_points_column_is_returned_unchanged(self):
         frame = pd.DataFrame({"position": ["RB"], "something_else": [1.0]})
         assert blend.blend_frame(frame, [5.0]).equals(frame)
+
+
+class TestFormAdequacy:
+    """A trailing 'five-game average' is built with min_periods=1, so it can be
+    one game. Below MIN_FORM_GAMES the blend falls back to the model."""
+
+    def test_full_window_is_fully_trusted(self):
+        assert blend.form_adequacy(5) == 1.0
+        assert blend.form_adequacy(17) == 1.0
+
+    def test_thin_window_is_not_trusted(self):
+        assert blend.form_adequacy(1) == 0.0
+        assert blend.form_adequacy(2) == 0.0
+
+    def test_unknown_count_keeps_the_old_behaviour(self):
+        assert blend.form_adequacy(None) == 1.0
+
+    def test_thin_history_falls_back_to_the_model(self):
+        # one fluke 30-point game must not drag a 10-point projection up
+        assert blend.blend_value(10.0, 30.0, "RB", n_games=1) == pytest.approx(10.0)
+
+    def test_enough_history_blends_normally(self):
+        assert blend.blend_value(10.0, 30.0, "RB", n_games=5) == pytest.approx(20.0)
+
+    def test_components_respect_the_same_gate(self):
+        rows = pd.DataFrame({"rushing_yards_roll5": [80.0]})
+        thin = blend.blend_components(
+            {"fanduel_fantasy_points": 9.0, "rushing_yards": 20.0}, rows, n_games=1)
+        deep = blend.blend_components(
+            {"fanduel_fantasy_points": 9.0, "rushing_yards": 20.0}, rows, n_games=5)
+        assert thin["rushing_yards"] == pytest.approx(20.0)
+        assert deep["rushing_yards"] == pytest.approx(50.0)

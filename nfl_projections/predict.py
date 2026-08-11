@@ -560,9 +560,13 @@ class Projector:
             form = blend_mod.recent_form_from_rows(
                 recent_stats, preseason=preseason
             ).iloc[0]
+            # How many recent games back the form window — too few and the
+            # "trailing average" is one game wearing a five-game label.
+            n_form_games = len(actual_games)
             blended = blend_mod.blend_value(
                 result["fanduel_fantasy_points"], form, position,
                 weights=blend_mod.weights_for_mode(preseason),
+                n_games=n_form_games,
             )
             if result["fanduel_fantasy_points"]:
                 blend_ratio = blended / result["fanduel_fantasy_points"]
@@ -571,7 +575,8 @@ class Projector:
             # positional mean independently of the total, which is how a QB who
             # gained 1 rushing yard all season projected for ~160. See blend.py.
             result = blend_mod.blend_components(
-                result, recent_stats, fallback_ratio=blend_ratio)
+                result, recent_stats, fallback_ratio=blend_ratio,
+                n_games=n_form_games)
             result["fanduel_fantasy_points"] = blended
 
         # Depth-chart role adjustment: scale the per-game number to a snap-share

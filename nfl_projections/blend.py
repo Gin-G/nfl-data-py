@@ -71,6 +71,31 @@ COMPONENT_FORM_COLS = {
 COMPONENT_MODEL_WEIGHT = 0.5
 
 
+# A trailing "5-game average" is built with min_periods=1, so it can be a single
+# game. Below this many games the window is not form, it is one number, and the
+# blend falls back to the model.
+#
+# GUARD RAIL, NOT A MEASURED WIN — say so rather than dressing it up. On 2025 it
+# looked like a real gain (thin-window MAE 3.065 -> 2.825, overall -0.008) but
+# that did not replicate on 2024 (2.971 -> 2.967, overall -0.0001). It is kept
+# because it is never worse on either season and because trusting a one-game
+# average as much as a five-game one is indefensible on its face; the benchmark
+# population is mostly established players and barely exercises the case.
+#
+# Note this is NOT what protects a player like Jonathon Brooks (two seasons, two
+# ACL tears, no recent snaps). The Projector routes anyone with fewer than two
+# games in the season-or-prior window to the draft-capital rookie prior before
+# any blending happens, so his projection never touches a stale stat line.
+MIN_FORM_GAMES = 3
+
+
+def form_adequacy(n_games):
+    """How far to trust a player's trailing form, in [0, 1]."""
+    if n_games is None:
+        return 1.0
+    return 1.0 if n_games >= MIN_FORM_GAMES else 0.0
+
+
 def weights_for_mode(preseason=False):
     """Per-position model weights for the in-season or preseason blend."""
     return PRESEASON_MODEL_WEIGHTS if preseason else DEFAULT_MODEL_WEIGHTS
@@ -88,32 +113,37 @@ def model_weight(position, weights=None):
     return float(weights.get(position, default))
 
 
-def blend_value(projection, recent_form, position, weights=None):
+def blend_value(projection, recent_form, position, weights=None, n_games=None):
     """Blend one projection with one recent-form number.
 
     ``recent_form`` of None/NaN (a player with no scoring history — rookies,
     debutants) leaves the projection untouched: there is no form to blend.
+    ``n_games`` is how many games back the form window, and shrinks the weight
+    on it when that is too few to mean anything (see MIN_FORM_GAMES).
     """
     if recent_form is None or (isinstance(recent_form, float) and np.isnan(recent_form)):
         return float(projection)
-    w = model_weight(position, weights)
-    return w * float(projection) + (1.0 - w) * float(recent_form)
+    form_w = (1.0 - model_weight(position, weights)) * form_adequacy(n_games)
+    return (1.0 - form_w) * float(projection) + form_w * float(recent_form)
 
 
-def blend_component_value(projection, form, weight=COMPONENT_MODEL_WEIGHT):
+def blend_component_value(projection, form, weight=COMPONENT_MODEL_WEIGHT,
+                          n_games=None):
     """Blend one component stat with the player's trailing average for it.
 
     Clipped at 0 — a blend toward a near-zero trailing average can otherwise go
     slightly negative, and no one rushes for -3 yards a game in expectation.
-    Missing form (no history) leaves the projection alone.
+    Missing form (no history) leaves the projection alone, and a window too thin
+    to be form falls back to the model (see MIN_FORM_GAMES).
     """
     if form is None or (isinstance(form, float) and np.isnan(form)):
         return float(projection)
-    return max(0.0, weight * float(projection) + (1.0 - weight) * float(form))
+    form_w = (1.0 - weight) * form_adequacy(n_games)
+    return max(0.0, (1.0 - form_w) * float(projection) + form_w * float(form))
 
 
 def blend_components(result, stat_rows, weight=COMPONENT_MODEL_WEIGHT,
-                     fallback_ratio=1.0):
+                     fallback_ratio=1.0, n_games=None):
     """Blend every component in ``result`` that has a trailing column.
 
     ``result`` is a per-player prediction dict. Components with a rolling
@@ -129,7 +159,7 @@ def blend_components(result, stat_rows, weight=COMPONENT_MODEL_WEIGHT,
         col = COMPONENT_FORM_COLS.get(stat)
         if col and col in stat_rows.columns:
             form = pd.to_numeric(stat_rows[col], errors="coerce").iloc[0]
-            out[stat] = blend_component_value(value, form, weight)
+            out[stat] = blend_component_value(value, form, weight, n_games=n_games)
         else:
             out[stat] = value * fallback_ratio
     return out

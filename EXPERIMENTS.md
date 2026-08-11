@@ -34,6 +34,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 15 | Board team-budget cap: league mean → p90 team-season | 4.138 | — | +0.044 vs mean cap | **KEPT** — buys the ordering back (see below); MAE cost accepted |
 | 16 | Is seed averaging compressing the elite tail? | 4.154 | — | members 4.130–4.181 | **REJECTED** — ensemble spread sits inside its members' range |
 | 17 | Blend each component with its own trailing-5 (not the points ratio) | unchanged | — | component MAE −30–45% | **KEPT** — display-only; points untouched |
+| 18 | Gate the form blend on trailing-window depth | 4.138 / 3.625 | — | 2025 −0.008, 2024 −0.0001 | **KEPT as a guard rail** — NOT a measured win; never worse |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -448,6 +449,48 @@ simulator supplies the shape + correlation** — best of both. stack_distributio
 same sims for QB+WR stack queries (correlation preserved). Refinements left: explicit
 passing-TD→receiving-TD coupling (would push corr toward 0.36), QB downside (benchings).
 Scripts: scratchpad/sim_calibration.py.
+## #18 Thin-history gating — a negative result worth writing down (2026-08-11)
+
+Concern raised: a history-weighted projection should badly misjudge a player whose history
+is unrepresentative — Jonathon Brooks, two NFL seasons, two ACL tears, no snaps in two years,
+healthy now and plausibly a top-36 back.
+
+**First finding: he is already handled, and not by anything measured here.** The Projector
+filters history to `season >= season - 1` and routes anyone with fewer than TWO games in that
+window to the draft-capital rookie prior, returning before any blending. Brooks projects as
+`rookie_prior` at 3.38/week (RB66) off his 2024 second-round capital — not off his stale
+3-game, 11%-snap 2024 line. 79 of 187 RBs on the 2026 board take that path. The worry that the
+form blend would drag such players toward a meaningless trailing average was WRONG for exactly
+the class of player it was raised about.
+
+**Second finding: the population that DOES get blended on thin history is small and the
+gating does not reliably help it.** 2025 backtest by trailing-window depth: 1-2 games is 3.5%
+of player-weeks, 3-4 games another 3.4%, and both are low-scoring players (mean actual 3.6 and
+5.0 vs 6.9 for a full window).
+
+| shape | 2025 overall | 2025 thin (1-2) | 2024 overall | 2024 thin |
+|---|--:|--:|--:|--:|
+| fixed weight (before) | 4.1463 | 3.065 | 3.6250 | 2.971 |
+| step: <3 games -> model only | 4.1380 | **2.825** | 3.6249 | 2.967 |
+| linear w/5 | 4.1407 | 2.869 | 3.6256 | 2.953 |
+| sqrt(w/5) | 4.1423 | 2.932 | 3.6252 | 2.952 |
+
+On 2025 the fixed blend looked actively harmful on thin windows (raw 2.825 -> blended 3.065)
+and the step recovered all of it. **On 2024 that effect is absent** (2.971 vs 2.967) and the
+overall delta is 0.0001. One season's apparent 0.008 gain did not replicate; by this ledger's
+own noise rule it is nothing.
+
+**Kept anyway, labelled as a guard rail, not a win.** `min_periods=1` means a "5-game trailing
+average" can be a single game, and weighting that like five games is indefensible regardless of
+what a benchmark dominated by established players shows. It is never worse on either season.
+Claiming it as an improvement would be overselling it.
+
+Still open (untested): using MEASURED snap share instead of the hardcoded depth-rank table in
+roles.py, which the code itself calls a "snap-share proxy". `offensive_snap_pct` has 100%
+coverage. Complication to settle first: the rate model already takes `offensive_snap_pct_roll5`
+and `snap_trend` as inputs — both high in the GBDT importances — so multiplying by a rank proxy
+afterwards may double-discount players whose role did not change.
+
 ## #17 Component stat lines shrink to the positional mean too (2026-08-10)
 
 Reported: the 2026 board had Matthew Stafford at 159 rushing yards. He gained ONE rushing yard
