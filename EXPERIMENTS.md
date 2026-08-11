@@ -35,6 +35,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 16 | Is seed averaging compressing the elite tail? | 4.154 | — | members 4.130–4.181 | **REJECTED** — ensemble spread sits inside its members' range |
 | 17 | Blend each component with its own trailing-5 (not the points ratio) | unchanged | — | component MAE −30–45% | **KEPT** — display-only; points untouched |
 | 18 | Gate the form blend on trailing-window depth | 4.138 / 3.625 | — | 2025 −0.008, 2024 −0.0001 | **KEPT as a guard rail** — NOT a measured win; never worse |
+| 19 | Snap-share role multiplier (vs the depth-rank table) | 3.748 | — | MAE −0.066, WR spearman .946→.804 | **REJECTED** — buys MAE with bias, damages ordering |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -449,6 +450,58 @@ simulator supplies the shape + correlation** — best of both. stack_distributio
 same sims for QB+WR stack queries (correlation preserved). Refinements left: explicit
 passing-TD→receiving-TD coupling (would push corr toward 0.36), QB downside (benchings).
 Scripts: scratchpad/sim_calibration.py.
+## #19 Snap share as the role multiplier — rejected, and the multiplier itself is suspect (2026-08-11)
+
+Idea: `roles.per_game_role_multiplier` is a hardcoded lookup by depth rank that the code itself
+calls a "snap-share proxy" (WR 1.00/0.92/0.72/0.50/0.30 by rank). We have MEASURED snap share
+at 100% coverage every season, so use the real number instead of the proxy.
+
+**First, the diagnostic that reframes the whole thing.** The multiplier assumes the model
+projects everyone as if they were a starter. It does not — it projects each player from HIS OWN
+usage history, and `offensive_snap_pct_roll5` / `snap_trend` are among its highest-importance
+inputs. 2024 backtest (n=11,198), actual divided by RAW model prediction, by depth rank:
+
+| pos | rank | actual/predicted | multiplier applied |
+|---|--:|--:|--:|
+| RB | 2 | 1.12 | 0.80 |
+| RB | 3 | 1.00 | 0.55 |
+| WR | 2 | 1.09 | 0.92 |
+| WR | 3 | 1.03 | 0.72 |
+| TE | 2 | 1.01 | 0.55 |
+| QB | 2 | 0.82 | 0.35 |
+
+The model already under-projects backups slightly at nearly every rank. The multiplier then
+cuts them a further 20-65%. **It is double-counting a correction the model already makes.**
+
+**Three arms on the same 2024 predictions:**
+
+| arm | MAE | bias | spearman QB / RB / WR / TE |
+|---|--:|--:|---|
+| no multiplier | 3.814 | −0.658 | 0.941 / 0.934 / **0.946** / **0.944** |
+| rank multiplier (shipped) | 3.762 | −1.206 | 0.899 / 0.939 / 0.950 / 0.863 |
+| snap-share multiplier | **3.748** | −1.532 | 0.926 / 0.873 / 0.804 / 0.883 |
+
+Both multipliers improve MAE and both damage ordering, by pushing bias from −0.66 to −1.21 and
+−1.53 — the same trade the league-mean budget cap made (#15). Snap share is the WORST for
+ordering (WR 0.946 -> 0.804) precisely because the model has already consumed snap features.
+**Rejected: do not replace the rank table with measured snap share.**
+
+**What is NOT settled.** This is in-season evidence, where the model has current-season usage.
+The multiplier's real justification is the PRESEASON board, where the model's inputs are a
+season stale and a depth-chart change is genuinely new information the model cannot see.
+Evaluating that needs a reconstructed 2025 preseason board scored against 2025 finishes; until
+that exists, do not change the production multiplier on this evidence. The indicated fix, if it
+holds up, is to apply the multiplier only where the depth rank DISAGREES with the player's own
+usage history — which is exactly the pattern `shares.py` already uses (rank prior for movers,
+own history for stable returners).
+
+**Two data facts worth not re-deriving:**
+- nflreadpy depth charts changed schema. 2018-2024 use `depth_team`; 2025+ use `pos_abb` /
+  `pos_rank`. `DepthChartAnalyzer` expects the NEW format, so current seasons parse fine and
+  the OLD ones raise KeyError — the opposite of what it looks like from the dataset, where
+  `depth_team` is 94-97% covered through 2024 and 0% for 2025.
+- That empty `depth_team` column is NOT a model feature, so nothing is silently degraded by it.
+
 ## #18 Thin-history gating — a negative result worth writing down (2026-08-11)
 
 Concern raised: a history-weighted projection should badly misjudge a player whose history
