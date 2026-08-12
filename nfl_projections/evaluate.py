@@ -250,7 +250,80 @@ def _spread_ratio(values, top, lower):
     return s.iloc[top - 1] / s.iloc[lower - 1]
 
 
-def rank_metrics(results, min_weeks=8, positions=None, verbose=True):
+def backtest_season_board(dataset, season, *, epochs=60, n_seeds=None,
+                          positions=None, min_games=8, schedule=None,
+                          service=None, snap_share=None, share_blend=0.2,
+                          shares=None, verbose=True):
+    """Preseason-board backtest: build the full season board for ``season`` using
+    ONLY data from before it, then score it against that season's real finishes.
+
+    This is the harness the weekly backtest cannot be. Every volume mechanism —
+    the depth-role multiplier, the availability model, the team-position budget,
+    the share model — exists to handle a board built before a snap is played,
+    where the model's inputs are a season stale and a depth-chart change is real
+    new information. Scoring them in-season, with current-season usage already in
+    the features, measures the wrong thing.
+
+    Leakage: the model trains on seasons < ``season``; team grades come from
+    ``ratings.preseason_prior(season - 1)`` rather than ``grades(season)``, which
+    would blend in that season's own results; league average and the games model
+    are both derived from season - 1. Rosters and depth charts for ``season`` ARE
+    used — a real preseason board has them — which is mildly optimistic about
+    final cuts and is the one place this harness knows more than August would.
+
+    Returns a per-player frame with proj_total / act_total, restricted to players
+    with at least ``min_games`` actual games. That restriction is survivorship:
+    a player is included partly because he stayed healthy enough to play, so read
+    the actual-side spreads as a reference rather than a target.
+    """
+    from . import ratings as ratings_mod
+    from . import season as season_mod
+
+    train_df = dataset[dataset["season"] < season]
+    if train_df.empty:
+        raise ValueError(f"No data before season {season} to train on")
+
+    if service is None:
+        from .service import ProjectionService
+
+        if verbose:
+            print(f"Training board model on seasons < {season}...")
+        service = ProjectionService(dataset=train_df, epochs=epochs, n_seeds=n_seeds)
+
+    # The preseason view of team strength: last season regressed toward the mean.
+    grades = ratings_mod.preseason_prior(season - 1, schedule=schedule)
+
+    if verbose:
+        print(f"Assembling the {season} board from pre-{season} data...")
+    weekly = season_mod.project_season(
+        service, season, grades=grades, schedule=schedule, positions=positions,
+        use_injuries=False, snap_share=snap_share,
+    )
+    if shares is not None:
+        weekly = season_mod.assemble_season(
+            service.project(season, 1, as_frame=True, use_injuries=False),
+            season, grades=grades, schedule=schedule, shares=shares,
+            share_blend=share_blend,
+        )
+    proj = season_mod.season_totals(weekly)
+
+    played = regular_games(dataset[dataset["season"] == season])
+    if positions:
+        played = played[played["position"].isin(positions)]
+    actual = (played.groupby("player_id")
+              .agg(act_total=("fanduel_fantasy_points", "sum"),
+                   act_games=("week", "count"))
+              .reset_index())
+
+    out = proj.merge(actual, on="player_id", how="inner")
+    out = out[out["act_games"] >= min_games].copy()
+    out = out.rename(columns={"proj_total": "proj_total"})
+    if verbose:
+        print(f"Scored {len(out)} players with >= {min_games} games")
+    return out
+
+
+def rank_metrics(results, min_weeks=8, positions=None, verbose=True, totals=None):
     """Ordering quality per position — what MAE structurally cannot see.
 
     MAE over ~180k player-weeks is dominated by low-usage players, and shrinking
@@ -263,8 +336,12 @@ def rank_metrics(results, min_weeks=8, positions=None, verbose=True):
         projection SHOULD be flatter than outcomes (the actual #1 is partly
         whoever got lucky), so these are diagnostic, not targets: a ratio far
         below the actual one means the elite tail is being compressed.
+
+    Pass ``totals`` (from backtest_season_board) to score a season board
+    directly instead of aggregating a weekly backtest.
     """
-    totals = season_totals_from_backtest(results, min_weeks=min_weeks)
+    if totals is None:
+        totals = season_totals_from_backtest(results, min_weeks=min_weeks)
     if totals.empty:
         return pd.DataFrame()
     positions = positions or config.POSITIONS

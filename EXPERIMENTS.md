@@ -7,7 +7,17 @@ Revert anything that regresses without a compensating gain.
 2020–2024), epochs 60, single seed. Primary metric = **MAE** of the
 fantasy-points point projection (lower is better); secondary = correlation.
 Single-seed deltas under ~0.05 MAE are noise — confirm across seeds before
-trusting small position-level moves.
+trusting small position-level moves. For anything about ORDERING, MAE is blind
+by construction — use `evaluate.rank_metrics` (#14).
+
+> **Benchmark correction, 2026-08-11 (#21).** Until this date `utils.regular_games`
+> did not filter `season_type` despite its name, so the training set, the backtest
+> population and board ground truth all included **postseason weeks 19–22** — 279
+> of 6,126 rows for 2025. Every row below numbered #0–#20 was measured on that
+> contaminated population. It was not leakage and every A/B shared the flaw across
+> both arms, so the RELATIVE deltas stand; the ABSOLUTE numbers are ~0.03 MAE off.
+> Corrected baseline for the current shipped model: **MAE 4.187 over 5,844 rows,
+> weeks 1–18.** Compare new work against that, not against 4.154.
 
 Rebuild the dataset first (`build-data`) so `passing_interceptions` scoring is
 correct. Dataset used: 2018–2025, 187,534 rows.
@@ -36,6 +46,8 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 17 | Blend each component with its own trailing-5 (not the points ratio) | unchanged | — | component MAE −30–45% | **KEPT** — display-only; points untouched |
 | 18 | Gate the form blend on trailing-window depth | 4.138 / 3.625 | — | 2025 −0.008, 2024 −0.0001 | **KEPT as a guard rail** — NOT a measured win; never worse |
 | 19 | Snap-share role multiplier (vs the depth-rank table) | 3.748 | — | MAE −0.066, WR spearman .946→.804 | **REJECTED** — buys MAE with bias, damages ordering |
+| 20 | Preseason-board harness (`backtest_season_board`) | — | — | QB spearman 0.27, WR top12 0.42 | **KEPT** — the missing benchmark for every volume mechanism |
+| 21 | `regular_games` now excludes the postseason | **4.187** | — | was 4.154 over a contaminated population | **KEPT** — correctness; new baseline |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -450,6 +462,61 @@ simulator supplies the shape + correlation** — best of both. stack_distributio
 same sims for QB+WR stack queries (correlation preserved). Refinements left: explicit
 passing-TD→receiving-TD coupling (would push corr toward 0.36), QB downside (benchings).
 Scripts: scratchpad/sim_calibration.py.
+## #20-21 The preseason board finally has a benchmark — and it exposed a bad one (2026-08-11)
+
+**#20 `evaluate.backtest_season_board(dataset, season)`.** Builds the whole season board for
+`season` from data strictly before it, then scores it against that season's real finishes with
+the same rank metrics as the weekly backtest (`rank_metrics(totals=...)`). It runs the real
+`season.project_season` assembly — depth-role multiplier, availability model, team budget,
+share model — not a reimplementation.
+
+This is the benchmark those mechanisms always needed. Every one of them exists for a board
+built before a snap is played, where the model's inputs are a season stale and a depth-chart
+change is genuinely new information. Scoring them in-season, with current usage already in the
+features, measures the wrong thing — which is why #19 could only reject snap share for the
+in-season case.
+
+Leakage handled: model trains on < season; team grades come from
+`ratings.preseason_prior(season - 1)`, NOT `grades(season)`, which blends in that season's own
+results; league average and the games model already used season - 1. Rosters and depth charts
+for `season` ARE used — a real August board has them — which is mildly optimistic about final
+cuts and is the one place this knows more than August would.
+
+**2025 board from pre-2025 data, 244 players with >= 8 games:**
+
+| pos | n | spearman | top12 | top24 | in-season spearman |
+|---|--:|--:|--:|--:|--:|
+| QB | 23 | **0.270** | 0.667 | — | 0.919 |
+| RB | 65 | 0.868 | 0.750 | 0.833 | 0.977 |
+| WR | 95 | 0.748 | 0.417 | 0.625 | 0.975 |
+| TE | 61 | 0.680 | 0.583 | 0.792 | 0.970 |
+
+A preseason board is a categorically harder problem than the weekly numbers imply: WR top-12
+overlap of 0.417 means five of the top twelve receivers. Per-game rates (injury luck removed)
+barely move it — QB 0.286, WR 0.765 — so this is ranking difficulty, not health variance.
+Judge board-stage changes against THESE numbers, not the in-season ones.
+
+**#21 The benchmark itself was wrong.** Building the harness surfaced that
+`utils.regular_games` never filtered `season_type` despite its name, so postseason weeks 19-22
+were in the training set, the backtest population and the board's ground truth. For 2025 that
+is 279 of 6,126 rows; for 2024, 489. Not leakage — but a biased sample containing only playoff
+teams, which over-weights good offenses and inflates any season total for a team that went
+deep. It is the same defect fixed in `games.py` earlier the same day, in a different place.
+
+Weekly backtest, same model, before -> after the filter:
+
+| | with postseason | regular season only |
+|---|--:|--:|
+| rows | 6,126 | 5,844 |
+| MAE | 4.154 | **4.187** |
+| QB / RB / WR / TE spearman | .949 / .984 / .978 / .975 | .919 / .977 / .975 / .970 |
+| QB / RB / WR / TE top12 | .917 / .833 / .750 / .750 | 1.000 / 1.000 / .583 / .833 |
+
+The top-12 sets move most, because removing playoff points changes who the top twelve actually
+were. Board metrics barely shifted (QB 0.267 -> 0.270, WR 0.748 both ways), so #20's conclusions
+hold either way. Every A/B in rows #0-#20 shared the flaw across both arms, so relative deltas
+stand; absolute numbers are ~0.03 MAE optimistic. **New reference: 4.187.**
+
 ## #19 Snap share as the role multiplier — rejected, and the multiplier itself is suspect (2026-08-11)
 
 Idea: `roles.per_game_role_multiplier` is a hardcoded lookup by depth rank that the code itself

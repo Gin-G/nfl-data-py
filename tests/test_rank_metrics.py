@@ -89,3 +89,48 @@ class TestHelpers:
         a = [1, 2, 3, 4, 5]
         b = [10, 200, 3000, 40000, 500000]
         assert evaluate._spearman(a, b) == pytest.approx(1.0)
+
+
+class TestBoardTotalsPath:
+    """rank_metrics must score a season board (from backtest_season_board)
+    directly, not only a weekly backtest."""
+
+    def _totals(self, n=26, **overrides):
+        t = pd.DataFrame({
+            "player_id": [f"p{i}" for i in range(n)],
+            "player_name": [f"P{i}" for i in range(n)],
+            "position": ["WR"] * n,
+            "proj_total": [float(30 - i) for i in range(n)],
+            "act_total": [float(30 - i) for i in range(n)],
+        })
+        for k, v in overrides.items():
+            t[k] = v
+        return t
+
+    def test_perfect_board_scores_one(self):
+        out = evaluate.rank_metrics(None, totals=self._totals(),
+                                    positions=["WR"], verbose=False)
+        assert out["spearman"].iloc[0] == pytest.approx(1.0)
+        assert out["top12"].iloc[0] == pytest.approx(1.0)
+
+    def test_totals_take_precedence_over_results(self):
+        # a weekly frame that would score badly, plus good totals -> good score
+        bad = pd.DataFrame({"player_id": ["x"], "player_name": ["X"],
+                            "position": ["WR"], "week": [1],
+                            "predicted": [1.0], "actual": [99.0]})
+        out = evaluate.rank_metrics(bad, totals=self._totals(),
+                                    positions=["WR"], verbose=False)
+        assert out["n"].iloc[0] == 26
+
+    def test_empty_totals_returns_empty(self):
+        empty = pd.DataFrame(columns=["player_id", "position", "proj_total", "act_total"])
+        assert evaluate.rank_metrics(None, totals=empty, verbose=False).empty
+
+    def test_a_flattened_board_is_caught(self):
+        # right order, squashed spread — exactly the board defect this exists for
+        t = self._totals()
+        t["proj_total"] = [20.0 - 0.01 * i for i in range(len(t))]
+        out = evaluate.rank_metrics(None, totals=t, positions=["WR"], verbose=False)
+        assert out["spearman"].iloc[0] == pytest.approx(1.0)
+        assert out["r_1_5_proj"].iloc[0] < 1.01
+        assert out["r_1_5_act"].iloc[0] > 1.1
