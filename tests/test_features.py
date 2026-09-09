@@ -48,6 +48,62 @@ class TestIsRookie:
         assert features.is_rookie("Player rk1", "rk1", df, 2025) is True
 
 
+class TestIsRookieNameMatching:
+    """A veteran whose roster name carries a suffix must not read as a rookie.
+
+    nflverse strips generational suffixes ("Travis Etienne") while rosters keep
+    them ("Travis Etienne Jr."). The old lookup asked whether the stored name
+    *contained* the roster name, which is false in that direction, so the
+    player's whole history vanished and he was projected off the rookie prior —
+    a 1,600-yard back at 19 rushing yards.
+    """
+
+    def _vet(self, stored):
+        return make_history([
+            ("gsis1", 2024, 1, 10.0, {"player_display_name": stored}),
+            ("gsis1", 2024, 2, 10.0, {"player_display_name": stored}),
+            ("gsis1", 2025, 1, 10.0, {"player_display_name": stored}),
+        ])
+
+    def test_suffixed_roster_name_matches_unsuffixed_history(self):
+        df = self._vet("Travis Etienne")
+        # No player_id, so the name is the only route — the real failing case,
+        # since the roster id and the stats id are not always the same.
+        assert features.is_rookie("Travis Etienne Jr.", "", df, 2026) is False
+
+    def test_every_suffix_form(self):
+        for stored, roster in [
+            ("James Cook", "James Cook III"),
+            ("Kyle Pitts", "Kyle Pitts Sr."),
+            ("Michael Pittman", "Michael Pittman Jr."),
+            ("David Sills", "David Sills V"),
+            ("Gardner Minshew", "Gardner Minshew II"),
+        ]:
+            assert features.is_rookie(roster, "", self._vet(stored), 2026) is False, roster
+
+    def test_player_id_still_wins_when_the_name_differs(self):
+        df = self._vet("Somebody Else")
+        assert features.is_rookie("Travis Etienne Jr.", "gsis1", df, 2026) is False
+
+    def test_a_different_player_is_not_matched(self):
+        # Exact-on-normalised, so a genuine rookie must not inherit a
+        # veteran's history the way a substring match could.
+        df = self._vet("Travis Etienne")
+        assert features.is_rookie("Trevor Etienne", "", df, 2026) is True
+
+    def test_substring_no_longer_collides(self):
+        """"Josh Allen" the QB must not pick up "Josh Allen" the edge rusher's
+        rows via containment — and a short name must not match a longer one."""
+        df = self._vet("Michael Pittman")
+        assert features.is_rookie("Michael Pitt", "", df, 2026) is True
+
+    def test_regex_metacharacters_are_not_interpreted(self):
+        """The old match ran the name as a regex, so the dots in "A.J. Brown"
+        matched any character. An unknown player must stay unknown."""
+        df = self._vet("AJJ Brown")
+        assert features.is_rookie("A.J. Brown", "", df, 2026) is True
+
+
 class TestDerivedFeatures:
     def test_yards_per_carry(self):
         df = pd.DataFrame({

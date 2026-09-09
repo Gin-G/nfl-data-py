@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from . import config
-from .utils import regular_games
+from .utils import normalize_player_name, regular_games
 
 logger = logging.getLogger(__name__)
 
@@ -292,10 +292,14 @@ def is_rookie(player_name, player_id, historical_df, current_season):
     Players with 2+ games in the current season use the ML model even in
     their rookie year.
     """
+    # Match on id first, then on the normalised name. A raw substring match
+    # here mislabelled every veteran whose roster name carries a suffix —
+    # nflverse stores "Kyle Pitts", the roster says "Kyle Pitts Sr.", and
+    # containment in that direction fails. See PlayerPredictor._player_history.
+    norm = normalize_player_name(player_name)
     history = historical_df[
         (historical_df["player_id"] == player_id)
-        | historical_df["player_display_name"].str.contains(player_name, case=False, na=False)
-        | historical_df["player_name"].str.contains(player_name, case=False, na=False)
+        | (historical_df["player_display_name"].apply(normalize_player_name) == norm)
     ]
     if history.empty:
         return True

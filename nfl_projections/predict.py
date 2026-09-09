@@ -17,7 +17,7 @@ import pandas as pd
 
 from . import config, features
 from .injuries import integrate_injuries
-from .utils import to_pandas
+from .utils import normalize_player_name, to_pandas
 
 logger = logging.getLogger(__name__)
 
@@ -447,11 +447,46 @@ class Projector:
         # History table with derived features for latest-game lookups
         print("Preparing player history features...")
         self.history = features.prepare_prediction_base(dataset)
+        # Normalised join key, computed once. Player lookups used to be a
+        # substring match on the raw name, which silently mislabelled every
+        # veteran whose roster name carries a suffix: nflverse stores "Travis
+        # Etienne" while the roster says "Travis Etienne Jr.", and
+        # "Travis Etienne".contains("Travis Etienne Jr.") is False — so his
+        # entire history vanished and he was projected off the rookie prior.
+        # See _player_history.
+        self.history["_norm_name"] = self.history["player_display_name"].apply(
+            normalize_player_name
+        )
 
         self.rookie_predictor = (
             RookiePredictor(self.history, self.depth_analyzer, season)
             if rookie_fallback else None
         )
+
+    def _player_history(self, player_name, player_id=""):
+        """Every historical row for one player.
+
+        Matches on ``player_id`` first and falls back to the normalised name,
+        which is the whole point of this method existing.
+
+        The old lookup was ``history[name].str.contains(player_name)`` — an
+        unanchored regex substring match, in the wrong direction. nflverse
+        strips generational suffixes ("Travis Etienne", "Kyle Pitts", "Michael
+        Pittman") while rosters keep them ("Travis Etienne Jr."), so asking
+        whether the stored name *contains* the roster name failed for exactly
+        those players. Their history came back empty, they fell through to the
+        rookie prior, and a 1,600-yard back was projected for 19 rushing yards.
+
+        Two lesser faults went with it: the pattern was interpreted as a regex,
+        so "A.J. Brown" matched any character where the dots are; and a
+        substring match let a short name collide with a longer one. Exact
+        matching on a normalised key fixes all three.
+        """
+        if player_id and not pd.isna(player_id):
+            by_id = self.history[self.history["player_id"] == player_id]
+            if not by_id.empty:
+                return by_id
+        return self.history[self.history["_norm_name"] == normalize_player_name(player_name)]
 
     def _opponent_features(self, team, position):
         """One-row DataFrame of upcoming-opponent features, or None if the model
@@ -515,10 +550,7 @@ class Projector:
                 "injury_reason": adjustment["reason"],
             }
 
-        player_data = self.history[
-            self.history["player_display_name"].str.contains(player_name, case=False, na=False)
-            | self.history["player_name"].str.contains(player_name, case=False, na=False)
-        ]
+        player_data = self._player_history(player_name, player_id)
 
         # "Recent" = this season or last; need 2+ games for an ML projection
         recent_data = player_data[player_data["season"] >= self.season - 1]
