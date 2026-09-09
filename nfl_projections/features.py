@@ -109,19 +109,30 @@ def add_rolling_features(df, windows=ROLLING_WINDOWS):
     return out
 
 
-def clean_training_data(df, min_season=config.TRAINING_MIN_SEASON, min_games=3):
-    """Drop AVG rows, low-activity players, fantasy-point outliers, old seasons."""
+def clean_training_data(df, min_season=config.TRAINING_MIN_SEASON, min_games=3,
+                       drop_outliers=True):
+    """Drop AVG rows, old seasons, and — for training — low-activity players
+    and fantasy-point outliers.
+
+    ``drop_outliers`` and ``min_games`` exist because the two callers want
+    different things from this function. Training wants a trimmed frame: a
+    freak 50-point game and a player with two career appearances both distort
+    the fit. **Prediction does not**, and applying the trims there is a bug
+    with a specific shape — see ``prepare_prediction_base``.
+    """
     games = regular_games(df) if "week" in df.columns else df.copy()
 
-    player_game_counts = games.groupby("player_id").size()
-    active_players = player_game_counts[player_game_counts >= min_games].index
-    games = games[games["player_id"].isin(active_players)]
+    if min_games and min_games > 1:
+        player_game_counts = games.groupby("player_id").size()
+        active_players = player_game_counts[player_game_counts >= min_games].index
+        games = games[games["player_id"].isin(active_players)]
 
-    q99 = games["fanduel_fantasy_points"].quantile(0.99)
-    q1 = games["fanduel_fantasy_points"].quantile(0.01)
-    games = games[
-        (games["fanduel_fantasy_points"] >= q1) & (games["fanduel_fantasy_points"] <= q99)
-    ]
+    if drop_outliers:
+        q99 = games["fanduel_fantasy_points"].quantile(0.99)
+        q1 = games["fanduel_fantasy_points"].quantile(0.01)
+        games = games[
+            (games["fanduel_fantasy_points"] >= q1) & (games["fanduel_fantasy_points"] <= q99)
+        ]
 
     if "season" in games.columns and min_season:
         games = games[games["season"] >= min_season]
@@ -320,10 +331,27 @@ def is_rookie(player_name, player_id, historical_df, current_season):
 def prepare_prediction_base(df, min_season=config.TRAINING_MIN_SEASON):
     """History table used to look up a player's latest game at prediction time.
 
-    Same cleaning and derived features as training, but keeps every game
-    (no next-week-target requirement), so a player's true latest game is used.
+    Keeps every real game, which is the whole point: this frame answers "what
+    has this player actually done", and the answer must not be filtered.
+
+    It used to inherit training's trims, and the docstring claiming it kept
+    every game was simply wrong. The consequence was narrow and bad. The
+    outlier bound sits at q1 = 0.0 fantasy points, so "outlier" in the lower
+    tail means *any net-negative game* — which for a quarterback in limited
+    relief is the normal result, not a freak one. A veteran whose recent
+    season was a handful of replacement-level appearances therefore lost his
+    entire recent history and fell through to the rookie prior. Gardner
+    Minshew, four 2025 appearances scoring -0.30, -0.30, -0.12 and 1.40, kept
+    one of them and was projected as a rookie. Across 2025 it hit 18 skill
+    players, 14 of whom lost every game of the season.
+
+    ``min_games`` goes for the same reason and one of its own: at 3 it
+    contradicts ``is_rookie``, which says two games in the current season is
+    enough to use the ML model — a player with exactly two would be dropped
+    here and then read as having none.
     """
-    cleaned = clean_training_data(df, min_season=min_season)
+    cleaned = clean_training_data(df, min_season=min_season, min_games=1,
+                                  drop_outliers=False)
     with_rolling = add_rolling_features(cleaned)
     with_features = add_derived_features(with_rolling)
     _, categorical = select_feature_columns(with_features)

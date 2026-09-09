@@ -226,6 +226,83 @@ class TestCleanTrainingData:
         out = features.clean_training_data(df, min_season=2020, min_games=3)
         assert set(out["player_id"]) == {"active"}
 
+    def test_prediction_path_keeps_the_trims_off(self):
+        """Training trims and prediction history want opposite things.
+
+        Training drops freak games and two-appearance players because both
+        distort a fit. The frame that answers "what has this player actually
+        done" must keep every real game.
+        """
+        rows = [("active", 2024, w, 10.0) for w in range(1, 6)]
+        rows.append(("fringe", 2024, 1, 10.0))
+        df = make_history(rows)
+
+        out = features.clean_training_data(df, min_season=2020, min_games=1,
+                                           drop_outliers=False)
+        assert set(out["player_id"]) == {"active", "fringe"}
+
+    def test_a_negative_game_is_not_an_outlier_at_prediction_time(self):
+        """The bug that made Gardner Minshew a rookie.
+
+        The lower outlier bound sits at q1 = 0.0 fantasy points, so in the
+        bottom tail "outlier" means *any net-negative game* — which for a
+        quarterback in limited relief is the normal result. His four 2025
+        appearances scored -0.30, -0.30, -0.12 and 1.40; three were discarded,
+        leaving one, and one game is below the two-game bar that separates a
+        veteran from a rookie.
+        """
+        rows = [("qb", 2025, 1, -0.30), ("qb", 2025, 2, -0.30),
+                ("qb", 2025, 3, -0.12), ("qb", 2025, 4, 1.40)]
+        # The cohort has to reproduce the real distribution's shape, not just
+        # its size: a block of scoreless games puts q1 exactly at 0.0, which is
+        # what makes the lower bound mean "any negative game" rather than "a
+        # rare one". Measured on 2020-25 nflverse, q1 is 0.000.
+        # 3+ games each, or min_games drops them before the quantile is taken.
+        rows += [(f"zero{i}", 2025, w, 0.0) for i in range(4) for w in range(1, 4)]
+        rows += [(f"other{i}", 2025, w, 12.0) for i in range(50) for w in range(1, 11)]
+        df = make_history(rows)
+
+        import numpy as np
+        # q1 is taken after min_games, so check it where the code does.
+        _after_min_games = features.clean_training_data(
+            df, min_season=2020, drop_outliers=False)
+        assert np.isclose(
+            _after_min_games["fanduel_fantasy_points"].quantile(0.01), 0.0
+        ), "fixture must reproduce q1 = 0.0"
+
+        trained = features.clean_training_data(df, min_season=2020)
+        predicted = features.clean_training_data(df, min_season=2020, min_games=1,
+                                                 drop_outliers=False)
+        qb_trained = (trained.player_id == "qb").sum()
+        qb_predicted = (predicted.player_id == "qb").sum()
+        # Three negatives discarded, the 1.40 kept — exactly what happened to
+        # Minshew, and one game is under the two-game veteran bar.
+        assert qb_trained == 1, "precondition: the trim is what caused this"
+        assert qb_predicted == 4
+
+        # And the consequence, stated as the routing rule that actually fires.
+        # PlayerPredictor._predict_one sends a player to the rookie prior when
+        # he has fewer than two games in the current or previous season; that
+        # is the check the trims were starving, not is_rookie (which treats any
+        # earlier season as veteran regardless of how many games survive).
+        def recent(frame):
+            return len(frame[(frame.player_id == "qb") & (frame.season >= 2025)])
+
+        assert recent(trained) < 2, "the trims routed him to the rookie prior"
+        assert recent(predicted) >= 2, "with his real history he is a veteran"
+
+    def test_prepare_prediction_base_does_not_trim(self):
+        """Guards the wiring, not just the helper — the bug was that
+        prepare_prediction_base inherited the training defaults while its own
+        docstring claimed it kept every game."""
+        rows = [("qb", 2025, w, -0.5) for w in range(1, 5)]
+        # 3+ games each, or min_games drops them before the quantile is taken.
+        rows += [(f"zero{i}", 2025, w, 0.0) for i in range(4) for w in range(1, 4)]
+        rows += [(f"other{i}", 2025, w, 12.0) for i in range(50) for w in range(1, 11)]
+        df = make_history(rows)
+        out = features.prepare_prediction_base(df, min_season=2020)
+        assert (out.player_id == "qb").sum() == 4
+
 
 class TestCategoricalCleaning:
     def test_invalid_positions_become_unknown(self):
