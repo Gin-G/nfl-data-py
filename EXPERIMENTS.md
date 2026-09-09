@@ -881,3 +881,57 @@ floor/median/ceiling works and is wired in; the median matches the mean model,
 the ceiling is trustworthy, the floor is the weak spot. Remaining honest levers:
 per-position models, richer data (snaps/routes/betting lines), or accept current
 accuracy and focus on usage (DFS optimizer, weekly workflow).
+
+---
+
+## Opportunity share vs trailing rate — week 1 2025 (2026-09-09)
+
+**Question.** The projections read "what have you done". When a role changes in
+the offseason the carries that left the building are invisible: a back promoted
+to RB1 keeps his backup rate, and the man he replaced keeps a starter's. Does
+projecting *opportunity* — depth rank to share of the team's carries, times the
+player's own efficiency — beat it?
+
+**Protocol** (the owner's, and the right one). Nothing after 2024 is used. The
+share curve is fit on 2020-24, efficiency is each player's 2024 ypc regressed
+toward the league mean by carry count (k=100), team volume is the 2024 rate, and
+the depth chart is the earliest one published in 2025. Score against week 1
+2025. Harness: `experiments/opportunity_share_wk1.py`.
+
+**Result** (n=73 RBs with a prior season):
+
+| model | MAE | bias | corr |
+|---|---|---|---|
+| trailing (what we ship) | 23.03 | **+11.48** | 0.588 |
+| team_share | **19.29** | **+1.99** | 0.568 |
+| blend of the two | 19.96 | +6.74 | **0.606** |
+
+Restricted to RB1s — the promoted and lead backs, where a role change actually
+bites — trailing is 32.24 MAE against team_share's 27.56.
+
+**The bias is the finding, not the MAE.** Trailing over-projects by 11.5 yards a
+game, because it hands every back last season's role. Share-based opportunity is
+close to unbiased. For a yardage prop that difference is the whole game: a model
+running eleven yards high takes overs it should not, and a board that suggested
+24 overs to 14 unders is what that looks like from the outside.
+
+**Be honest about what it does not do.** Correlation is flat to slightly worse,
+and among RB1s alone both models correlate poorly (0.27 and 0.18). Week-1
+rushing is noisy — Etienne went for 143 off a 37-yard trailing rate, Saquon for
+60 off 125. This is "better calibrated", not "better informed", and the blend
+column is a reminder that the two carry different information.
+
+**Fixed alongside it.** The depth-rank multiplier was applied to
+`fanduel_fantasy_points` and nothing else, so the component stats a prop settles
+on kept a starter's rate while the points beside them were correctly discounted.
+It now scales `roles.ROLE_SCALED_COMPONENTS` too. That is a straight bug and is
+independent of the share model above.
+
+**Still open.** The multiplier only ever scales *down* (`if role_mult < 1.0`),
+so promotion remains unmodelled — the share curve is the natural reference for
+fixing that, since it says what an RB1 should get rather than only what an RB3
+should lose. And none of this touches matchup: personnel groupings are available
+in nflverse participation data (Jacksonville ran 68.4% 11 personnel in 2025
+against a league 61.4%, and only 7.9% two-RB), as are coverage fields, so
+"who is covering this receiver and are they any good" is reachable from data
+already on hand.

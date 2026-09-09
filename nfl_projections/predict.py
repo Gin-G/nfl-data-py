@@ -623,6 +623,17 @@ class Projector:
         depth_rank = depth_role["depth_rank"] if depth_role else None
         role_mult = roles.per_game_role_multiplier(position, depth_rank)
         if role_mult < 1.0:
+            # Scale the components too, not only the points total. They used to
+            # be left alone, and the consequence is invisible in fantasy output
+            # but not in a prop: the per-game numbers a yardage line settles on
+            # kept a starter's rate while the points beside them were correctly
+            # discounted. Jacksonville, week 1 2026 — Chris Rodriguez Jr. as RB2
+            # carried 4.6 projected points (x0.80 applied) alongside 53.5
+            # projected rushing yards (untouched), above the RB1 the market
+            # priced 17 yards higher.
+            for stat in roles.ROLE_SCALED_COMPONENTS:
+                if isinstance(result.get(stat), (int, float)):
+                    result[stat] *= role_mult
             result["fanduel_fantasy_points"] *= role_mult  # floor/ceiling scaled below too
             adjustment = f"{position} depth-rank {roles.norm_rank(depth_rank)} x{role_mult:.2f}"
         else:

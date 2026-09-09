@@ -105,6 +105,17 @@ def _lookup(table: dict, deep: dict, position, depth_rank, default: float) -> fl
     return deep.get(pos, min(tiers.values()))
 
 
+# Component stats that a depth-rank discount has to touch as well as the points
+# total. Everything a prop settles on: a backup does not put up a starter's
+# yards, and saying so only in the fantasy-point column leaves the per-game
+# numbers wrong for anyone reading the components directly.
+ROLE_SCALED_COMPONENTS = (
+    "passing_yards", "passing_tds", "passing_interceptions",
+    "rushing_yards", "rushing_tds",
+    "receiving_yards", "receptions", "receiving_tds",
+)
+
+
 def per_game_role_multiplier(position, depth_rank) -> float:
     """Snap-share proxy in [0, 1]: how much of a starter's per-game production a
     player at this depth rank is expected to put up. Unknown position -> 1.0."""

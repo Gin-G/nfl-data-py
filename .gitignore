@@ -184,3 +184,4 @@ model_debug.log
 
 # Claude Code local settings
 .claude/
+experiments/_cache/

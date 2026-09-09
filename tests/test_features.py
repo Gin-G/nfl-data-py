@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 import pandas as pd
 
@@ -314,3 +315,36 @@ class TestCategoricalCleaning:
         df = pd.DataFrame({"recent_team": ["DAL", None]})
         out = features.clean_categorical_features(df, ["recent_team"])
         assert out["recent_team"].tolist() == ["DAL", "Unknown"]
+
+
+class TestRoleScaling:
+    """A depth-rank discount has to reach the numbers a prop settles on."""
+
+    def test_components_are_listed_for_scaling(self):
+        from nfl_projections import roles
+        for stat in ("rushing_yards", "receiving_yards", "receptions",
+                     "passing_yards"):
+            assert stat in roles.ROLE_SCALED_COMPONENTS
+
+    def test_backup_multiplier_is_below_one_and_starter_is_not(self):
+        from nfl_projections import roles
+        assert roles.per_game_role_multiplier("RB", 1) == 1.0
+        assert roles.per_game_role_multiplier("RB", 2) < 1.0
+
+    def test_scaling_a_result_touches_components_and_points(self):
+        """The bug: only fanduel_fantasy_points was scaled, so an RB2 carried a
+        correctly discounted points total beside an undiscounted per-game
+        rushing number — which is the one a yardage line settles on."""
+        from nfl_projections import roles
+
+        result = {"fanduel_fantasy_points": 10.0, "rushing_yards": 50.0,
+                  "receiving_yards": 20.0, "receptions": 3.0}
+        mult = roles.per_game_role_multiplier("RB", 2)
+        for stat in roles.ROLE_SCALED_COMPONENTS:
+            if isinstance(result.get(stat), (int, float)):
+                result[stat] *= mult
+        result["fanduel_fantasy_points"] *= mult
+
+        assert result["rushing_yards"] == pytest.approx(50.0 * mult)
+        assert result["receptions"] == pytest.approx(3.0 * mult)
+        assert result["fanduel_fantasy_points"] == pytest.approx(10.0 * mult)
