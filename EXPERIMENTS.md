@@ -975,3 +975,48 @@ needs per-route matchup data rather than a team rate.
 **Shipped** in sharp-edge as `nfl/matchup.py`, TE receiving only, clamped to
 0.75-1.30. The two positions that failed are named in that module so nobody
 re-adds them on intuition.
+
+---
+
+## Opponent-adjusted defence beats raw allowed-per-game (2026-09-09)
+
+**The objection, and it is right.** A raw allowed-per-game number measures who
+a defence happened to draw as much as how it played. Face three elite tight
+ends and it looks terrible; face three backups and it looks elite. Neither is a
+statement about the defence.
+
+**The fix.** Compare every player against himself. For each player-game against
+a defence, the baseline is that player's production over all his *other* games
+that season, and the game scores as a ratio; average those and opponent quality
+cancels. Weighted by each player's baseline volume, because a fringe receiver's
+ratio is mostly noise and an unweighted mean lets it count as much as a
+starter's. Leave-one-out is load-bearing — a season average that includes the
+game being scored leaks the answer into its own baseline.
+
+**Result**, week 1 of 2022-25, prior season only. Bar: MAE improves in at least
+three of four seasons, since correlation alone can shuffle ranks without
+getting closer.
+
+| market | MAE wins | corr wins | shipped |
+|---|---|---|---|
+| TE receiving yards | **4/4** | 3/4 | yes |
+| RB receiving yards | **4/4** | 3/4 | yes |
+| RB receptions | **3/4** | 3/4 | yes |
+| TE receptions | 2/4 | 3/4 | no |
+| RB rushing yards | 2/4 | 2/4 | no |
+| WR (any market) | 0-2/4 | 0-1/4 | no |
+
+Two things changed. The adjusted metric beats raw for tight ends (pooled MAE
+18.02 -> 17.70), and more importantly it **unlocks running-back receiving**,
+which raw did not justify — raw won 2 of 4 seasons, adjusted wins 4 of 4.
+
+Unweighted leave-one-out is slightly *worse* than raw, which is the argument
+for the volume weighting rather than a free parameter.
+
+**Rushing still fails**, for a plain reason: the factor is built from receiving
+yards allowed, a statement about pass defence. Tested against rushing anyway
+and came back a coin flip, as it should have. **Wide receiver still fails
+everywhere** — the dilution problem is not something a better denominator
+fixes; it needs shadow-coverage data that nflverse does not publish.
+
+Harness: `experiments/fpa_adjusted.py`.
