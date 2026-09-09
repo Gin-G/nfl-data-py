@@ -935,3 +935,43 @@ in nflverse participation data (Jacksonville ran 68.4% 11 personnel in 2025
 against a league 61.4%, and only 7.9% two-RB), as are coverage fields, so
 "who is covering this receiver and are they any good" is reachable from data
 already on hand.
+
+---
+
+## Coverage matchup — a null result, and one narrow win (2026-09-09)
+
+**Question.** The share model fixed bias but not correlation. Does knowing the
+defence a receiver faces carry the information that would?
+
+**Protocol.** Same as before, repeated over four week 1s (2022-25) so a single
+noisy week could not carry the conclusion. Harness:
+`experiments/coverage_wk1.py`.
+
+| position | n | MAE | corr |
+|---|---|---|---|
+| TE | 183 | 18.67 -> **17.92** | 0.371 -> **0.424** |
+| WR | 392 | 26.73 -> 26.94 | 0.472 -> 0.457 |
+| RB | 188 | 13.59 -> 13.67 | 0.312 -> 0.321 |
+
+**Only tight end works**, and it moves both error and correlation, which is
+what separates a matchup signal from a recalibration. It holds in three of four
+seasons (+0.025, +0.134, -0.011, +0.056).
+
+**Wide receiver is actively worse, and that is the interesting part.** "Yards
+allowed to WR" is spread across a defence's whole secondary and a team's whole
+receiving corps, so it says nearly nothing about the matchup one receiver
+faces. The thing that would — which corner travels with him and whether he is
+any good — is a shadow-coverage assignment, and nflverse has no such field. A
+tight end draws a much more specific assignment, usually a linebacker or
+safety, which is why the team-level number is closer to a real matchup for him.
+
+**Coverage scheme is a null result.** Man/zone rates are published (49% of
+snaps classified) and a receiver's own man-vs-zone yards per target can be
+computed, but regressed for sample size the adjustment spans 0.977 to 1.015 at
+the 10th and 90th percentiles — a two percent nudge — and it changed MAE by
+0.03 yards across 763 player-weeks. It is not wired in anywhere. Reviving it
+needs per-route matchup data rather than a team rate.
+
+**Shipped** in sharp-edge as `nfl/matchup.py`, TE receiving only, clamped to
+0.75-1.30. The two positions that failed are named in that module so nobody
+re-adds them on intuition.
