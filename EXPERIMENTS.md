@@ -1073,3 +1073,51 @@ Shipped in sharp-edge for tight-end receiving only, where it clears the bar and
 is genuinely incremental: stacked on the existing matchup factor it takes TE
 receiving from 16.71 to 16.52 MAE, 4/4 seasons, with the two factors correlating
 **0.110**.
+
+---
+
+## Usage decomposition beats trailing rate — for tight ends and backs (2026-09-11)
+
+The rushing share model already worked (week-1 MAE 23.03 -> 19.29, bias +11.48
+-> +1.99). This asks whether the same shape holds when the opportunity being
+divided is targets, and whether the share should come from the depth chart or
+from the player's own prior share. Harness: `experiments/usage_share.py`.
+
+**Week 1 of 2022-25**, prior season only:
+
+| pos | model | MAE | bias | corr | seasons won |
+|---|---|---|---|---|---|
+| WR | trailing | 24.55 | +6.07 | 0.540 | |
+| | depth-chart share | 26.98 | -2.96 | **0.249** | 1/4 |
+| | **own prior share** | **23.21** | -0.54 | 0.535 | **4/4** |
+| TE | trailing | 16.41 | +6.01 | 0.472 | |
+| | **own prior share** | 14.99 | +1.02 | 0.474 | **4/4** |
+| RB | trailing | 11.27 | +0.90 | 0.439 | |
+| | **own prior share** | **10.49** | -1.51 | 0.464 | **4/4** |
+
+**The depth chart loses to the player's own share for receivers**, which is the
+opposite of the rushing result. Chart rank is coarse — two WR2s can see 25% and
+15% of a team's targets, and collapsing them to one number destroys correlation
+(0.540 -> 0.249). A running back's depth rank is much closer to binary, which is
+why it survives there and not here.
+
+**In-season (2025 weeks 2-6)** — the regime that matters from week 2 on, with
+current-season data once two weeks exist:
+
+| pos | n | MAE trail | MAE own | corr trail | corr own | weeks won |
+|---|---|---|---|---|---|---|
+| WR | 637 | 21.30 | 21.38 | 0.566 | 0.552 | 3/5 |
+| TE | 291 | 15.28 | **14.66** | 0.521 | **0.548** | 4/5 |
+| RB | 385 | 11.05 | **10.60** | 0.504 | **0.527** | 4/5 |
+
+**WR does not survive.** Its week-1 win was the year-stale trailing average
+being bad rather than the decomposition being good — once trailing is current
+the two are indistinguishable and correlation is slightly worse. Tight ends and
+backs win in both regimes, on MAE and correlation together, which is the
+combination that has survived every other test here.
+
+**Not shipped yet, and the reason is the honest one.** All of this beats a
+*trailing average*. The production model is not a trailing average — it has an
+ML layer on top — so "beats trailing" is not "beats what we ship". Testing that
+needs the production projections replayed historically, which
+`evaluate.backtest_season_board` can do and this harness does not.
