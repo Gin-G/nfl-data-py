@@ -1182,3 +1182,55 @@ have kept.
 Still untested: FTN charting (play action, screen, RPO, motion, backfield count,
 box count), which is play-level context rather than a player efficiency rating
 and might behave differently. Harness: `experiments/ngs_incremental.py`.
+
+---
+
+## FTN charting: the most stable traits measured here, and they add nothing (2026-09-11)
+
+NGS failed because efficiency regresses. FTN charting is play-level *context*
+rather than a player rating — was the snap play-action, a screen, an RPO, was
+there motion, how many in the backfield, how many in the box — so the
+hypothesis was that it describes a player's ROLE, and role is what persists.
+
+**Stability is emphatic.** Season-to-season correlation of a player's own role
+profile, 540 player-seasons:
+
+| feature | r (season N → N+1) |
+|---|---|
+| n_offense_backfield | **0.748** |
+| is_play_action | **0.719** |
+| n_defense_box | 0.674 |
+| is_screen_pass | 0.602 |
+| is_motion | 0.582 |
+| is_no_huddle | 0.371 |
+| is_rpo | 0.344 |
+
+These are the most stable traits measured anywhere in this file — above
+success-rate-allowed (0.618), far above defence-vs-position (0.06-0.25). A
+screen-game back is a screen-game back next year.
+
+**And they predict nothing.** Leave-one-season-out, predicting a player's share
+of his team's touches next season from his current share plus the profile:
+
+| position | n | current share (fitted) | + FTN profile | FTN adds |
+|---|---|---|---|---|
+| RB | 253 | 7.109 | 7.345 | **+0.235** |
+| WR | 338 | 2.950 | 2.919 | -0.031 |
+| TE | 110 | 2.346 | 2.587 | **+0.241** |
+
+(MAE in share percentage points.) Worse for two of three, nothing for the
+third, and correlation falls for RB and TE.
+
+**The reason is the finding.** A role profile is already *encoded in* the share
+it produces. Knowing a back is a screen back adds nothing once you know he
+takes 14% of his team's touches — the share is the role, expressed as a number.
+Context describes usage; it does not predict it.
+
+That is now four independent tests landing the same way — defence-vs-position,
+success-rate-allowed, Next Gen Stats, and FTN charting. Stability keeps being
+easy to find and incremental signal keeps being absent, and the two are not the
+same question. The only things that have moved projections here are opportunity
+quantities: share of carries, share of targets, and who the role belongs to
+after it changes hands.
+
+Harness: `experiments/ftn_usage.py`.
