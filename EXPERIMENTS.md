@@ -1020,3 +1020,56 @@ everywhere** — the dilution problem is not something a better denominator
 fixes; it needs shadow-coverage data that nflverse does not publish.
 
 Harness: `experiments/fpa_adjusted.py`.
+
+---
+
+## Granular defensive matchup, and the trait that is stable but inert (2026-09-11)
+
+Follow-up to "Why opponent/matchup keeps failing", which tested defence-vs-
+position at the team level and found split-half r of 0.06-0.25. That is one
+crude aggregate and does not rule out the granular version — that a defence is
+reliably good against 11 personnel and soft against 12. Same split-half method
+so the numbers compare, 186,137 plays with participation data, 2022-25.
+Harness: `experiments/granular_stability.py`.
+
+| trait | split-half r | plays per cell |
+|---|---|---|
+| team: **success rate allowed** | **0.618** | 721 |
+| team: EPA allowed per play | 0.397 | — |
+| team: EPA per rush / per pass | 0.234 / 0.233 | — |
+| team x **personnel**: EPA | **-0.062** | 21 |
+| team x personnel: success rate | 0.026 | 21 |
+| team x formation: success rate | 0.033 | 95 |
+| team x man/zone: EPA | 0.139 | — |
+
+**Slicing by personnel or formation destroys the signal rather than refining
+it** — one cut comes back negative. The last column is why: a team-half-
+personnel cell holds about 21 plays. A defence's true rate against 12 personnel
+is not measurable from 21 snaps, and no modelling fixes a sample size.
+
+**Success rate allowed is the real find.** r 0.618 is more than double anything
+in the earlier work and well above EPA's 0.397. The difference is the metric:
+the original test used fantasy points allowed, which is volume-contaminated and
+noisy, while success rate is bounded per play so explosive plays cannot drag it.
+
+**And it is nearly inert as a player-level multiplier**, which is the useful
+half of the result. Four week-1 samples, prior season only
+(`experiments/success_rate_predict.py`):
+
+| market | MAE change | seasons won |
+|---|---|---|
+| TE receiving | -0.24 | 4/4 |
+| WR receiving | -0.03 | 3/4 |
+| RB rushing | +0.03 | 2/4 |
+| RB receiving | +0.02 | 1/4 |
+| QB passing | -0.98 | 2/4 |
+
+The whole factor spans 0.94 to 1.06; a six per cent nudge cannot move a
+projection far however well it is measured. This is the earlier warning arriving
+from the other side — there the matchup signal was real but unstable, here it is
+real *and* stable and still tiny.
+
+Shipped in sharp-edge for tight-end receiving only, where it clears the bar and
+is genuinely incremental: stacked on the existing matchup factor it takes TE
+receiving from 16.71 to 16.52 MAE, 4/4 seasons, with the two factors correlating
+**0.110**.
