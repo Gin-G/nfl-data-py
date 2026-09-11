@@ -1121,3 +1121,64 @@ combination that has survived every other test here.
 ML layer on top — so "beats trailing" is not "beats what we ship". Testing that
 needs the production projections replayed historically, which
 `evaluate.backtest_season_board` can do and this harness does not.
+
+---
+
+## Next Gen Stats add nothing — and the near-miss is the lesson (2026-09-11)
+
+**First, what the model already has.** The feature list carries EPA by position,
+racr, pacr, dakota, target_share, air_yards_share, wopr, snap counts and snap
+share, plus derived yards-per-target, epa-per-target and average target depth.
+"We do not use advanced metrics" is not true; most of the public ones are in.
+
+**DVOA specifically is not obtainable.** It is FTN/Football Outsiders'
+proprietary metric and is published in no free feed. The closest public
+equivalents are the Next Gen Stats efficiency numbers, which nflverse does
+publish (2016-2026) and which the model does not touch: separation, cushion,
+YAC above expectation, catch rate, rush yards over expected, time to line of
+scrimmage, eight-defender rate.
+
+**Step 1 looked promising.** Correlation of each NGS metric with the *residual*
+of a trailing projection — the part the player's own rate gets wrong:
+
+| metric | r vs actual | r vs residual |
+|---|---|---|
+| RB rush_yards_over_expected_per_att | +0.143 | **-0.130** |
+| RB rush_pct_over_expected | +0.018 | **-0.137** |
+| RB NGS efficiency | -0.091 | **+0.118** |
+| TE catch_percentage | +0.023 | **-0.150** |
+| WR (everything) | — | all < 0.10 |
+
+Negative, which is the interesting direction: a back who ran above expectation
+last year tends to *under*-perform his own trailing rate next year. Efficiency
+regresses, exactly as a DVOA-minded reading would predict.
+
+**Step 2 looked like a win.** Leave-one-season-out regression of actual on
+trailing plus the standardised metric improved MAE in 4 of 4 seasons every time
+— RB rushing 27.51 -> 25.46 with RYOE, TE 21.35 -> 17.80 with catch rate.
+
+**Step 3 killed it.** Correlation fell in every one of those cases, which is the
+signature of shrinkage rather than signal. The control — the same regression on
+trailing *alone* — captures essentially the whole gain:
+
+| model | MAE raw | MAE fit (trailing only) | MAE + NGS | NGS adds |
+|---|---|---|---|---|
+| RB rush, RYOE/att | 27.51 | 24.93 | 25.46 | **+0.53** |
+| RB rush, NGS efficiency | 27.51 | 24.93 | 24.91 | -0.02 |
+| TE rec, catch % | 21.35 | 17.83 | 17.80 | -0.03 |
+| WR rec, air yards share | 28.78 | 27.09 | 27.14 | +0.05 |
+
+**The entire improvement was the fitted slope pulling predictions toward the
+mean.** NGS moves MAE by less than 0.05 either way once that is controlled for,
+and one of the two "best" metrics makes it worse. The residual correlations at
+r≈0.13 are real but too weak to survive contact with a baseline that is itself
+shrunk.
+
+Without the control this reads as a clean 4-of-4 win across three positions. It
+is worth keeping as the example of why "improved MAE in every season" is not
+sufficient evidence on its own — a model can buy MAE with variance it should
+have kept.
+
+Still untested: FTN charting (play action, screen, RPO, motion, backfield count,
+box count), which is play-level context rather than a player efficiency rating
+and might behave differently. Harness: `experiments/ngs_incremental.py`.
