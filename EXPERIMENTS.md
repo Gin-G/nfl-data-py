@@ -1234,3 +1234,52 @@ quantities: share of carries, share of targets, and who the role belongs to
 after it changes hands.
 
 Harness: `experiments/ftn_usage.py`.
+
+---
+
+## The gate: usage decomposition vs the PRODUCTION model (2026-09-11)
+
+Every usage result so far was scored against a trailing average, which the
+shipped model is not — it has the ML layer, the form blend, the depth-role
+multiplier and a team budget on top. "Beats trailing" was always a proxy, and a
+weak baseline flatters any method. This runs `evaluate.backtest` for real:
+trained on seasons before 2025, predicting weeks 1-8 with `include_components`,
+compared on identical player-weeks. Single seed, so anything inside +/-0.05 MAE
+is not readable; every delta below is far outside that.
+
+| market | n | prod | trail | usage | blend | usage-prod | r prod | r use | wks won |
+|---|---|---|---|---|---|---|---|---|---|
+| RB rushing | 524 | **22.21** | 25.17 | 24.01 | 22.37 | **+1.80** | 0.537 | 0.495 | 4/8 |
+| WR receiving | 888 | **22.59** | 25.20 | 24.09 | 22.62 | **+1.50** | 0.512 | 0.464 | 2/8 |
+| TE receiving | 457 | 15.93 | 16.15 | **15.34** | 15.39 | **-0.59** | 0.522 | 0.525 | 5/8 |
+| RB receiving | 545 | 11.33 | 12.12 | 11.50 | **11.18** | +0.16 | 0.439 | 0.473 | 5/8 |
+
+**The answer is mostly no, and the earlier results were beating a weak
+baseline.** Production beats trailing everywhere by 2.5-3 MAE, which is the ML
+layer doing real work; usage also beats trailing everywhere, by rather less; and
+on the two big markets production beats usage by 1.5-1.8 with the week count
+going the same way (4/8 and 2/8). Whatever role-staleness the decomposition was
+fixing, the shipped pipeline already handles most of it.
+
+**Two narrow exceptions, and they are the same two markets as everything else.**
+TE receiving is an outright win for usage — lower MAE, marginally better
+correlation, 5 of 8 weeks. RB receiving is a wash on MAE but usage correlates
+better (0.473 vs 0.439) and the blend beats production outright (11.18 vs
+11.33). Those are exactly the markets where the opponent-adjusted matchup factor
+and success-rate-allowed also earned their place, which is now three independent
+methods pointing at the same two low-volume, role-dependent markets as the place
+the production model is thinnest.
+
+**Not shipped.** The blend is a tie or worse on the two big markets and the
+RB-receiving margin is -0.15 on a single seed — above the noise floor but not by
+much. A full five-seed run on those two markets is what would settle it, and
+that is the next concrete step rather than a judgement call.
+
+**What the share work is actually for**, then: the role-conflict diagnostic that
+already ships in sharp-edge — flagging when our projection ranks a team's
+players differently from the market — rather than a replacement projection. It
+found the Jacksonville backfield inversion, which the production model does
+make, even though the decomposition does not beat it on average.
+
+Harness: `experiments/vs_production.py` (runs inside the nfl-api image; local
+sklearn is binary-incompatible with the local numpy).
