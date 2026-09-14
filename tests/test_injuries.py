@@ -77,3 +77,20 @@ class TestBuildOverrides:
         # IR Guy has roster status IR -> zeroed out even with no report
         assert "IR Guy" in overrides
         assert overrides["IR Guy"]["status"] == "OUT"
+
+    def test_overrides_keep_the_player_id(self):
+        # The Projector matches on ID first; a name-only override is what let
+        # IND's D.J. Montgomery zero out HOU's David Montgomery.
+        rosters = self._rosters().assign(gsis_id=["00-01", "00-02", "00-03", "00-04"])
+        overrides, _ = injuries.build_overrides({}, rosters, self._depth_charts())
+        assert overrides["IR Guy"]["player_id"] == "00-04"
+
+    def test_report_ids_flow_through(self):
+        reports = pd.DataFrame({
+            "week": [3], "full_name": ["Star Back"], "gsis_id": ["00-0035685"],
+            "position": ["RB"], "team": ["DAL"], "report_status": ["Out"],
+            "practice_status": ["DNP"], "report_primary_injury": ["Knee"],
+        })
+        parsed = injuries.parse_nflverse_injuries(reports, week=3)
+        overrides, _ = injuries.build_overrides(parsed, self._rosters(), self._depth_charts())
+        assert overrides["Star Back"]["player_id"] == "00-0035685"

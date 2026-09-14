@@ -154,24 +154,50 @@ def add_rolling_averages(df):
     return df
 
 
+def _unpublished(exc):
+    """True when nflreadpy failed because a season has no data file yet — a 404,
+    or its own season-range check — as opposed to a network or parsing fault."""
+    msg = str(exc)
+    return "404" in msg or "Season must be between" in msg
+
+
+def load_through_latest(load, seasons, what):
+    """Call an nflreadpy loader over ``seasons``, tolerating only the NEWEST season
+    being unpublished (the first days of a season, before nflverse posts it).
+
+    Returns ``(frame, seasons_loaded)``. Anything else still raises: a transient
+    failure that silently dropped the current season would put every projection
+    back on last season's data with nothing downstream able to tell.
+    """
+    seasons = list(seasons)
+    try:
+        return to_pandas(load(seasons=seasons)), seasons
+    except Exception as exc:
+        if len(seasons) < 2 or not _unpublished(exc):
+            raise
+        logger.warning("%s for %d not published yet; loading through %d",
+                       what, seasons[-1], seasons[-2])
+        return to_pandas(load(seasons=seasons[:-1])), seasons[:-1]
+
+
 def build_dataset(seasons=None, output_path=config.DATASET_PATH):
     """Build the full historical dataset and (optionally) save it to CSV.
 
     Args:
-        seasons: list of season years (default: config.SEASONS)
+        seasons: list of season years (default: config.SEASONS, which runs
+            through the season in progress)
         output_path: where to save the CSV; pass None to skip saving
     """
     import nflreadpy as nfl
 
-    seasons = seasons or config.SEASONS
-    current_season = seasons[-1]
+    seasons = list(seasons or config.SEASONS)
 
     print(f"Loading player stats for {seasons[0]}-{seasons[-1]} from nflreadpy...")
-    player_stats = to_pandas(nfl.load_player_stats(seasons=seasons))
-    print(f"Total player stat records: {len(player_stats)}")
+    player_stats, seasons = load_through_latest(nfl.load_player_stats, seasons, "player stats")
+    print(f"Total player stat records: {len(player_stats)} (through {seasons[-1]})")
 
     print("Loading rosters for sportradar_id mapping...")
-    all_rosters = to_pandas(nfl.load_rosters_weekly(seasons=seasons))
+    all_rosters, _ = load_through_latest(nfl.load_rosters_weekly, seasons, "weekly rosters")
     sportradar_mapping = all_rosters[["gsis_id", "sportradar_id"]].drop_duplicates("gsis_id")
 
     # player_stats 'player_id' is a gsis_id
@@ -187,8 +213,9 @@ def build_dataset(seasons=None, output_path=config.DATASET_PATH):
           f"({has_sr / len(player_stats) * 100:.1f}%)")
 
     print("Loading depth charts and snap counts...")
-    depth_charts = to_pandas(nfl.load_depth_charts(seasons=seasons))
-    snap_data = process_snap_counts(to_pandas(nfl.load_snap_counts(seasons=seasons)))
+    depth_charts, _ = load_through_latest(nfl.load_depth_charts, seasons, "depth charts")
+    snap_data = process_snap_counts(
+        load_through_latest(nfl.load_snap_counts, seasons, "snap counts")[0])
 
     print("Merging snap count data...")
     name_col = "player_display_name" if "player_display_name" in player_stats.columns else "player_name"

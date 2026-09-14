@@ -139,6 +139,7 @@ def categorize_injury_impact(injuries_dict, roster_data, depth_charts):
             "injury": injury_info["injury_type"],
             "position": injury_info["position"],
             "team": injury_info["team"],
+            "player_id": injury_info.get("player_id", ""),
         }
         if status in ["OUT", "DOUBTFUL", "D"]:
             out_players.add(player_name.lower())
@@ -182,6 +183,7 @@ def build_overrides(injuries_dict, roster_data, depth_charts):
             "reason": player_info["injury"],
             "team": player_info["team"],
             "position": player_info["position"],
+            "player_id": player_info.get("player_id", ""),
         }
     for backup_info in impact["boost_backup"]:
         backup_situations[backup_info["player"]] = {
@@ -228,6 +230,7 @@ def parse_nflverse_injuries(injuries_df, week):
     injury_col = _first_col(df, ["report_primary_injury", "injury", "primary_injury"])
     team_col = _first_col(df, ["team", "club_code", "team_abbr"])
     pos_col = _first_col(df, ["position", "pos"])
+    id_col = _first_col(df, ["gsis_id", "player_id"])
 
     injuries = {}
     for _, row in df.iterrows():
@@ -254,6 +257,7 @@ def parse_nflverse_injuries(injuries_df, week):
             "position": str(row.get(pos_col, "") or "UNK"),
             "team": str(row.get(team_col, "") or "UNK"),
             "practice_status": practice_status,
+            "player_id": str(row.get(id_col) or "") if id_col else "",
         }
 
     print(f"Processed {len(injuries)} injured players from nflverse injury reports")

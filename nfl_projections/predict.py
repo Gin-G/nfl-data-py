@@ -34,13 +34,56 @@ def _extract_team(row):
     return "Unknown"
 
 
+def current_depth_chart(depth_charts, as_of=None):
+    """Reduce nflverse's snapshot-format depth charts to the one chart in force.
+
+    From 2025 nflverse publishes depth charts as dated league-wide ESPN snapshots
+    (``dt``, roughly one a day from spring on) rather than one chart per week.
+    Read as-is that is a hundred-plus charts stacked on each other, and the
+    per-player role map keeps whichever row it meets last — the rows run newest
+    first, so the OLDEST. On 2026-09-14 that gave 252 of 574 offensive players a
+    months-stale rank or team.
+
+    Keeps the latest snapshot taken on or before ``as_of`` (a date; default: the
+    latest there is), so a past week never reads a chart from after it. Frames
+    without ``dt`` — the older weekly charts, the ESPN roster sync — pass through.
+    """
+    if depth_charts is None or "dt" not in depth_charts.columns or depth_charts.empty:
+        return depth_charts
+    stamp = pd.to_datetime(depth_charts["dt"], utc=True, errors="coerce")
+    keep = stamp.notna()
+    if as_of is not None:
+        cutoff = pd.Timestamp(as_of)
+        cutoff = cutoff.tz_localize("UTC") if cutoff.tzinfo is None else cutoff.tz_convert("UTC")
+        keep &= stamp < cutoff.normalize() + pd.Timedelta(days=1)
+    if not keep.any():
+        return depth_charts.iloc[0:0]
+    return depth_charts[stamp == stamp[keep].max()].reset_index(drop=True)
+
+
+def week_start_date(season, week, schedule=None):
+    """First gameday of a regular-season week, or None if the schedule can't say."""
+    try:
+        if schedule is None:
+            import nflreadpy as nfl
+
+            schedule = to_pandas(nfl.load_schedules(seasons=[season]))
+        games = schedule[(schedule["season"] == season) & (schedule["week"] == week)]
+        days = pd.to_datetime(games["gameday"], errors="coerce").dropna()
+        return days.min().date() if not days.empty else None
+    except Exception as exc:
+        logger.warning("No schedule for %s week %s (%s); using the latest depth chart",
+                       season, week, exc)
+        return None
+
+
 class DepthChartAnalyzer:
     """Current depth chart roles: starter / backup / deep_backup per player."""
 
     OFFENSIVE_POSITIONS = ["QB", "RB", "WR", "TE", "FB"]
 
     def __init__(self, depth_chart_data):
-        self.depth_charts = depth_chart_data
+        self.depth_charts = current_depth_chart(depth_chart_data)
         self._process_depth_charts()
 
     def _process_depth_charts(self):
@@ -72,11 +115,18 @@ class DepthChartAnalyzer:
             }
         logger.info("Processed depth charts: %d offensive players", len(self.offensive_depth))
 
-    def get_player_role(self, player_name):
-        if player_name in self.player_roles:
-            return self.player_roles[player_name]
+    def get_player_role(self, player_name, team=None):
+        """Depth role for a player. With ``team``, only that team's chart counts:
+        the name fallback otherwise lends one team's rank to a namesake on another
+        (NO's Travis Etienne read CAR's RB4 slot, his brother Trevor's)."""
+        def on_team(role_info):
+            return not team or team in ("UNK", "Unknown") or role_info["team"] == team
+
+        exact = self.player_roles.get(player_name)
+        if exact and on_team(exact):
+            return exact
         for depth_name, role_info in self.player_roles.items():
-            if self._names_similar(player_name, depth_name):
+            if self._names_similar(player_name, depth_name) and on_team(role_info):
                 return role_info
         return None
 
@@ -93,7 +143,7 @@ class DepthChartAnalyzer:
     def analyze_rookie_opportunity(self, player_name, team, position):
         """Rate a rookie's opportunity from where they sit on the depth chart."""
         team_depth = self.get_team_competition(team, position)
-        player_role = self.get_player_role(player_name)
+        player_role = self.get_player_role(player_name, team)
 
         if not team_depth:
             return {"opportunity": "unknown", "context": "No team depth chart data"}
@@ -147,6 +197,10 @@ class InjuryStatusAnalyzer:
             self._normalize_name(name): (name, info)
             for name, info in backup_situations.items()
         }
+        self.injury_by_id = {
+            str(info["player_id"]): info for info in injury_overrides.values()
+            if info.get("player_id")
+        }
 
     @staticmethod
     def _normalize_name(name):
@@ -157,17 +211,32 @@ class InjuryStatusAnalyzer:
             name_clean = name_clean.replace(suffix, "")
         return " ".join(name_clean.split())
 
-    def check_player_status(self, player_name):
+    @staticmethod
+    def _same_player(info, team=None, player_id=None):
+        """Whether a NAME match can be this player: not when the IDs differ, and
+        not when the teams do. Across the league names collide — IND's D.J.
+        Montgomery, on the reserve list, zeroed out HOU's David Montgomery the
+        week after he scored 28 — so a name only counts inside its own team."""
+        def known(v):
+            return v is not None and not pd.isna(v) and str(v) not in ("", "UNK", "Unknown")
+
+        other_id = info.get("player_id")
+        if known(player_id) and known(other_id) and str(other_id) != str(player_id):
+            return False
+        other_team = info.get("team")
+        return not known(team) or not known(other_team) or other_team == team
+
+    def _name_matches(self, player_name):
+        """Candidate entries for a name, best match first."""
         if player_name in self.injury_overrides:
-            return self.injury_overrides[player_name]
+            yield self.injury_overrides[player_name]
         if player_name in self.backup_situations:
-            return self.backup_situations[player_name]
+            yield self.backup_situations[player_name]
 
         normalized = self._normalize_name(player_name)
-        if normalized in self.injury_by_normalized:
-            return self.injury_by_normalized[normalized][1]
-        if normalized in self.backup_by_normalized:
-            return self.backup_by_normalized[normalized][1]
+        for lookup in (self.injury_by_normalized, self.backup_by_normalized):
+            if normalized in lookup:
+                yield lookup[normalized][1]
 
         # Last resort: last name + first initial
         last_name = normalized.split()[-1] if normalized else ""
@@ -175,31 +244,40 @@ class InjuryStatusAnalyzer:
             for lookup in (self.injury_by_normalized, self.backup_by_normalized):
                 for norm_key, (_, info) in lookup.items():
                     if norm_key.endswith(last_name) and normalized[0] == norm_key[0]:
-                        return info
+                        yield info
+
+    def check_player_status(self, player_name, team=None, player_id=None):
+        if player_id is not None and not pd.isna(player_id) and str(player_id) in self.injury_by_id:
+            return self.injury_by_id[str(player_id)]
+        for info in self._name_matches(player_name):
+            if self._same_player(info, team, player_id):
+                return info
         return None
 
-    def should_zero_out_player(self, player_name):
-        status_info = self.check_player_status(player_name)
+    def should_zero_out_player(self, player_name, team=None, player_id=None):
+        status_info = self.check_player_status(player_name, team, player_id)
         if status_info and "status" in status_info:
             return status_info["status"] in ["OUT", "DOUBTFUL"]
         return False
 
-    def should_boost_backup(self, player_name):
-        if player_name in self.backup_situations:
-            return True
-        return self._normalize_name(player_name) in self.backup_by_normalized
+    def should_boost_backup(self, player_name, team=None):
+        info = self.backup_situations.get(player_name)
+        if info is None:
+            match = self.backup_by_normalized.get(self._normalize_name(player_name))
+            info = match[1] if match else None
+        return info is not None and self._same_player(info, team)
 
-    def get_adjustment_info(self, player_name):
-        status_info = self.check_player_status(player_name)
+    def get_adjustment_info(self, player_name, team=None, player_id=None):
+        status_info = self.check_player_status(player_name, team, player_id)
         if not status_info:
             return None
-        if self.should_zero_out_player(player_name):
+        if self.should_zero_out_player(player_name, team, player_id):
             return {
                 "type": "injury_zero",
                 "reason": f"OUT due to {status_info.get('reason', 'injury')}",
                 "original_role": "injured_starter",
             }
-        if self.should_boost_backup(player_name):
+        if self.should_boost_backup(player_name, team):
             return {
                 "type": "backup_boost",
                 "reason": status_info.get("reason", "replacing injured starter"),
@@ -207,6 +285,22 @@ class InjuryStatusAnalyzer:
                 "original_role": "backup_now_starting",
             }
         return None
+
+
+def projectable_status(status, roster_week, week):
+    """Whether a roster row's status lets the player onto this week's board.
+
+    Active players, yes; practice squad, cut, exempt and the like, no. INA is
+    the exception once it is stale: it is a gameday designation for the week the
+    row belongs to, and nflverse keeps serving last week's rows until the next
+    week's are posted, so a Wednesday run for week 2 would otherwise drop
+    everyone who sat out week 1 — Tua, Bowers, Kamara. Whether they play THIS
+    week is the injury report's call, not a stale gameday list's.
+    """
+    if status == "ACT":
+        return True
+    roster_week = pd.to_numeric(roster_week, errors="coerce")
+    return bool(status == "INA" and pd.notna(roster_week) and roster_week < week)
 
 
 def _pick_tier(pick):
@@ -414,6 +508,11 @@ class Projector:
                 rosters = to_pandas(nfl.load_rosters_weekly(seasons=[season]))
             if depth_charts is None:
                 depth_charts = to_pandas(nfl.load_depth_charts(seasons=[season]))
+        if depth_charts is not None and "dt" in depth_charts.columns:
+            # The chart as it stood going into this week — also what the injury
+            # backup lookup below reads, so both see the same depth order.
+            depth_charts = current_depth_chart(
+                depth_charts, as_of=week_start_date(season, week, schedule))
 
         self.rosters = dedupe_rosters(rosters)
         self.depth_charts = depth_charts
@@ -526,6 +625,28 @@ class Projector:
                                    and (seasons == self.season).sum() == 0)
         return self._preseason
 
+    def _apply_rookie_role(self, pred, player_name, position, team):
+        """Give a draft-capital projection the same depth-rank discount a veteran's
+        gets (in place).
+
+        The prior is fit on rookies who played, so it is a starter's rate; veterans
+        are scaled by depth rank in _predict_roster_row and rookies were not. The
+        preseason board hid it under the season availability weight. In season
+        there is none, and the 2026 week 2 dry run put inactive rookie QB3s at 6-11
+        points — Ty Simpson at 11.2 behind Stafford.
+        """
+        from . import roles
+
+        depth_role = self.depth_analyzer.get_player_role(player_name, team)
+        mult = roles.per_game_role_multiplier(
+            position, depth_role["depth_rank"] if depth_role else None)
+        if mult >= 1.0:
+            return
+        for key in ("fanduel_fantasy_points", "floor", "projection_median", "ceiling",
+                    *roles.ROLE_SCALED_COMPONENTS):
+            if isinstance(pred.get(key), (int, float)):
+                pred[key] = round(pred[key] * mult, 2)
+
     def _predict_roster_row(self, player_info):
         from . import model as model_mod
 
@@ -537,8 +658,8 @@ class Projector:
             player_id = ""
 
         # Injured players are zeroed before anything else
-        if self.injury_analyzer.should_zero_out_player(player_name):
-            adjustment = self.injury_analyzer.get_adjustment_info(player_name)
+        if self.injury_analyzer.should_zero_out_player(player_name, team, player_id):
+            adjustment = self.injury_analyzer.get_adjustment_info(player_name, team, player_id)
             return {
                 "player_id": player_id,
                 "player_name": player_name,
@@ -561,6 +682,7 @@ class Projector:
                     player_name, position, team
                 )
                 if rookie_pred:
+                    self._apply_rookie_role(rookie_pred, player_name, position, team)
                     return {
                         "player_id": player_id,
                         "player_name": player_name,
@@ -619,7 +741,7 @@ class Projector:
         # players we most want to discount). See roles.py.
         from . import roles
 
-        depth_role = self.depth_analyzer.get_player_role(player_name)
+        depth_role = self.depth_analyzer.get_player_role(player_name, team)
         depth_rank = depth_role["depth_rank"] if depth_role else None
         role_mult = roles.per_game_role_multiplier(position, depth_rank)
         if role_mult < 1.0:
@@ -699,14 +821,17 @@ class Projector:
             if player_name in processed:
                 continue
 
-            if self.injury_analyzer.should_zero_out_player(player_name):
-                adjustment = self.injury_analyzer.get_adjustment_info(player_name)
+            team = _extract_team(player)
+            player_id = player.get("player_id", player.get("gsis_id", ""))
+            if self.injury_analyzer.should_zero_out_player(player_name, team, player_id):
+                adjustment = self.injury_analyzer.get_adjustment_info(
+                    player_name, team, player_id)
                 processed.add(player_name)
                 predictions.append({
-                    "player_id": player.get("player_id", player.get("gsis_id", "")),
+                    "player_id": player_id,
                     "player_name": player_name,
                     "position": position,
-                    "team": _extract_team(player),
+                    "team": team,
                     "fanduel_fantasy_points": 0.0,
                     "prediction_type": "injured_out",
                     "injury_status": "OUT",
@@ -715,9 +840,10 @@ class Projector:
                 })
                 continue
 
-            # Skip inactive players (practice squad etc.) unless they're a
-            # backup elevated by an injury
-            if player.get("status") != "ACT" and not self.injury_analyzer.should_boost_backup(player_name):
+            # Skip players off the active roster (practice squad etc.) unless
+            # they're a backup elevated by an injury
+            if (not projectable_status(player.get("status"), player.get("week"), self.week)
+                    and not self.injury_analyzer.should_boost_backup(player_name, team)):
                 continue
 
             pred = self._predict_roster_row(player)

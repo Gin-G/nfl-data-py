@@ -1,8 +1,28 @@
 """Central configuration for the projections pipeline."""
 
-# Seasons pulled into the historical dataset
-SEASONS = list(range(2018, 2026))
-CURRENT_SEASON = 2025
+from datetime import date, timedelta
+
+
+def current_season(today=None):
+    """The NFL season in progress, by date: this calendar year from the Thursday
+    after Labor Day, the previous year before it.
+
+    Same rule as ``nflreadpy.get_current_season``, restated so importing config
+    doesn't pull in nflreadpy. This used to be a hand-edited constant, bumped
+    each August. 2026 week 1 was played with it still reading 2025, which kept
+    every weekly retrain off the new season's games.
+    """
+    today = today or date.today()
+    labor_day = date(today.year, 9, 1)
+    labor_day += timedelta(days=(0 - labor_day.weekday()) % 7)   # first Monday
+    return today.year if today >= labor_day + timedelta(days=3) else today.year - 1
+
+
+# Seasons pulled into the historical dataset: through the season in progress.
+# The current season's stats may not be published yet in its first days;
+# dataset.build_dataset drops it then rather than failing.
+CURRENT_SEASON = current_season()
+SEASONS = list(range(2018, CURRENT_SEASON + 1))
 
 # Only train on seasons from this year forward (older football is less relevant)
 TRAINING_MIN_SEASON = 2020

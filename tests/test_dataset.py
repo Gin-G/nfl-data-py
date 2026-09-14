@@ -78,3 +78,43 @@ class TestRollingAverages:
         })
         out = dataset.add_rolling_averages(df)
         assert out.iloc[0]["avg_fppg"] == 0
+
+
+class TestLoadThroughLatest:
+    @staticmethod
+    def _loader(fail_on, message):
+        calls = []
+
+        def load(seasons):
+            calls.append(list(seasons))
+            if fail_on in seasons:
+                raise ConnectionError(message)
+            return pd.DataFrame({"season": seasons})
+        return load, calls
+
+    def test_drops_an_unpublished_newest_season(self):
+        load, calls = self._loader(2026, "404 Client Error: Not Found for url")
+        frame, loaded = dataset.load_through_latest(load, [2024, 2025, 2026], "stats")
+        assert loaded == [2024, 2025]
+        assert frame["season"].tolist() == [2024, 2025]
+        assert calls == [[2024, 2025, 2026], [2024, 2025]]
+
+    def test_season_range_check_counts_as_unpublished(self):
+        load, _ = self._loader(2027, "Season must be between 2012 and 2026")
+        _, loaded = dataset.load_through_latest(load, [2026, 2027], "snaps")
+        assert loaded == [2026]
+
+    def test_any_other_failure_still_raises(self):
+        # A flaky download must not quietly fall back to last season's data.
+        import pytest
+
+        load, _ = self._loader(2026, "Connection reset by peer")
+        with pytest.raises(ConnectionError):
+            dataset.load_through_latest(load, [2025, 2026], "stats")
+
+    def test_only_the_newest_season_may_be_missing(self):
+        import pytest
+
+        load, _ = self._loader(2024, "404 Client Error")
+        with pytest.raises(ConnectionError):
+            dataset.load_through_latest(load, [2024, 2025, 2026], "stats")

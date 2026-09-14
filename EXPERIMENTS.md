@@ -49,6 +49,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 20 | Preseason-board harness (`backtest_season_board`) | — | — | QB spearman 0.27, WR top12 0.42 | **KEPT** — the missing benchmark for every volume mechanism |
 | 21 | `regular_games` now excludes the postseason | **4.187** | — | was 4.154 over a contaminated population | **KEPT** — correctness; new baseline |
 | 22 | LIVE: 2026 week 1 published board vs actuals (first prospective week) | 4.502 pub / 4.291 cond | ρ 0.690 | naive 4.739; pub ties it, cond −0.25 | **measurement** — availability discount leaked into a weekly board |
+| 23 | In-season path, first real run: season auto-detect + depth snapshots + injury/rookie fixes | — | — | week 2 dry run: 5 bugs found, 603-row board | **KEPT** — correctness; the weekly loop now sees the new season |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -1351,3 +1352,85 @@ its record will show the tie with naive unless it is rescored.
 
 Harness: `experiments/live_week_accuracy.py 2026 1` (read-only: public API +
 nflreadpy).
+
+## The in-season path, run on 2026 for the first time (2026-09-14)
+
+Not a model change, a pipeline audit. The loop has always been right — every
+Wednesday rebuilds from nflverse, retrains, projects the next week — but
+`config.SEASONS` was a hand-bumped constant still ending at 2025. The dataset never
+included 2026, and NFL-API reads "season newer than the dataset" as preseason, so
+week 1 went out on the ESPN/rookie-prior/availability path and every later week
+would have too: last season's form, re-scaled by environment, stamped `as_of_week=N`.
+Now `config.current_season()` (nflreadpy's date rule), and `build_dataset` drops only
+an unpublished NEWEST season on a 404. Any other load failure still raises, because
+silently falling back to last season is exactly the failure being fixed. Dataset:
+148,267 stat rows through 2026.
+
+Flipping that exposed the in-season path to 2026 data for the first time. Three
+single-seed dry runs of week 2, in the nfl-api image against a throwaway SQLite DB,
+each turned up something:
+
+| run | published | found |
+|---|---|---|
+| 1 | 544 | 4 healthy players zeroed as injured; 63 week-1 inactives dropped |
+| 2 | 603 | rookie-prior backup QBs at 6-14 pts; one cross-team depth rank |
+| 3 | 603 | clean |
+
+**Depth charts.** nflverse's 2025+ format is dated league-wide snapshots (178 for 2026,
+newest first). `DepthChartAnalyzer` let the last row win, i.e. the OLDEST: 252 of 574
+offensive players got a stale rank or team. For 2025 the oldest snapshot is early
+August, and 212 of 546 players differ from the chart going into week 1. **So #20's
+board harness, and any 2025 Projector run, read the August 2025 depth chart.** A/Bs
+inside it shared the flaw; absolute numbers there may move. Fixed with
+`current_depth_chart`: the latest snapshot on or before the week's first gameday.
+
+**Injury name collisions.** The first-initial + last-name fallback crossed teams.
+Four healthy players were zeroed: David Montgomery (IND's D.J. Montgomery is on the
+reserve list; Montgomery scored 28 in week 1), Travis Etienne (CAR's Trevor), Justice
+Hill (NE's Julian), Barion Brown (CHI's Brittain). Now matched by gsis ID first; a
+name match only counts on the same team with no conflicting ID. After the fix all 84
+zero-outs are real reserve-list players.
+
+**Stale gameday inactives.** The Projector skips non-`ACT` rows, and nflverse serves
+week 1 rosters until week 2's are posted. 63 week-1 `INA` skill players (36 with 2025
+stat lines) vanished, including Penix, Tua, Bowers, Kamara and TreVeyon Henderson.
+`INA` from an earlier week no longer blocks a player; the injury report decides.
+
+**Rookie prior without a depth discount.** It is fit on rookies who played, so it's a
+starter's rate. Veterans get the depth-rank multiplier and rookie rows returned before
+it. The preseason availability weight had been hiding this. In season: Fernando
+Mendoza 14.4 as LV's QB2, Ty Simpson 11.2 behind Stafford. Rookie rows now take the
+same multiplier (5.0 and 1.7), and 104 rookie-prior rows moved. The depth lookup is
+team-scoped too, which ends Travis Etienne reading Trevor's CAR RB4 slot (4.0 → 7.2).
+This also changes preseason-path rookie numbers; #20 was not re-measured.
+
+NFL-API side (its own commit): the in-season run keeps `rookie_fallback`, the published
+week gets its game environment and simulator like the archived weeks, and the loader
+refreshes the season in progress. Its skip-if-any-rows would have loaded 2026 week 1
+and never week 2.
+
+**The final dry-run board:** 603 rows (406 veteran_ml, 113 rookie_prior, 84
+injured_out), `exp_games` 1.0 throughout. 9,648 archived rows for weeks 2-18 at
+`as_of_week=1`. 14 minutes locally, single seed. Mean projection for the players
+scored in week 1:
+
+| | week 1 board | week 2 dry run | week 1 actual |
+|---|---|---|---|
+| QB | 8.7 | 13.4 | 15.7 |
+| RB | 5.4 | 6.5 | 8.0 |
+| WR | 4.4 | 4.9 | 5.7 |
+| TE | 2.8 | 3.9 | 4.3 |
+
+Different weeks, so this shows the discount is gone. It is not an accuracy claim.
+
+**Not settled.**
+- A veteran with fewer than two recent games still gets the rookie prior, looked up
+  against the CURRENT draft class, so as undrafted. Deshaun Watson, CLE's QB1, is 6.0
+  (0.18 on the week 1 board).
+- The team-position budget is still not applied in season.
+- Production runs five seeds; these were one.
+- The dry run predates DEN@KC.
+- A Wednesday run sees only a partial injury report.
+- Two tests fail in the nfl-api image on pandas 2.1 (`include_groups` in
+  `evaluate.summarize` / `summarize_quantiles`). They predate this work and are off the
+  production path.
