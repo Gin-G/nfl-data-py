@@ -48,6 +48,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 19 | Snap-share role multiplier (vs the depth-rank table) | 3.748 | — | MAE −0.066, WR spearman .946→.804 | **REJECTED** — buys MAE with bias, damages ordering |
 | 20 | Preseason-board harness (`backtest_season_board`) | — | — | QB spearman 0.27, WR top12 0.42 | **KEPT** — the missing benchmark for every volume mechanism |
 | 21 | `regular_games` now excludes the postseason | **4.187** | — | was 4.154 over a contaminated population | **KEPT** — correctness; new baseline |
+| 22 | LIVE: 2026 week 1 published board vs actuals (first prospective week) | 4.502 pub / 4.291 cond | ρ 0.690 | naive 4.739; pub ties it, cond −0.25 | **measurement** — availability discount leaked into a weekly board |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -1283,3 +1284,70 @@ make, even though the decomposition does not beat it on average.
 
 Harness: `experiments/vs_production.py` (runs inside the nfl-api image; local
 sklearn is binary-incompatible with the local numpy).
+
+## Live week 1, 2026: the first prospective scorecard (2026-09-14)
+
+The first week the model had to call in advance. Scored Monday afternoon with the
+Denver–Kansas City game still to play, against nflverse actuals, because NFL-API's
+own scorer waits on the Tuesday loader. Same rules as that scorer: the board as
+`/projections/` served it, players with no stat line unscored, projections dated
+after their team's gameday excluded. **n = 277** player-weeks from the 13 Sunday
+games — one week, so every number here carries a lot of noise.
+
+| | n | MAE | bias | naive MAE (same rows) | Spearman model / naive |
+|---|---|---|---|---|---|
+| Board as published | 277 | 4.50 | **−2.64** | 4.74 vs **4.75** (tie) | 0.69 / 0.67 |
+| Availability weight removed | 277 | **4.29** | −1.17 | 4.74 vs **4.49** | — |
+| QB (weight removed) | 29 | 7.10 | −4.20 | 5.92 vs 7.01 | 0.50 / 0.50 |
+| RB (weight removed) | 68 | 4.71 | −1.51 | 5.80 vs 5.05 | 0.73 / 0.60 |
+| WR (weight removed) | 118 | 3.97 | −0.43 | 4.13 vs 4.06 | 0.67 / 0.66 |
+| TE (weight removed) | 62 | 3.14 | −0.76 | 4.06 vs 3.34 | 0.62 / 0.49 |
+
+Top-N overlap with the actual finish (model / naive): QB-12 8/7, RB-24 17/14,
+WR-36 21/19, TE-12 3/4. The floor–ceiling band caught 62.8% (26.7% above the
+ceiling, 10.5% below the floor); with the availability weight divided out of both
+ends it caught 72.6% (16.6% / 10.8%).
+
+**The published board ran 2.6 points low on every player who played, and most of
+that is the pipeline, not the model.** Week 1 went down the preseason path because
+nflreadpy had no 2026 rows when it ran (`use_espn`). That path multiplies each week
+by expected games / 17, around 0.75 for the scored players, which is a SEASON rate:
+the chance of missing some games over 17 weeks. Applied to one week whose inactives
+are already known, and scored only on players who suited up, it guarantees the
+number comes in low. Dividing it back out drops MAE 4.50 → 4.29, turns a tie with
+naive into a 0.25 lead, and puts band coverage back on the ~72% it has always had.
+The in-season path writes `exp_games = 1.0`, so from week 2 this should disappear
+without a change, provided the dataset build picks up 2026.
+
+**What is left after that is mostly the week, not the model.** Week 1 games averaged
+50.0 points against a 45.2 Vegas total; the two previous week 1s averaged 45.8 and
+41.3. Naive usually over-projects week 1 by 1.1–1.3 points (2024, 2025) and this year
+under-projected by 0.4, so the league ran about 1.5 points per player hotter than an
+ordinary opening week. That shows up where scoring concentrates: five of the
+fifteen biggest misses came from Chicago 59, Carolina 37.
+
+**Still true after both corrections: QBs are too low.** They trail naive by 1.1 MAE
+with the weight removed, 1.6 points more negative than naive's own bias. Their
+ordering is no worse than naive (0.50 each, 8 vs 7 of the top 12), so the problem
+is level, not ordering, which is the QB compression the Aug-07 QB separation work
+found. One week and 29 QBs cannot say more than that.
+
+**Data facts found along the way.**
+- The only week-1 projection for NE, SEA, SF and LA was computed 2026-09-12 04:00 UTC,
+  after the Wednesday and Thursday games, so it can never be honestly scored. The
+  earlier Wednesday run was overwritten before the vintage archive existed.
+- Twelve skill players with stats had no projection, all late signings: Diggs (WAS,
+  15.5), Keenan Allen (IND, 9.2), Jonnu Smith (GB, 7.0), Waller (CAR, 4.8). Nine more
+  were projected for teams they had left. The ESPN roster sync failed today with a 403.
+- The preseason path runs with `use_injuries=False`, so players ruled out in advance
+  stayed on the board: Josh Jacobs 9.6, Tua Tagovailoa 8.1, Brock Bowers 6.5. The
+  scorer drops them, so they never count as misses, but a user of the board still
+  sees them.
+
+**Not settled:** whether the weekly board should carry an availability weight at
+all, and if so which one (the questionable/out tag, not a season durability rate).
+The rows NFL-API freezes for week 1 will use the published, discounted numbers, so
+its record will show the tie with naive unless it is rescored.
+
+Harness: `experiments/live_week_accuracy.py 2026 1` (read-only: public API +
+nflreadpy).
