@@ -50,6 +50,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 21 | `regular_games` now excludes the postseason | **4.187** | — | was 4.154 over a contaminated population | **KEPT** — correctness; new baseline |
 | 22 | LIVE: 2026 week 1 published board vs actuals (first prospective week) | 4.502 pub / 4.291 cond | ρ 0.690 | naive 4.739; pub ties it, cond −0.25 | **measurement** — availability discount leaked into a weekly board |
 | 23 | In-season path, first real run: season auto-detect + depth snapshots + injury/rookie fixes | — | — | week 2 dry run: 5 bugs found, 603-row board | **KEPT** — correctness; the weekly loop now sees the new season |
+| 24 | LIVE: weeks 1-2 scored prospectively, first weeks on the fixed path | wk2 3.870 | ρ 0.62 | wk1 4.485 → wk2 3.870; skill +0.07 → +0.65 | **measurement** — the in-season fixes hold up out of sample |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -1434,3 +1435,29 @@ Different weeks, so this shows the discount is gone. It is not an accuracy claim
 - Two tests fail in the nfl-api image on pandas 2.1 (`include_groups` in
   `evaluate.summarize` / `summarize_quantiles`). They predate this work and are off the
   production path.
+
+## Weeks 1 and 2, scored prospectively (2026-09-25)
+
+The first read on whether #23's fixes hold up on football nobody had seen. Same
+scorer, same population rules, frozen rows — week 1 was projected by the old
+preseason path, week 2 by the fixed in-season one.
+
+| | n | MAE | bias | naive MAE | skill | band |
+|---|---|---|---|---|---|---|
+| Week 1 (preseason path) | 302 | 4.485 | −2.44 | 4.804 | +0.07 | 63% |
+| Week 2 (in-season path) | 354 | **3.870** | **−0.71** | 4.627 | **+0.65** | 70% |
+| Both | 656 | 4.153 | −1.50 | 4.704 | +0.40 | 67% |
+
+The −2.6 bias is gone, as predicted when the availability weight was divided out
+by hand (#22 put the corrected week-1 figure at 4.29 / −1.17; week 2 came in
+better than that). Skill over naive went from inside the noise to +0.65 on 354
+player-weeks, against a backtest average margin of ~0.05 — one week, so read it
+as "not broken", not as the new number. Band coverage 70% is the usual ~72%.
+
+**QB is still the position that loses to naive**: 7.599 MAE against 6.915 over
+70 player-weeks, bias −4.18, band coverage 0.529. Third independent look at the
+same thing (#22, the week 2 dry run, now this): the level is too low and the
+ordering is fine. Everything else beats naive — RB +0.71, TE +0.64, WR +0.55.
+
+Nothing was tuned on this. It is the record, and the QB gap is the next thing
+worth a real experiment rather than a fix.
