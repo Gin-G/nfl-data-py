@@ -51,6 +51,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 22 | LIVE: 2026 week 1 published board vs actuals (first prospective week) | 4.502 pub / 4.291 cond | ρ 0.690 | naive 4.739; pub ties it, cond −0.25 | **measurement** — availability discount leaked into a weekly board |
 | 23 | In-season path, first real run: season auto-detect + depth snapshots + injury/rookie fixes | — | — | week 2 dry run: 5 bugs found, 603-row board | **KEPT** — correctness; the weekly loop now sees the new season |
 | 24 | LIVE: weeks 1-2 scored prospectively, first weeks on the fixed path | wk2 3.870 | ρ 0.62 | wk1 4.485 → wk2 3.870; skill +0.07 → +0.65 | **measurement** — the in-season fixes hold up out of sample |
+| 25 | LIVE: four weeks scored; and does correcting the level help? | wk2-4 3.942 | ρ 0.680 | skill +0.312 over naive; level correction +0.09/+0.13 MAE | **measurement + REJECTED** — the negative bias is the skew, not an error |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -1461,3 +1462,59 @@ ordering is fine. Everything else beats naive — RB +0.71, TE +0.64, WR +0.55.
 
 Nothing was tuned on this. It is the record, and the QB gap is the next thing
 worth a real experiment rather than a fix.
+
+## Four weeks in, and the bias that should not be corrected (2026-10-05)
+
+Weeks 1-3 are frozen in `projection_accuracy`; week 4 is scored here with
+`experiments/live_week_accuracy.py` (Sunday games only, before the Monday
+nighter), same rules as the scorer.
+
+| week | n | MAE | bias | naive | skill | band |
+|---|---|---|---|---|---|---|
+| 1 (preseason path) | 302 | 4.485 | −2.44 | 4.804 | +0.07 | 63% |
+| 2 | 354 | 3.870 | −0.71 | 4.627 | +0.65 | 70% |
+| 3 | 351 | 4.037 | −1.55 | 4.181 | +0.15 | 70% |
+| 4 (partial) | 328 | 3.917 | −1.68 | 4.061 | +0.14 | 73% |
+| **weeks 2-4 pooled** | **1033** | **3.942** | −1.30 | 4.293 | **+0.312** | 71% |
+
+Pooled Spearman 0.680. Every position now beats naive on the fixed path: QB
++0.57, RB +0.44, WR +0.27, TE +0.13. **That reverses #24's read on QBs** —
+which was dominated by week 1, where the availability discount hit QBs hardest.
+Ordering is a tie with naive at the top of each position (top-12/24/36 overlap
+19/19, 46/45, 51/51, 16/14 across three weeks), so the win is level, not sort.
+
+**The board runs about 1.3 points low, and that is correct.** First question was
+whether it is the population: the scorer only scores players who played, and if
+the ones who sit are the low projections, conditioning on "played" selects
+upward. It is not that. The miss holds at every projected level — −1.33 under 2
+points, −1.83 in the 6-8 band, −1.02 above 12 where 93% play — and holds at
+−1.51 among the 247 players who appeared in all three weeks.
+
+So I fit the correction and tested it the only way worth testing: per-position
+offset and scale fit on the weeks already played, applied to the NEXT week only.
+
+| target week | MAE | + additive | + scaled | bias → |
+|---|---|---|---|---|
+| 3 (fit on wk 2) | 4.038 | 4.128 (**+0.090**) | 4.097 (+0.059) | −1.55 → −0.83 |
+| 4 (fit on wk 2-3) | 3.917 | 4.051 (**+0.134**) | 4.024 (+0.108) | −1.68 → −0.55 |
+
+**Halves the bias, costs MAE both times — rejected.** The reason is structural
+rather than a tuning failure: MAE is minimised by the conditional MEDIAN, and
+fantasy scoring is right-skewed, so the mean of outcomes sits above the median
+every week. A projection that minimises absolute error is *supposed* to come in
+under the mean. Shifting everything up pays for a handful of big games with a
+small error on the many quiet ones. The naive baseline carries the same sign for
+the same reason (−0.38, −0.62) and is smaller only because it averages actuals.
+
+Per-position bias is also not stable enough to lean on: QB −1.28, −3.28, −2.00
+across weeks 2-4; RB +0.52, −0.44, −1.64. The correction fit on week 2 would
+have pushed RBs DOWN into week 3 (−0.52) and been roughly a no-op into week 4.
+
+**Consequence for anything that needs expected points** (DFS, season totals):
+take it from the simulator, whose mean is anchored but whose shape carries the
+skew, not from shifting the point projection. The point projection is a median
+and should stay one. Nothing to change in the model.
+
+Harnesses: `experiments/live_week_accuracy.py`, plus the two throwaway scripts
+this measured with (bias by projected level, and the next-week-only correction
+fit) — the numbers above are the record.
