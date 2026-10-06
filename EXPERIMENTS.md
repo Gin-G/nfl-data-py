@@ -1529,11 +1529,17 @@ its first four weeks ALONE and project weeks 5-18.
 
 Three windows, identical evaluation rows, model never sees the week it predicts:
 
-| training window | rows | MAE (5 seeds) | MAE (1 seed) | bias |
-|---|---|---:|---:|---:|
-| history only, 2020-2024 | 152,185 | **4.120** | 4.094 | −0.24 |
-| history + current (production today) | 156,594 | 4.125 | 4.148 | −0.27 |
-| current season only, 2025 wk1-4 | 4,409 | 4.217 | 4.159 | +0.11 |
+| training window | rows supplied | rows TRAINED on | MAE (5 seeds) | MAE (1 seed) | bias |
+|---|---:|---:|---:|---:|---:|
+| history only, 2020-2024 | 152,185 | 91,810 | **4.120** | 4.094 | −0.24 |
+| history + current (production today) | 156,594 | 94,628 | 4.125 | 4.148 | −0.27 |
+| current season only, 2025 wk1-4 | 4,409 | 2,619 | 4.217 | 4.159 | +0.11 |
+
+*(Corrected 2026-10-05: this table first reported only the supplied counts as
+though they were the training set. `train_ensemble` then drops seasons before
+`min_season`, the AVG rows and low-activity players, so the figures the networks
+actually saw are the second column — a ~35x gap between the widest and narrowest
+window, not the ~34x the first column implies. No measurement changes.)*
 
 **Rejected: +0.097 against history-only at production's five seeds** — twice the
 measured gain of the seed ensemble itself (#0, 0.04), and it would be paid every
