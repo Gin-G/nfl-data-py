@@ -52,6 +52,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 23 | In-season path, first real run: season auto-detect + depth snapshots + injury/rookie fixes | — | — | week 2 dry run: 5 bugs found, 603-row board | **KEPT** — correctness; the weekly loop now sees the new season |
 | 24 | LIVE: weeks 1-2 scored prospectively, first weeks on the fixed path | wk2 3.870 | ρ 0.62 | wk1 4.485 → wk2 3.870; skill +0.07 → +0.65 | **measurement** — the in-season fixes hold up out of sample |
 | 25 | LIVE: four weeks scored; and does correcting the level help? | wk2-4 3.942 | ρ 0.680 | skill +0.312 over naive; level correction +0.09/+0.13 MAE | **measurement + REJECTED** — the negative bias is the skew, not an error |
+| 26 | Train on the CURRENT SEASON ONLY (the four weeks in hand) | 4.217 (5 seeds) | ρ ~unchanged | +0.097 vs history-only; +0.068 retrained weekly, 12/14 weeks lost | **REJECTED** — the season's signal is in the FEATURES, not the training rows |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -1518,3 +1519,66 @@ and should stay one. Nothing to change in the model.
 Harnesses: `experiments/live_week_accuracy.py`, plus the two throwaway scripts
 this measured with (bias by projected level, and the next-week-only correction
 fit) — the numbers above are the record.
+
+## Training on the current season alone (2026-10-05)
+
+The proposal, at week 5 of 2026: train only on this season. Four weeks is the
+most relevant football there is, and everything the old seasons taught is
+already baked into it. Testable without waiting — 2025 is finished, so train on
+its first four weeks ALONE and project weeks 5-18.
+
+Three windows, identical evaluation rows, model never sees the week it predicts:
+
+| training window | rows | MAE (5 seeds) | MAE (1 seed) | bias |
+|---|---|---:|---:|---:|
+| history only, 2020-2024 | 152,185 | **4.120** | 4.094 | −0.24 |
+| history + current (production today) | 156,594 | 4.125 | 4.148 | −0.27 |
+| current season only, 2025 wk1-4 | 4,409 | 4.217 | 4.159 | +0.11 |
+
+**Rejected: +0.097 against history-only at production's five seeds** — twice the
+measured gain of the seed ensemble itself (#0, 0.04), and it would be paid every
+week of the season. Note the single-seed column UNDERSTATED the gap (+0.066),
+which is the noise floor doing exactly what it is documented to do; the 2024
+replication (single seed) read +0.023. One seed cannot settle a 0.1 question.
+
+**Retrained weekly, as the idea would actually run**, the answer does not
+change. `experiments/train_window_expanding.py` retrains for each target week on
+that season's prior weeks only, so week 12 gets eleven weeks rather than four:
+
+| | current-only | fully trained | delta |
+|---|---|---|---|
+| weeks 5-10 | 4.283 | 4.198 | +0.086 |
+| weeks 11-18 | 4.077 | 4.022 | +0.055 |
+| pooled, 4,554 player-weeks | 4.161 | 4.094 | **+0.068** |
+
+It won 2 of 14 weeks. The gap narrows as rows accumulate — +0.16 in week 5,
++0.04 by week 18 with 17,556 rows — and never closes, because 17k rows is still
+a tenth of 150k and the mapping being learned is not season-specific.
+
+**Why the intuition does not pay, and what it got right.** The current season
+reaches a projection TWICE: through training rows, and through the player's own
+rolling last-3/last-5 form, which in week 5 is entirely current-season football
+whatever the training window. The features carry the recency; the training set
+only estimates the stable mapping from form to next week. Which is why the third
+arm matters most here: adding the four weeks to 150k historical rows moved
+nothing (+0.005, a wash). The current season's rows are neither the problem nor
+the lever.
+
+The part the proposal gets right is operational: 4k rows trains in seconds
+against most of an hour, so a current-season-only weekly run would be ~5 minutes
+rather than ~42. That is a real saving and it buys a 0.1 MAE regression — and
+the model cache (NFL-API) already makes the second and later runs of a week
+cheap, so the saving is mostly gone anyway.
+
+**Untested middle ground**, and the natural next probe: keep the history but
+shorten or down-weight it — `config.TRAINING_MIN_SEASON` is already the knob
+(2020 today), and sample weighting by season is a small change. "Recent football
+matters more" is a different claim from "only recent football", and this
+experiment does not speak to it.
+
+Harnesses: `experiments/train_window.py` (one training window per arm),
+`experiments/train_window_expanding.py` (weekly retrain). CAVEAT found while
+scoring: the evaluation frame holds ~1.25 rows per player-week — the dataset's
+depth-chart merge duplicates some rows — so n is inflated. Every arm shares the
+same rows, so the deltas stand; absolute MAE here is comparable with other
+entries, which share the flaw.
