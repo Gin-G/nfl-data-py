@@ -53,6 +53,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 24 | LIVE: weeks 1-2 scored prospectively, first weeks on the fixed path | wk2 3.870 | ρ 0.62 | wk1 4.485 → wk2 3.870; skill +0.07 → +0.65 | **measurement** — the in-season fixes hold up out of sample |
 | 25 | LIVE: four weeks scored; and does correcting the level help? | wk2-4 3.942 | ρ 0.680 | skill +0.312 over naive; level correction +0.09/+0.13 MAE | **measurement + REJECTED** — the negative bias is the skew, not an error |
 | 26 | Train on the CURRENT SEASON ONLY (the four weeks in hand) | 4.217 (5 seeds) | ρ ~unchanged | +0.097 vs history-only; +0.068 retrained weekly, 12/14 weeks lost | **REJECTED** — the season's signal is in the FEATURES, not the training rows |
+| 27 | How deep should history go? min_season 1 vs 2 vs 3 vs 6 prior seasons | 4.110-4.126 | ρ ~unchanged | whole spread 0.016 — a tie | **measurement** — depth past one prior season buys nothing, and costs nothing |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -1588,3 +1589,48 @@ scoring: the evaluation frame holds ~1.25 rows per player-week — the dataset's
 depth-chart merge duplicates some rows — so n is inflated. Every arm shares the
 same rows, so the deltas stand; absolute MAE here is comparable with other
 entries, which share the flaw.
+
+## How far back should training reach (2026-10-05)
+
+#26's untested middle ground: "recent football matters more" rather than "only
+recent football". `config.TRAINING_MIN_SEASON` is the dial, 2020 today. Same
+harness and discipline — identical evaluation rows, five seeds, each arm trained
+on its prior seasons PLUS the test season's first four weeks, exactly the shape
+production uses. Tested on 2025, so the windows read one year back; the
+min_season a 2026 run would set is in the second column.
+
+| history kept | 2026 equivalent | rows supplied | MAE | bias | vs best |
+|---|---|---:|---:|---:|---:|
+| 1 prior season | min_season **2025** | 26,826 | **4.110** | −0.25 | — |
+| 3 prior seasons | min_season 2023 | 71,230 | 4.119 | −0.22 | +0.009 |
+| 6 prior seasons | min_season 2020 (today) | 135,617 | 4.123 | −0.17 | +0.013 |
+| 2 prior seasons | min_season 2024 | 48,845 | 4.126 | −0.22 | +0.016 |
+
+**The entire spread is 0.016 MAE — a tie four ways.** The ordering is
+non-monotonic (1, then 3, then 6, then 2), which is what noise looks like; a
+real trend in either direction would not jump about. Spearman is flat too (QB
+0.937-0.943, RB 0.971-0.973, WR 0.966-0.968, TE 0.960-0.961), so the ordering
+does not care either.
+
+Read together with #26, the picture is specific rather than vague: 2,619 training
+rows (four weeks) is genuinely too thin, at +0.097. Somewhere under 20,000 that
+cost disappears, and from one prior season onward more history is neither help
+nor harm. The mapping from form to next week is apparently stable enough that
+2019 football teaches it as well as 2024 football, and shallow enough that one
+season's worth of examples pins it down.
+
+**Where the win actually is: training cost.** One prior season supplies 26,826
+rows against 135,617, so a five-seed run trains in roughly a fifth of the time —
+the weekly job's ~35 minutes of training becomes ~7. That is the same saving
+#26's proposal chased, at none of its accuracy cost, which makes
+`TRAINING_MIN_SEASON = CURRENT_SEASON - 1` the version of that idea worth
+shipping.
+
+**Not shipped yet, deliberately.** One test season cannot carry a production
+change on a 0.016 spread; the 2024 replication is running. Two things this does
+not measure and would want checking before it ships: whether a thinner window is
+more seed-sensitive (variance across the five members, not just their mean), and
+what it does to the preseason board, where #20's harness trains on prior seasons
+only and a one-season window would be 18k rows rather than 90k.
+
+Harness: `experiments/history_depth.py` (DEPTHS, TEST_SEASON, SEEDS).
