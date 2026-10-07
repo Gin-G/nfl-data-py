@@ -46,6 +46,11 @@ class ProjectionService:
         quantiles: train a quantile model (floor/median/ceiling) if none loaded
         opponent: train with opponent-defense features
         epochs: training epochs when training here
+        min_season: earliest season to TRAIN on (default
+            config.TRAINING_MIN_SEASON). The dataset is untouched, so the
+            features a projection is built from are unchanged — this moves only
+            how far back the learned mapping is estimated from, which is what
+            makes a shallow-history model comparable with a deep one.
         n_seeds: networks in the mean-model seed ensemble when training here
             (default 5 — measured ~0.04 MAE better than a typical single seed
             and immune to the seed lottery). Costs n_seeds x the training time;
@@ -57,7 +62,7 @@ class ProjectionService:
 
     def __init__(self, dataset=None, data_path=config.DATASET_PATH, model_dir=None,
                  quantile_model_dir=None, quantiles=False, opponent=False, epochs=100,
-                 n_seeds=None, blend_form=True):
+                 n_seeds=None, blend_form=True, min_season=config.TRAINING_MIN_SEASON):
         from . import dataset as dataset_mod
         from . import model as model_mod
 
@@ -79,7 +84,7 @@ class ProjectionService:
             # No plot side-effect when used as a library
             n_seeds = model_mod.DEFAULT_N_SEEDS if n_seeds is None else n_seeds
             self.model, _ = model_mod.train_ensemble(
-                self.dataset, n_seeds=n_seeds, epochs=epochs,
+                self.dataset, n_seeds=n_seeds, epochs=epochs, min_season=min_season,
                 matchup_table=matchup, plot_path=None,
             )
 
@@ -92,7 +97,7 @@ class ProjectionService:
             else:
                 self.quantile_model, _ = q_mod.train_quantile_model(
                     self.dataset, epochs=epochs, matchup_table=matchup,
-                    n_seeds=n_seeds,
+                    n_seeds=n_seeds, min_season=min_season,
                 )
 
     def _projector(self, season, week, use_injuries=True, injury_source="nflverse",
