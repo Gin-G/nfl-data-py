@@ -54,6 +54,7 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 | 25 | LIVE: four weeks scored; and does correcting the level help? | wk2-4 3.942 | ρ 0.680 | skill +0.312 over naive; level correction +0.09/+0.13 MAE | **measurement + REJECTED** — the negative bias is the skew, not an error |
 | 26 | Train on the CURRENT SEASON ONLY (the four weeks in hand) | 4.217 (5 seeds) | ρ ~unchanged | +0.097 vs history-only; +0.068 retrained weekly, 12/14 weeks lost | **REJECTED** — the season's signal is in the FEATURES, not the training rows |
 | 27 | How deep should history go? min_season 1 vs 2 vs 3 vs 6 prior seasons | 4.110-4.126 | ρ ~unchanged | whole spread 0.016 — a tie | **measurement** — depth past one prior season buys nothing, and costs nothing |
+| 28 | History depth RETRAINED WEEKLY (what #27 could not ask) | 4.0355 vs 4.0338 | — | pooled delta +0.002; weekly deltas swing ±0.07 | **measurement** — a tie, and the week-to-week swings are the real finding |
 
 **Notes**
 - #4/#5: matchup info doesn't help the single-game *mean* projection — the
@@ -1634,3 +1635,63 @@ what it does to the preseason board, where #20's harness trains on prior seasons
 only and a one-season window would be 18k rows rather than 90k.
 
 Harness: `experiments/history_depth.py` (DEPTHS, TEST_SEASON, SEEDS).
+
+## History depth, retrained every week (2026-10-07)
+
+#27 compared training windows by training ONCE on prior seasons plus weeks 1-4
+and projecting weeks 5-18. Fine for "which window is better for week 5", useless
+for week 12: no arm had weeks 5-11 in training either, while production retrains
+every Tuesday. The owner caught it. This retrains each arm at each target week on
+everything played before it, so the only difference left is how far back history
+reaches.
+
+2025, one prior season (the 2026 equivalent of min_season 2025) against six
+(min_season 2020), three seeds, identical player-weeks per checkpoint:
+
+| week | current-season rows | 1 prior season | 6 prior seasons | delta |
+|---|---:|---:|---:|---:|
+| 5 | 4,409 | 4.133 | 4.071 | **+0.062** |
+| 9 | 8,324 | 4.102 | 4.087 | +0.014 |
+| 13 | 12,256 | 3.807 | 3.874 | **−0.067** |
+| 17 | 16,488 | 4.118 | 4.112 | +0.006 |
+| **pooled** (1,317 player-weeks) | | **4.0355** | **4.0338** | **+0.002** |
+
+**A tie, and the swing is the point.** Pooled, the two windows are 0.002 apart —
+nothing. Week to week the delta moves across a 0.13 range and changes sign three
+times. Any single week would "prove" whichever answer that week happened to
+favour, which is exactly why a weekly MAE readout is not evidence about a
+training window.
+
+There is a shape under the noise, weak but consistent with #26: the shallow
+window trails early (+0.038 over weeks 5 and 9) and leads late (−0.030 over 13
+and 17), as current-season rows accumulate from 4k to 16k. Same curve the
+current-season-only arm traced, just shallower, because one prior season already
+supplies enough examples that the current season's volume barely matters.
+
+**What this does NOT say.** It compares one prior season + current against six +
+current. It does not test the current season ALONE — that is #26 (+0.097 single
+train; +0.068 pooled when retrained weekly, winning 2 of 14 weeks).
+
+### Decision, 2026-10-07: the live model trains on the current season alone
+
+The owner's call, taken with these numbers in hand rather than against them:
+from week 6 of 2026 the weekly board trains on 2026 only, on the reasoning that
+a board for this season should describe this season, that weekly ebbs and flows
+make any single week's comparison unreliable, and that older football is a
+stand-in for current-season data rather than a substitute for it.
+
+Recorded here with its measured price — **~0.07-0.10 MAE**, by the two
+experiments that tested that window — because a ledger that only keeps the
+decisions the numbers made is not much of a ledger. The preseason board keeps
+the historical window: with no current-season football there is nothing to train
+on, which is the same reasoning read the other way.
+
+**The trade is now measured rather than argued.** NFL-API's weekly job trains the
+historical window as a SHADOW model, projects the same week with it, and
+`GET /projections/shadow/accuracy` grades both against the frozen actuals on
+identical player-weeks. Prospective, one population, no hindsight — the standard
+the board is already held to (#22, #24, #25). Expect a verdict around week 11-12
+of 2026: the margin at stake is the size of a week's noise, so it takes several.
+
+Harness: `experiments/history_depth_weekly.py` (DEPTHS, WEEKS, SEEDS,
+TEST_SEASON — runs on 2026 as weeks accrue).
