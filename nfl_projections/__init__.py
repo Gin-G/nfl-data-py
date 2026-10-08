@@ -29,13 +29,6 @@ Command line:
     python -m nfl_projections backtest --season 2025 --weeks 1-17
 """
 
-from .service import (
-    ProjectionService,
-    optimize_week,
-    project_week,
-    results_to_frame,
-)
-
 __version__ = "1.5.0"
 
 __all__ = [
@@ -44,3 +37,26 @@ __all__ = [
     "optimize_week",
     "results_to_frame",
 ]
+
+# The service names are resolved on first use rather than at import, because
+# importing them pulls in TensorFlow (service -> predict -> model). Anything
+# that only wants a pandas-level module — `from nfl_projections import
+# optimizer` to build a FanDuel lineup, say — should not pay for a 500 MB
+# dependency it never calls. NFL-API's web image installs this package without
+# TensorFlow for exactly that reason.
+#
+# `from nfl_projections import ProjectionService` still works: Python falls back
+# to this module __getattr__ (PEP 562) when the name is not already bound.
+_SERVICE_EXPORTS = frozenset(__all__)
+
+
+def __getattr__(name):
+    if name in _SERVICE_EXPORTS:
+        from . import service
+
+        return getattr(service, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | _SERVICE_EXPORTS)
