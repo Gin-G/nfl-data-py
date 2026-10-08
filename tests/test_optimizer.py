@@ -84,3 +84,47 @@ class TestOptimizeObjective:
         )
         defense = lineups[0][lineups[0]["Roster Position"] == "DEF"].iloc[0]
         assert defense["lineup_points"] == defense["FPPG"] == 8
+
+
+class TestEligibility:
+    """FanDuel's export has used bare positions ("RB") and flex-qualified ones
+    ("RB/FLEX"). Matching one exactly built ZERO lineups from the other, with
+    nothing in the response to say why — hit live on a real Thu-Mon slate."""
+
+    def test_bare_positions(self):
+        assert optimizer.eligible_slots("RB") == {"RB/FLEX", "FLEX"}
+        assert optimizer.eligible_slots("WR") == {"WR/FLEX", "FLEX"}
+        assert optimizer.eligible_slots("TE") == {"TE/FLEX", "FLEX"}
+        assert optimizer.eligible_slots("QB") == {"QB"}
+
+    def test_flex_qualified_positions(self):
+        assert optimizer.eligible_slots("RB/FLEX") == {"RB/FLEX", "FLEX"}
+        assert optimizer.eligible_slots("TE/FLEX") == {"TE/FLEX", "FLEX"}
+
+    def test_the_many_spellings_of_a_defense(self):
+        for spelling in ("D", "DEF", "DST", "D/ST"):
+            assert optimizer.eligible_slots(spelling) == {"DEF"}, spelling
+
+    def test_kickers_fill_nothing(self):
+        assert optimizer.eligible_slots("K") == set()
+
+    def test_falls_back_to_the_position_column(self):
+        # Some exports put something unhelpful in Roster Position.
+        assert optimizer.eligible_slots("", "RB") == {"RB/FLEX", "FLEX"}
+        assert optimizer.eligible_slots(None, "QB") == {"QB"}
+        assert optimizer.eligible_slots(float("nan"), "D") == {"DEF"}
+
+    def test_unknown_values_are_simply_not_eligible(self):
+        assert optimizer.eligible_slots("LS", "LS") == set()
+
+    def test_slot_counts_explain_an_impossible_slate(self):
+        import pandas as pd
+
+        frame = pd.DataFrame({
+            "Roster Position": ["QB", "RB", "RB", "WR", "WR", "WR", "D"],
+            "Position": ["QB", "RB", "RB", "WR", "WR", "WR", "D"],
+        })
+        counts = optimizer.slot_counts(frame)
+        assert counts["QB"] == 1 and counts["RB/FLEX"] == 2 and counts["DEF"] == 1
+        assert counts["TE/FLEX"] == 0        # the slate has no tight end
+        assert counts["FLEX"] == 5

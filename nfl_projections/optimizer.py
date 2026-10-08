@@ -20,6 +20,59 @@ ROSTER_SLOTS = {
     "FLEX": 1,
 }
 FLEX_ELIGIBLE = ["RB/FLEX", "WR/FLEX", "TE/FLEX"]
+
+# Which roster slots each position can fill. FanDuel's export has used two
+# conventions for "Roster Position" over the years — bare positions ("RB") and
+# flex-qualified ones ("RB/FLEX") — and matching one of them exactly produces NO
+# lineups at all when the file uses the other, with nothing to say why. So both
+# are parsed, and `Position` is the fallback when the roster column is unhelpful.
+_POSITION_SLOTS = {
+    "QB": ("QB",),
+    "RB": ("RB/FLEX", "FLEX"),
+    "FB": ("RB/FLEX", "FLEX"),
+    "WR": ("WR/FLEX", "FLEX"),
+    "TE": ("TE/FLEX", "FLEX"),
+    "D": ("DEF",),
+    "DEF": ("DEF",),
+    "DST": ("DEF",),
+    "D/ST": ("DEF",),
+    "K": (),            # FanDuel's NFL roster has no kicker
+}
+
+
+def eligible_slots(roster_position, position=None) -> frozenset:
+    """The roster slots a player can fill, from either CSV convention."""
+    tokens = []
+    for raw in (roster_position, position):
+        if raw is None or raw != raw:        # None / NaN
+            continue
+        tokens = [t.strip().upper() for t in str(raw).split("/") if t.strip()]
+        # "RB/FLEX" splits to RB + FLEX; "D/ST" is one position, not a flex.
+        if str(raw).strip().upper() == "D/ST":
+            tokens = ["D/ST"]
+        if any(t in _POSITION_SLOTS for t in tokens):
+            break
+    slots = set()
+    for token in tokens:
+        slots.update(_POSITION_SLOTS.get(token, ()))
+    return frozenset(slots)
+
+
+def add_eligibility(df):
+    """Add a `_slots` column of roster slots each row can fill (in place)."""
+    df["_slots"] = [
+        eligible_slots(rp, pos)
+        for rp, pos in zip(df.get("Roster Position", pd.Series(index=df.index, dtype=object)),
+                           df.get("Position", pd.Series(index=df.index, dtype=object)))
+    ]
+    return df
+
+
+def slot_counts(df) -> dict:
+    """How many rows can fill each slot — what to report when no lineup fits."""
+    frame = df if "_slots" in df.columns else add_eligibility(df.copy())
+    return {slot: int(sum(slot in s for s in frame["_slots"]))
+            for slot in list(ROSTER_SLOTS) + ["FLEX"] if slot != "FLEX" or True}
 EXCLUDED_INJURY_STATUSES = ["IR", "O", "D"]
 
 # Which projection column drives lineup value. "mean" is the expected-points
@@ -67,7 +120,7 @@ def merge_fanduel_salaries(fanduel_df, predictions_df):
 
 
 def _get_top_n_by_position(df, position, n=5):
-    return df[df["Roster Position"] == position].nlargest(n, "lineup_points")
+    return df[[position in s for s in df["_slots"]]].nlargest(n, "lineup_points")
 
 
 def _is_lineup_unique(new_lineup, existing_lineups):
@@ -126,9 +179,9 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
     # always falls back to FanDuel's FPPG.
     proj_col = _objective_column(df, objective)
     df["lineup_points"] = df[proj_col].fillna(df["fanduel_fantasy_points"]).fillna(0)
-    df.loc[df["Roster Position"] == "DEF", "lineup_points"] = df.loc[
-        df["Roster Position"] == "DEF", "FPPG"
-    ]
+    add_eligibility(df)
+    is_defense = [("DEF" in s) for s in df["_slots"]]
+    df.loc[is_defense, "lineup_points"] = df.loc[is_defense, "FPPG"]
 
     strategies = [("QB", 5), ("RB/FLEX", 5), ("WR/FLEX", 5), ("TE/FLEX", 5)]
     all_lineups = []
@@ -151,17 +204,19 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
             lineup = [focus_player]
             remaining_salary = salary_cap - focus_player["Salary"]
             positions_needed = dict(roster_slots)
-            positions_needed[focus_player["Roster Position"]] -= 1
+            # Spend the focus player on his own position's slot, never the FLEX:
+            # the FLEX is what the remaining positions compete for.
+            focus_slot = next((s for s in focus_player["_slots"] if s != "FLEX"), None)
+            if focus_slot not in positions_needed:
+                continue
+            positions_needed[focus_slot] -= 1
 
             lineup_complete = True
             for position in roster_slots:
-                if position == focus_player["Roster Position"]:
+                if position == focus_slot:
                     continue
 
-                if position == "FLEX":
-                    available = current_df[current_df["Roster Position"].isin(FLEX_ELIGIBLE)]
-                else:
-                    available = current_df[current_df["Roster Position"] == position]
+                available = current_df[[position in s for s in current_df["_slots"]]]
 
                 available = available.copy()
                 available["value"] = available["lineup_points"] / available["Salary"]
