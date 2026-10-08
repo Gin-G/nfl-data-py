@@ -281,3 +281,155 @@ def display_lineups(lineups):
 
     print("\nTop 20 most used players:")
     print(calculate_player_usage(lineups).head(20))
+
+
+# ── Showdown (single game) ────────────────────────────────────────────────────
+#
+# A different contest, not a variant of the classic one: five players from ONE
+# game, with one named MVP who scores 1.5x and costs 1.5x. FanDuel's export says
+# so in two places — every row's Roster Position reads "MVP - 1.5X
+# Points/AnyFLEX", and there is an extra "MVP 1.5x Salary" column — and no
+# classic slot appears anywhere in the file, which is why running it through the
+# classic optimizer yields nothing at all.
+SHOWDOWN_ROSTER_SIZE = 5
+MVP_MULTIPLIER = 1.5
+MVP_SALARY_COLUMN = "MVP 1.5x Salary"
+
+
+def is_showdown(df) -> bool:
+    """Whether a FanDuel export is a single-game Showdown slate."""
+    if MVP_SALARY_COLUMN in df.columns:
+        return True
+    if "Roster Position" not in df.columns:
+        return False
+    values = df["Roster Position"].dropna().astype(str).str.upper()
+    return bool(len(values)) and values.str.contains("MVP|ANYFLEX").all()
+
+
+def _best_under_cap(pool, k, cap, salary_step=100, position_limits=None):
+    """Indices of exactly ``k`` rows maximising ``lineup_points`` with salaries
+    summing to no more than ``cap`` — a cardinality-constrained knapsack, solved
+    exactly.
+
+    Filling by points-per-dollar instead leaves money on the table: on a real
+    Showdown pool it spent $38k of a $60k cap and rostered both kickers, because
+    cheap-and-efficient beats expensive-and-better on that measure every time. A
+    lineup is scored on points, not on value, so the cap should be spent.
+
+    Salaries are bucketed to ``salary_step`` to keep the table small; FanDuel
+    prices in hundreds, so nothing is lost.
+
+    ``position_limits`` ({"K": 1} and so on) caps how many of a position may
+    appear. It is enforced by solving, then dropping the weakest offender and
+    solving again — near-exact rather than exact, which is the right trade for
+    a rule that exists to stop a lineup rostering two kickers because FanDuel's
+    season-average FPPG makes both look efficient.
+    """
+    limits = position_limits or {}
+    pool = pool.copy()
+    if k <= 0:
+        return None
+    budget = int(cap // salary_step)
+    dropped: set = set()
+
+    while True:
+        rows = [(idx, int(row["Salary"] // salary_step), float(row["lineup_points"]))
+                for idx, row in pool.iterrows()
+                if idx not in dropped and row["Salary"] == row["Salary"]
+                and row["Salary"] <= cap]
+        if len(rows) < k:
+            return None
+
+        # best[c][s] = (points, picks) for exactly c players costing s buckets
+        best = [dict() for _ in range(k + 1)]
+        best[0][0] = (0.0, ())
+        for idx, cost, points in rows:
+            for count in range(k - 1, -1, -1):
+                for spent, (total, picks) in list(best[count].items()):
+                    new_spent = spent + cost
+                    if new_spent > budget:
+                        continue
+                    current = best[count + 1].get(new_spent)
+                    if current is None or total + points > current[0]:
+                        best[count + 1][new_spent] = (total + points, picks + (idx,))
+        if not best[k]:
+            return None
+        picks = max(best[k].values(), key=lambda v: v[0])[1]
+        if not limits:
+            return picks
+
+        over = None
+        for position, limit in limits.items():
+            same = [i for i in picks
+                    if str(pool.loc[i].get("Position", "")).upper() == position.upper()]
+            if len(same) > limit:
+                over = min(same, key=lambda i: pool.loc[i]["lineup_points"])
+                break
+        if over is None:
+            return picks
+        dropped.add(over)
+
+
+def optimize_showdown(df, num_lineups=5, salary_cap=60000, exclude_players=None,
+                      max_usage_percentage=50, objective="mean",
+                      roster_size=SHOWDOWN_ROSTER_SIZE, position_limits=None):
+    """Build Showdown lineups: one MVP at 1.5x points and 1.5x salary, plus
+    ``roster_size - 1`` others from the same game.
+
+    Kickers and defenses are eligible here, unlike the classic slate, and both
+    appear in a real Showdown pool. Neither is projected by the model, so both
+    fall back to FanDuel's FPPG the same way classic defenses do — which also
+    makes them look cheap and reliable, so ``position_limits`` (e.g. {"K": 1})
+    is how a caller stops a lineup taking both kickers in a game.
+
+    Each MVP candidate is tried in turn and the rest of the lineup filled by
+    points per dollar — the same greedy shape as the classic optimizer, which
+    keeps the two reading alike.
+    """
+    df = df.copy()
+    df["Injury Indicator"] = df.get(
+        "Injury Indicator", pd.Series("", index=df.index)).fillna("")
+    df = df[~df["Injury Indicator"].str.upper().isin(EXCLUDED_INJURY_STATUSES)]
+    df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=["Salary", "FPPG", "Nickname"])
+    if exclude_players:
+        df = df[~df["Nickname"].isin(set(exclude_players))]
+    if df.empty:
+        return []
+
+    proj_col = _objective_column(df, objective)
+    df["lineup_points"] = df[proj_col].fillna(df["fanduel_fantasy_points"]).fillna(df["FPPG"])
+    # Positions the model never projects — kickers and defenses — keep FanDuel's.
+    unprojected = df["fanduel_fantasy_points"].isna()
+    df.loc[unprojected, "lineup_points"] = df.loc[unprojected, "FPPG"]
+    df["mvp_salary"] = (df[MVP_SALARY_COLUMN] if MVP_SALARY_COLUMN in df.columns
+                        else df["Salary"] * MVP_MULTIPLIER)
+
+    lineups = []
+    # Best MVP candidates first: the 1.5x applies to their points, so the
+    # ordering that matters is points, not value.
+    for _, mvp in df.sort_values("lineup_points", ascending=False).iterrows():
+        if len(lineups) >= num_lineups:
+            break
+        if not _check_usage_limit(mvp["Nickname"], lineups, num_lineups, max_usage_percentage):
+            continue
+        remaining = salary_cap - mvp["mvp_salary"]
+        if remaining < 0:
+            continue
+
+        pool = df[df["Nickname"] != mvp["Nickname"]]
+        pool = pool[[_check_usage_limit(n, lineups, num_lineups, max_usage_percentage)
+                     for n in pool["Nickname"]]]
+        best = _best_under_cap(pool, roster_size - 1, remaining,
+                               position_limits=position_limits)
+        if best is None:
+            continue
+        picked = [mvp] + [pool.loc[i] for i in best]
+        lineup = pd.DataFrame(picked)
+        # MVP first, and his row carries the 1.5x on both sides.
+        lineup.loc[lineup.index[0], "lineup_points"] = mvp["lineup_points"] * MVP_MULTIPLIER
+        lineup.loc[lineup.index[0], "Salary"] = mvp["mvp_salary"]
+        lineup["Roster Position"] = ["MVP"] + ["FLEX"] * (len(lineup) - 1)
+        if _is_lineup_unique(lineup, lineups):
+            lineups.append(lineup)
+
+    return lineups
