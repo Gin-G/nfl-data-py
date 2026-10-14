@@ -29,7 +29,7 @@ Command line:
     python -m nfl_projections backtest --season 2025 --weeks 1-17
 """
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 
 __all__ = [
     "ProjectionService",
