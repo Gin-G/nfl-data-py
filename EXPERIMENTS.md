@@ -1939,3 +1939,90 @@ working in full PPR, and this implementation reproduces them.
 Harnesses are the module itself (`scarcity.baselines()`), plus
 `tests/test_scarcity.py` for the invariants that matter — replacement below the
 last starter, positional ordering, composition summing to the cut.
+
+---
+
+## Blocking scheme: the most stable trait in this file, and it predicts nothing (2026-10-14)
+
+The coaching breakdowns that prompted the trench work classify all 32 teams by
+blocking scheme — outside zone, power gap, split zone — attach the label to the
+offensive line coach, and update it when a team switches. nflverse has no scheme
+field, but it charts where every carry went (`run_location` left/middle/right,
+`run_gap` guard/tackle/end), and zone and gap schemes distribute carries
+differently by construction: zone attacks the edge, gap concentrates between the
+tackles behind pulling blockers. So the direction profile is a proxy for the
+label. 102,036 charted non-QB carries, 2018-25. Harness:
+`experiments/blocking_scheme.py`.
+
+League-average mix: 27.0% middle, 26.0% guard, 23.8% tackle, 23.2% end.
+
+### The profile is the most persistent trait measured anywhere here
+
+| metric | split-half r | year-over-year r |
+|---|---|---|
+| interior share (guard + middle) | **0.702** | 0.622 |
+| middle share | 0.638 | **0.716** |
+| outside share (either end) | 0.649 | 0.506 |
+| tackle share | 0.565 | 0.632 |
+| left/right balance | 0.194 | 0.143 |
+
+**Year over year this beats everything else in the file.** For comparison: team
+success rate allowed 0.618 split-half, offensive line grades 0.25-0.42
+year-over-year, team offensive SRS 0.489. A team's run-direction identity
+survives roster turnover and coaching changes better than its ability to block
+does, which is exactly what you would expect if it is a scheme and not a
+performance.
+
+**Left/right balance is not a trait** (0.194 / 0.143). Teams do not
+persistently favour one side. That is the second independent death of the
+"they cannot block the left side" idea — the first was gap-level rating
+stability collapsing to 0.09 in the entry above.
+
+### And it tells you nothing about the backfield
+
+The question worth asking, given that every result here says projections move on
+opportunity and not efficiency: do zone teams ride one back while gap teams
+rotate? Leave-one-season-out, 224 team-season pairs, predicting next season's
+lead-back carry share and the Herfindahl concentration of the backfield.
+
+| predictor | next lead share (MAE) | next backfield HHI (MAE) |
+|---|---|---|
+| **league mean (no skill)** | **0.1211** | 0.1156 |
+| own prior value | 0.1209 | **0.1136** |
+| own + scheme profile | 0.1228 | 0.1152 |
+| scheme profile alone | 0.1240 | 0.1184 |
+
+Adding the profile makes both targets **worse**, and the profile alone is worst
+of all with negative correlation. Same season the association exists and is
+tiny: interior share against backfield concentration is r = 0.142, outside share
+-0.134. Interior-heavy teams concentrate carries very slightly more, and it does
+not survive a year.
+
+**A second finding fell out of the baseline.** A team's backfield concentration
+barely predicts its own next season either — own prior value beats the league
+mean by 0.0002 on lead share (corr 0.104). *Team* backfield structure resets
+year to year even though the scheme does not. That matters for how the share
+model is built: it works at the player level off depth rank and the player's own
+history, and this says the team-level structure was never the thing carrying it.
+
+### Six for six
+
+Defence-vs-position, success-rate-allowed, Next Gen Stats, FTN charting, the
+trenches, and now blocking scheme. **Stability keeps being easy to find and
+incremental signal keeps being absent**, and this is the cleanest instance:
+the single most persistent trait measured in this file predicts nothing it was
+pointed at.
+
+The pattern has a mechanism, stated once more because it has now survived six
+tests. These metrics all describe **how** production happened — which direction,
+which personnel, which coverage, which scheme. A projection needs **how much**:
+carries, targets, and who owns the role when it changes hands. Context is
+descriptive and stable precisely because it is not the causal quantity, and
+stability is not evidence of predictive value. It is often the opposite: the
+most stable things are the ones that have already expressed themselves in the
+numbers a model is fitted on.
+
+**What this does NOT close.** Scheme change attributed to a coaching hire is
+untested and untestable from nflverse, which has no offensive-line-coach field —
+a change in the profile is detectable, its cause is not. And nothing here tested
+scheme against a *back's fit*, only against team-level structure.
