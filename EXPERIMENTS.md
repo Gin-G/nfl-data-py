@@ -1695,3 +1695,120 @@ of 2026: the margin at stake is the size of a week's noise, so it takes several.
 
 Harness: `experiments/history_depth_weekly.py` (DEPTHS, WEEKS, SEEDS,
 TEST_SEASON — runs on 2026 as weeks accrue).
+
+---
+
+## The trench report: line play, rebuilt from public data (2026-10-14)
+
+Hand-charted line play — offensive lines against defensive fronts, receivers
+against coverages — is sold as a subscription product and not obtainable. The
+question here is whether the same three axes can be rebuilt from nflverse and
+whether they survive the bar the rest of this file is held to.
+
+One of the three was already settled. "Coverage matchup" found tight end works
+(MAE 18.67 -> 17.92) and wide receiver is actively worse, because yards allowed
+to WR is diluted across a whole secondary while the thing that would matter —
+which corner travels with him — is not published. **The trenches had never been
+tested here at all**, and they had the better prior: a line is five players
+under contract together rather than a weekly assignment.
+
+### Is a line a trait? Yes, and it is the offence's trait, not the defence's
+
+Split-half within season, 52,884 non-QB carries and 80,753 dropbacks, 2022-25.
+Adjusted line yards is FO's banding — losses 1.2x, 0-4 yards fully, 5-10 half,
+11+ not at all. Harness: `experiments/trench_stability.py`.
+
+| metric | offence r | defence r |
+|---|---|---|
+| pressure rate (sack or hit per dropback) | **0.557** | 0.338 |
+| sack rate per dropback | **0.477** | 0.068 |
+| adjusted line yards | 0.393 | 0.428 |
+| stuff rate | 0.313 | 0.441 |
+| second-level yards (5-10) | 0.425 | 0.314 |
+| open-field yards (11+) | 0.296 | 0.271 |
+
+Year over year the asymmetry widens: offence holds 0.25-0.42, defence collapses
+to 0.11-0.28. **A pass-protection unit is the single most stable offensive trait
+measured in this file**, and a defensive pass rush measured by sacks allowed per
+dropback is not a trait at all (r = 0.068 — a coin flip inside one season).
+
+Every one of these clears defence-vs-position (0.06-0.25) and none reaches
+success-rate-allowed (0.618). And **cutting by gap destroys it again** —
+team x run-location/gap falls to 0.091 for line yards and 0.138 for stuff rate,
+the same collapse personnel and formation produced in September. "They cannot
+block the left side" is not a measurable thing at public resolution; roughly 20
+carries per gap-half is why.
+
+### Does the front move a weekly rushing projection? Yes, barely
+
+The adjusted-defence work closed TE and RB receiving and left rushing open in
+writing, because its factor was built from receiving yards allowed. This is the
+rushing-specific replacement: 2,865 back-games from week 6 on, baseline is the
+back's own trailing five games, treatment multiplies by a shrunk opponent
+factor from weeks strictly before the game. Harness: `experiments/trench_value.py`.
+
+| treatment | MAE | corr | MAE wins |
+|---|---|---|---|
+| baseline (trailing 5) | 24.672 | 0.508 | — |
+| **def adjusted line yards** (k=150) | **24.548** | 0.514 | **4/4** |
+| def yards per carry (k=150) | 24.577 | 0.514 | 3/4 |
+| def stuff rate, inverted (k=150) | 25.118 | 0.503 | 0/4 |
+
+It passes the stated bar — four seasons of four, both error and correlation —
+and it is worth **0.124 yards of MAE on a 24.7 baseline, half a percent**. The
+banding is also nearly redundant: plain yards per carry allowed captures 0.095
+of the 0.124, so the FO weights are buying 0.03 yards. Shippable, in the same
+sense RB receptions was shippable, and not a lever.
+
+### Yards per carry is not projectable, and the trap that looks like it is
+
+Season N to N+1, 111 back-season pairs with 80+ carries in both, leave-one-
+season-out. Every carry splits four ways with no overlap — negative, the first
+four yards, 5-10, 11+ — so their means sum to YPC exactly and the baseline and
+treatment see the same numbers arranged differently.
+Harness: `experiments/trench_decomposition.py`.
+
+| predictor | MAE | corr |
+|---|---|---|
+| **league mean YPC (no skill at all)** | **0.488** | 0.000 |
+| own YPC | 0.507 | 0.007 |
+| own YPC + carries | 0.517 | 0.013 |
+| decomposed, 4 bands | 0.526 | 0.027 |
+| decomposed + own team's line | 0.526 | 0.055 |
+| decomposed + next team's PRIOR-year line | 0.550 | -0.080 |
+| next team's prior-year line alone | 0.521 | -0.313 |
+
+**Nothing beats knowing nothing.** The league mean wins outright; a back's own
+YPC is worse than ignoring him, and taking it apart makes it worse still. Piece
+stability is real but low (open field 0.347, first four yards 0.295, YPC 0.194)
+and none of it converts.
+
+The entry worth keeping is the one that got caught. Regressed on the line he
+*actually* ran behind next season, the model looked transformative — MAE 0.416
+against 0.488, correlation **0.514**, the largest jump anywhere in this file.
+It was circular: a team's line yards are computed from its backs' carries, so
+for a lead back the feature is mostly his own target. Recomputing the identical
+feature with his own carries removed collapses it to **corr 0.022, MAE 0.531**,
+worse than the mean. The prior-year version — the only one a board could
+actually use — predicts *negatively*.
+
+### What this adds up to
+
+That is now five independent tests landing the same way: defence-vs-position,
+success-rate-allowed, Next Gen Stats, FTN charting, and now the trenches.
+Stability is easy to find and incremental signal is absent, and the trenches
+were the strongest version of the hypothesis — the most stable offensive trait
+in the file, and it still does not move a projection.
+
+The reason is the same each time and now has a clean statement. **These metrics
+describe how yards were produced; projections are driven by how many
+opportunities a player gets.** Efficiency reverts to the positional mean
+(#17, #8), so a model that predicts opportunity and applies a mean rate is
+already extracting what is there. The one place the trenches earn a line of
+code is the weekly opponent factor above, which is half a percent.
+
+**What is not closed, and is a different experiment**: pass protection is the
+most stable trait here (0.557) and nothing in this entry tested it against
+anything — it belongs to quarterback projection and to sack/pressure props, not
+to rushing yards. The defence side of it being a coin flip (0.068) is itself a
+finding worth remembering before anyone builds a pass-rush matchup.
