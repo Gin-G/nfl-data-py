@@ -20,6 +20,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .scarcity import USABLE_BAR, usability
 from .scoring import fanduel_points
 
 # efficiency dispersion (SD of per-opportunity yards) — game-to-game realism
@@ -137,10 +138,17 @@ def _simulate_team(exps: list[dict], n_sims: int, rng: np.random.Generator) -> n
 
 
 def simulate(players: pd.DataFrame, n_sims: int = 1000, seed: int | None = None,
-             mean_anchor: str | None = None) -> tuple[pd.DataFrame, np.ndarray]:
+             mean_anchor: str | None = None,
+             bars: dict | None = None) -> tuple[pd.DataFrame, np.ndarray]:
     """Simulate a slate. `players` needs a ``team`` column and the exp_* / ypt/ypc/ypa
     fields (from build_expectations). Returns (summary_df, sims) where sims is
     (n_players, n_sims) aligned to summary_df rows — use it for stack/correlation queries.
+
+    `bars`: optional {position: points} startable bar, from
+    ``scarcity.baselines()["bars"]``. Given it, the summary carries `p_start`,
+    the chance of beating the replacement player at that position — which is a
+    different question from `p_usable`, whose flat bar is generous to
+    quarterbacks and nearly unreachable for tight ends.
 
     `mean_anchor`: optional column of externally-projected means (e.g. the point model's
     projection). When given, each player's simulations are rescaled so their mean matches
@@ -171,6 +179,14 @@ def simulate(players: pd.DataFrame, n_sims: int = 1000, seed: int | None = None,
     summary["median"] = np.percentile(sims, 50, axis=1).round(2)
     summary["ceiling"] = np.percentile(sims, 90, axis=1).round(2)
     summary["p_boom_20"] = (sims >= 20).mean(axis=1).round(3)
+    summary["p_usable"] = usability(sims)["p_usable"]
+    if bars and "position" in summary.columns:
+        bar = summary.position.map(bars).to_numpy(dtype=float)
+        known = ~np.isnan(bar)
+        p_start = np.full(len(summary), np.nan)
+        if known.any():
+            p_start[known] = (sims[known] >= bar[known, None]).mean(axis=1)
+        summary["p_start"] = np.round(p_start, 3)
     return summary, sims
 
 
@@ -180,7 +196,8 @@ _STAT_COLS = ["targets", "carries", "attempts", "receiving_yards", "rushing_yard
 
 
 def project_distributions(proj_frame: pd.DataFrame, history: pd.DataFrame, *, n_sims: int = 1000,
-                          seed: int = 0, trailing: int = 6, anchor_col: str = "fanduel_fantasy_points"):
+                          seed: int = 0, trailing: int = 6, anchor_col: str = "fanduel_fantasy_points",
+                          bars: dict | None = None):
     """Simulator-based distributions for an existing projection frame, anchored to the
     model's mean. For each player, expectations come from their `trailing` most recent
     games in `history`; the simulation is rescaled so its mean matches the model
@@ -188,7 +205,8 @@ def project_distributions(proj_frame: pd.DataFrame, history: pd.DataFrame, *, n_
 
     Returns (summary, sims) covering only players with enough history to simulate
     (rookies / no-history players are omitted — keep their model/prior band). `summary`
-    has player_id/position/team + mean/floor/median/ceiling/p_boom_20.
+    has player_id/position/team + mean/floor/median/ceiling/p_boom_20/p_usable,
+    and p_start when `bars` is given.
     """
     need = [c for c in _STAT_COLS if c in history.columns]
     hist = history.sort_values(["season", "week"]).groupby("player_id")
@@ -211,7 +229,7 @@ def project_distributions(proj_frame: pd.DataFrame, history: pd.DataFrame, *, n_
     if not exps:
         return pd.DataFrame(), np.zeros((0, n_sims))
     pl = pd.DataFrame(exps)
-    return simulate(pl, n_sims=n_sims, seed=seed, mean_anchor="proj")
+    return simulate(pl, n_sims=n_sims, seed=seed, mean_anchor="proj", bars=bars)
 
 
 def stack_distribution(sims: np.ndarray, idxs: list[int]) -> np.ndarray:

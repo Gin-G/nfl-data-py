@@ -1812,3 +1812,130 @@ most stable trait here (0.557) and nothing in this entry tested it against
 anything — it belongs to quarterback projection and to sack/pressure props, not
 to rushing yards. The defence side of it being a coin flip (0.068) is itself a
 finding worth remembering before anyone builds a pass-rush matchup.
+
+---
+
+## Line ratings shipped, and which half of a matchup is real (2026-10-14)
+
+Follow-up to the entry above, which measured the trenches and found them
+stable but nearly inert as a projection input. The owner's call was to build
+them anyway as a **rating** — four 0-100 grades per team (50 = league average,
+15 points to a standard deviation, the same scale as the team power ratings)
+plus a matchup number per game, with an endpoint and a dashboard.
+
+`nfl_projections/trenches.py`: `run_block` and `pass_block` for the offence,
+`run_stop` and `pass_rush` for the defence, each opponent-adjusted by the same
+alternating-means construction the power ratings use, shrunk toward the league
+mean by play count, and blended with last season's regressed grade until enough
+football has accrued. Per-unit carry-over because the two sides do not regress
+alike: 0.40 for protection, 0.20 for a run-stopping front, from the
+year-over-year numbers above. Pass rush is built from pressures and not sacks,
+because a defence's **sack rate allowed per dropback has a split-half r of
+0.068** — the grade would have been noise.
+
+### The backtest, and the half that carries information
+
+1,540 team-games, weeks 6 on, 2022-25, every rating rebuilt from the weeks
+before the game it is graded against. Harness: `trenches.backtest()`, so the
+claim ships with the code rather than living here alone.
+
+| band | team-games | yds/carry | vs own avg | rush yards | stuffed |
+|---|---|---|---|---|---|
+| fade (22) | 134 | 3.93 | -0.14 | 94.8 | 23.3% |
+| lean down (36) | 318 | 4.12 | -0.03 | 98.5 | 20.5% |
+| neutral (50) | 642 | 4.09 | -0.15 | 101.8 | 18.5% |
+| lean up (64) | 312 | 4.35 | -0.07 | 115.8 | 16.7% |
+| smash (75) | 134 | 4.67 | +0.09 | 125.5 | 15.8% |
+
+The ladder is monotone in every raw column — 95 rushing yards at the bottom and
+126 at the top. **And almost all of that is which offence is running, not which
+matchup it drew.** Subtract each team's own season average and the spread
+collapses: correlation with `ypc_vs_own` is 0.035, against 0.137 with raw yards
+per carry.
+
+Splitting the rating into its two halves says it plainly:
+
+| half of the matchup | corr with game yds/carry | corr with yds/carry vs own avg |
+|---|---|---|
+| own run-block grade | +0.091 | **-0.051** |
+| opponent run-stop grade | -0.102 | **-0.100** |
+
+**The offence's own line adds nothing once you know how the offence has been
+running** — which is exactly right, because its own line is what produced that
+form. The opponent's front is the half that is new information, and it holds up
+on its own:
+
+| opponent front | team-games | yds/carry | vs own avg |
+|---|---|---|---|
+| very soft | 249 | 4.42 | **+0.14** |
+| soft | 355 | 4.28 | -0.01 |
+| average | 341 | 4.17 | -0.09 |
+| stout | 382 | 3.99 | **-0.27** |
+| very stout | 213 | 4.13 | -0.15 |
+
+Monotone across four of five bands, **0.43 yards per carry from very soft to
+stout** — about nine rushing yards on a typical workload. That is a bigger
+number than the 0.124 MAE the weekly multiplier bought, and the two are
+consistent: the multiplier was measured on top of a projection that already
+knew the back's trailing production, so it could only ever be paid for the
+opponent half. The top band reverting is the thing to watch rather than
+explain; it is 213 games and the two stout bands are a tenth of a yard apart.
+
+**Consequence for the product.** The dashboard leads with the opponent column
+and ships both ladders, because the combined rating is the flattering one and
+showing it alone would overstate what a number in the eighties means. The
+`/trenches/backtest` endpoint returns the own-vs-opponent split next to the
+bands so no caller can display one without the other.
+
+### A speed note worth keeping
+
+The readable opponent adjustment — groupby, then `Series.map` per team per
+iteration — took 3.8 seconds a fit, and the weekly backtest pays for 156 of
+them. Rewritten against integer team codes and `np.bincount` it is 0.08
+seconds, identical arithmetic, a 47x difference. That is what moved line
+ratings from a batch job to something an endpoint can compute inside a request.
+
+---
+
+## Positional scarcity: replacement level, and a flat bar that cannot work (2026-10-14)
+
+The board ranks by projected points, which answers who scores more and never
+who is harder to replace. `nfl_projections/scarcity.py` adds the missing half,
+from 11 seasons of weekly stats scored as FanDuel half-PPR (2015-25), 12-team
+slots of 1 QB / 2 RB / 3 WR / 1 TE.
+
+| position | last starter | replacement | usable-week rate (>=15) |
+|---|---|---|---|
+| QB | 19.30 | 18.09 | **50.0%** |
+| RB | 11.60 | 10.90 | 15.7% |
+| WR | 10.20 | 9.82 | 12.4% |
+| TE | 8.41 | 7.70 | **5.4%** |
+
+**The flat 15-point startable bar cannot be used across positions.** Pooled, it
+marks 26 quarterbacks a season as usable and **0.7 tight ends** — a bar that
+nearly every starting quarterback clears and essentially no tight end does is
+not measuring startability, it is measuring that quarterbacks score more. The
+replacement levels are the fix: value over replacement puts a 12-point tight end
+ahead of a 20-point quarterback, which is the ordering a lineup actually wants.
+
+The simulator now reports both, since it already produces a distribution per
+player-week: `p_usable` at the flat bar, and `p_start` against the positional
+replacement level. On a worked example a tight end projected at 12.1 points has
+`p_usable` 0.31 and `p_start` 0.63 — the same player, and only the second
+number answers "should he be in the lineup".
+
+### Top-100 composition, and a check against a published version
+
+The diagnostic behind scarcity is how a position's scorers are spread. Under
+FanDuel scoring, 2015-25, the top 100 by season total holds 27-33
+quarterbacks, 23-31 backs, 34-42 receivers and 4-9 tight ends.
+
+Recomputed under **full PPR** for 2024 it comes out 24 QB / 28 RB / 40 WR / 8
+TE, against a publicly stated 26 / 27 / 39 / 8 for the same cut — within one or
+two at every position, and an exact match at tight end. Worth recording because
+it independently confirms the construction: whoever published those numbers was
+working in full PPR, and this implementation reproduces them.
+
+Harnesses are the module itself (`scarcity.baselines()`), plus
+`tests/test_scarcity.py` for the invariants that matter — replacement below the
+last starter, positional ordering, composition summing to the cut.
