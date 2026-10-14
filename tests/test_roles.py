@@ -1,5 +1,6 @@
 """Unit tests for depth-chart role -> volume/availability logic (roles.py)."""
 import pandas as pd
+import pytest
 
 from nfl_projections import roles
 
@@ -90,3 +91,60 @@ def test_apply_team_budget_scales_over_budget_group_only():
     assert abs(rbs.iloc[0]["pts"] / rbs.iloc[1]["pts"] - 1.5) < 1e-6  # split preserved
     assert abs(rbs.iloc[0]["ceil"] - rbs.iloc[0]["pts"] * 2) < 1e-6   # band scaled too
     assert frame[frame.position == "WR"].iloc[0]["pts"] == 15.0       # under budget: untouched
+
+
+# --------------------------------------------------------------------------- promotion
+
+def test_effective_rank_only_counts_absences_above():
+    assert roles.effective_rank(2, [1]) == 1
+    assert roles.effective_rank(3, [1, 2]) == 1
+    assert roles.effective_rank(3, [1]) == 2
+    # a backup being out does not promote the starter
+    assert roles.effective_rank(1, [2, 3]) == 1
+    # and it never goes below 1
+    assert roles.effective_rank(2, [1, 1]) == 1
+
+
+def test_effective_rank_is_identity_with_nobody_out():
+    for rank in (1, 2, 3, 4, 9):
+        assert roles.effective_rank(rank, ()) == rank
+
+
+def test_promotion_is_neutral_when_nobody_above_is_out():
+    assert roles.promotion_multiplier("RB", 2, ()) == 1.0
+    assert roles.promotion_multiplier("RB", 1, [2, 3]) == 1.0
+
+
+def test_promotion_undoes_the_discount_and_adds_the_measured_lift():
+    """RB2 with RB1 out: the 0.80 discount goes, times the fitted 1.42."""
+    promo = roles.promotion_multiplier("RB", 2, [1])
+    expected = (1.0 / 0.80) * roles.PROMOTION_FACTOR["RB"]
+    assert promo == pytest.approx(expected, rel=1e-6)
+
+
+def test_promotion_is_larger_for_a_deeper_backup():
+    """An RB3 stepping up two spots gains more than an RB2 stepping up one."""
+    assert (roles.promotion_multiplier("RB", 3, [1, 2])
+            > roles.promotion_multiplier("RB", 2, [1]))
+
+
+def test_quarterback_promotion_is_the_biggest():
+    """A backup QB who plays is the starter; nothing else is that binary."""
+    qb = roles.promotion_multiplier("QB", 2, [1])
+    assert qb > roles.promotion_multiplier("RB", 2, [1])
+    assert qb > roles.promotion_multiplier("WR", 2, [1])
+
+
+def test_receivers_get_the_discount_back_and_no_more():
+    """The fitted extra factor was 1.00 for WR and TE, so only the discount goes."""
+    for position in ("WR", "TE"):
+        promo = roles.promotion_multiplier(position, 2, [1])
+        static = roles.per_game_role_multiplier(position, 2)
+        assert promo == pytest.approx(1.0 / static, rel=1e-6)
+
+
+def test_promotion_handles_unreadable_ranks():
+    """Depth charts carry 'N/A' and None; neither may raise here."""
+    assert roles.promotion_multiplier("RB", None, [1]) == pytest.approx(
+        roles.promotion_multiplier("RB", roles.norm_rank(None), [1]))
+    assert roles.effective_rank("N/A", [1]) >= 1

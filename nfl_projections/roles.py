@@ -72,6 +72,19 @@ _EXPECTED_GAMES_DEEP = {"QB": 0.3, "RB": 4.0, "WR": 5.0, "TE": 4.0}
 # computes. A budget at the league MEAN truncates every good offense.
 DEFAULT_BUDGETS = {"QB": 22.4, "RB": 31.0, "WR": 41.9, "TE": 14.4}
 
+# Extra lift for a backup who has been promoted by an absence, ON TOP of losing
+# his depth-rank discount. Fitted on 2018-23 and tested on 2024-25
+# (experiments/starter_out.py): dropping the discount helps at every position
+# and rank, and only the backfield and quarterback want anything beyond it.
+#
+#   RB2 promoted, MAE predicting his usage: 8.54 discounted -> 7.39 undiscounted
+#                                           -> 6.63 with this factor
+#   QB2 promoted:                          23.33 -> 13.33 -> 11.90
+#   WR and TE:                              the fitted factor came back at 1.00
+#                                           and 1.10, the second of which made
+#                                           2024-25 slightly worse. Left at 1.0.
+PROMOTION_FACTOR = {"RB": 1.42, "QB": 1.29, "WR": 1.0, "TE": 1.0}
+
 _SKILL = ("RB", "WR", "TE")
 
 
@@ -90,6 +103,42 @@ def norm_rank(depth_rank) -> int:
     except (TypeError, ValueError):
         return _UNKNOWN_RANK
     return rank if rank >= 1 else _UNKNOWN_RANK
+
+
+def effective_rank(depth_rank, out_ranks=()) -> int:
+    """Where a player actually sits once absences above him are accounted for.
+
+    A depth chart is a statement about a healthy room. When the back ahead of
+    you does not play you are the starter that week, and the weekly path used to
+    keep charging you a backup's discount in exactly those weeks — measured, the
+    most expensive single error in the role code (experiments/starter_out.py).
+
+    Only absences STRICTLY ABOVE the player promote him, so a team with its RB1
+    out moves RB2 to 1 and RB3 to 2, and an RB2 being out does not promote RB1.
+    """
+    rank = norm_rank(depth_rank)
+    above = sum(1 for r in out_ranks if norm_rank(r) < rank)
+    return max(1, rank - above)
+
+
+def promotion_multiplier(position, depth_rank, out_ranks=()) -> float:
+    """Total weekly adjustment for a player whose room has absences above him.
+
+    Returned relative to the static depth-rank multiplier, so a caller that has
+    already applied `per_game_role_multiplier` multiplies by this and nothing
+    else. 1.0 when nobody above him is out.
+    """
+    if not out_ranks:
+        return 1.0
+    rank = norm_rank(depth_rank)
+    promoted = effective_rank(rank, out_ranks)
+    if promoted >= rank:
+        return 1.0
+    static = per_game_role_multiplier(position, rank)
+    if static <= 0:
+        return 1.0
+    lift = per_game_role_multiplier(position, promoted) / static
+    return lift * PROMOTION_FACTOR.get(position, 1.0)
 
 
 def _lookup(table: dict, deep: dict, position, depth_rank, default: float) -> float:

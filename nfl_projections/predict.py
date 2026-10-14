@@ -515,6 +515,9 @@ class Projector:
                 depth_charts, as_of=week_start_date(season, week, schedule))
 
         self.rosters = dedupe_rosters(rosters)
+        # Who is out, by (team, position) -> depth ranks. Built lazily on the
+        # first projection of the week; see _out_ranks.
+        self._out_rank_cache = None
         self.depth_charts = depth_charts
         self.depth_analyzer = DepthChartAnalyzer(depth_charts)
 
@@ -647,6 +650,42 @@ class Projector:
             if isinstance(pred.get(key), (int, float)):
                 pred[key] = round(pred[key] * mult, 2)
 
+    def _out_ranks(self, team, position):
+        """Depth ranks at (team, position) whose player will not play this week.
+
+        Built once for the week and cached, because it needs a pass over the
+        whole roster and is then asked for on every player. An empty tuple means
+        nobody is out, which is the common case and costs one dict lookup.
+        """
+        if self._out_rank_cache is None:
+            self._out_rank_cache = self._build_out_ranks()
+        return self._out_rank_cache.get((team, position), ())
+
+    def _build_out_ranks(self):
+        """Scan the roster once for players who are out, and note where they sat."""
+        out = {}
+        roster = getattr(self, "rosters", None)
+        if roster is None or not len(roster):
+            return out
+        for _, player in roster.iterrows():
+            name = player.get("player_name")
+            position = player.get("position")
+            if not name or position not in config.POSITIONS:
+                continue
+            team = _extract_team(player)
+            player_id = player.get("player_id", player.get("gsis_id", "")) or ""
+            absent = self.injury_analyzer.should_zero_out_player(name, team, player_id)
+            if not absent and not projectable_status(player.get("status"),
+                                                    player.get("week"), self.week):
+                # off the active roster, and not an elevated fill-in
+                absent = not self.injury_analyzer.should_boost_backup(name, team)
+            if not absent:
+                continue
+            role = self.depth_analyzer.get_player_role(name, team)
+            if role and role.get("depth_rank") is not None:
+                out.setdefault((team, position), []).append(role["depth_rank"])
+        return {k: tuple(v) for k, v in out.items()}
+
     def _predict_roster_row(self, player_info):
         from . import model as model_mod
 
@@ -744,6 +783,7 @@ class Projector:
         depth_role = self.depth_analyzer.get_player_role(player_name, team)
         depth_rank = depth_role["depth_rank"] if depth_role else None
         role_mult = roles.per_game_role_multiplier(position, depth_rank)
+        out_ranks = self._out_ranks(team, position)
         if role_mult < 1.0:
             # Scale the components too, not only the points total. They used to
             # be left alone, and the consequence is invisible in fantasy output
@@ -760,6 +800,23 @@ class Projector:
             adjustment = f"{position} depth-rank {roles.norm_rank(depth_rank)} x{role_mult:.2f}"
         else:
             adjustment = "no adjustment"
+
+        # Promotion: the discount above describes a healthy room, and in a week
+        # when the player ahead of him is out it is charging a backup's rate to
+        # the man doing the starter's job. Measured as the most expensive error
+        # in this file — an RB2 with his starter out was projected at x0.80 of a
+        # backup's baseline when the truth is nearer x1.4 of it
+        # (EXPERIMENTS.md, "The starter is out").
+        promo = roles.promotion_multiplier(position, depth_rank, out_ranks)
+        if promo != 1.0:
+            for stat in roles.ROLE_SCALED_COMPONENTS:
+                if isinstance(result.get(stat), (int, float)):
+                    result[stat] *= promo
+            result["fanduel_fantasy_points"] *= promo
+            ahead = ", ".join(str(roles.norm_rank(r)) for r in sorted(out_ranks))
+            adjustment = (f"{adjustment}; promoted to "
+                          f"{roles.effective_rank(depth_rank, out_ranks)} "
+                          f"(rank {ahead} out) x{promo:.2f}")
         result["fanduel_fantasy_points"] = round(result["fanduel_fantasy_points"], 1)
 
         rookie = features.is_rookie(player_name, player_id, self.history, self.season)

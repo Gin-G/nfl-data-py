@@ -263,3 +263,84 @@ class TestRosterHelpers:
         assert _extract_team(pd.Series({"club_code": "PHI"})) == "PHI"
         assert _extract_team(pd.Series({"team": None, "recent_team": "NYG"})) == "NYG"
         assert _extract_team(pd.Series({"other": 1})) == "Unknown"
+
+
+# --------------------------------------------------------------- promotion wiring
+
+class _FakeInjuries:
+    """Zeroes a named set of players, so the roster scan has something to find."""
+
+    def __init__(self, out_names):
+        self.out_names = set(out_names)
+
+    def should_zero_out_player(self, name, team=None, player_id=None):
+        return name in self.out_names
+
+    def should_boost_backup(self, name, team=None):
+        return False
+
+    def get_adjustment_info(self, name, team=None, player_id=None):
+        return {"reason": "test"}
+
+
+class _FakeDepth:
+    def __init__(self, ranks):
+        self.ranks = ranks
+
+    def get_player_role(self, name, team=None):
+        rank = self.ranks.get(name)
+        return None if rank is None else {"depth_rank": rank, "role": "x"}
+
+
+def _projector_with(roster, out_names, ranks):
+    """A Projector with just enough wiring for the out-rank scan."""
+    proj = Projector.__new__(Projector)
+    proj.rosters = roster
+    proj.week = 5
+    proj._out_rank_cache = None
+    proj.injury_analyzer = _FakeInjuries(out_names)
+    proj.depth_analyzer = _FakeDepth(ranks)
+    return proj
+
+
+def _roster():
+    return pd.DataFrame([
+        {"player_name": "Starter Back", "position": "RB", "team": "AAA",
+         "player_id": "rb1", "status": "ACT", "week": 5},
+        {"player_name": "Backup Back", "position": "RB", "team": "AAA",
+         "player_id": "rb2", "status": "ACT", "week": 5},
+        {"player_name": "Other Back", "position": "RB", "team": "BBB",
+         "player_id": "rb3", "status": "ACT", "week": 5},
+    ])
+
+
+def test_out_ranks_finds_the_absent_starter():
+    proj = _projector_with(_roster(), {"Starter Back"},
+                           {"Starter Back": 1, "Backup Back": 2, "Other Back": 1})
+    assert proj._out_ranks("AAA", "RB") == (1,)
+
+
+def test_out_ranks_is_scoped_to_the_team():
+    """A team losing its starter must not promote anyone on another team."""
+    proj = _projector_with(_roster(), {"Starter Back"},
+                           {"Starter Back": 1, "Backup Back": 2, "Other Back": 1})
+    assert proj._out_ranks("BBB", "RB") == ()
+
+
+def test_out_ranks_is_empty_when_everyone_plays():
+    proj = _projector_with(_roster(), set(),
+                           {"Starter Back": 1, "Backup Back": 2, "Other Back": 1})
+    assert proj._out_ranks("AAA", "RB") == ()
+
+
+def test_out_ranks_is_cached_after_the_first_scan():
+    proj = _projector_with(_roster(), {"Starter Back"},
+                           {"Starter Back": 1, "Backup Back": 2, "Other Back": 1})
+    proj._out_ranks("AAA", "RB")
+    proj.rosters = pd.DataFrame(columns=_roster().columns)   # scan again would find nothing
+    assert proj._out_ranks("AAA", "RB") == (1,)
+
+
+def test_out_ranks_survives_a_player_missing_from_the_depth_chart():
+    proj = _projector_with(_roster(), {"Starter Back"}, {"Backup Back": 2})
+    assert proj._out_ranks("AAA", "RB") == ()

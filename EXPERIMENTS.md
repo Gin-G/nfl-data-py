@@ -2121,3 +2121,89 @@ vacancy he is walking into. Adding team vacancy on top of old-team share was
 flat here (0.0366 to 0.0371 for carries), but the test was crude — a signing's
 share should plausibly depend on what opened up, and 661 rows split by vacancy
 size gets thin fast.
+
+---
+
+## The starter is out, and the backup was being charged a backup's rate (2026-10-14)
+
+The season-scale vacated-share work found that a vacated role transfers to
+whoever holds it next, and that `shares.py` handles it by re-ranking. **The
+weekly path does not re-rank.** `predict.py` zeroes a player who is OUT and then
+hands every remaining teammate a multiplier from his static depth-chart rank —
+so a back listed RB2 kept the RB2 discount (x0.80) in the one week where he was
+the only back on the roster. The discount was also one-sided: `role_mult` was
+applied only when below 1.0, so nothing in the weekly path could ever revise a
+projection upward.
+
+This is the most actionable call in weekly fantasy, and it was wrong in the
+direction that matters. Harness: `experiments/starter_out.py`, 2018-25, 63,311
+player-weeks at entering rank 1-4. Who the starter is comes from trailing usage
+only; who actually played comes from snap counts, which state it rather than
+inferring it from an injury report. **The entering rank-1 player missed 16.3% of
+team-position-weeks** — this is not an edge case.
+
+### What a promoted backup actually does
+
+Usage per player-week (carries + targets; attempts for QB), starter in vs out:
+
+| position | rank | starter in | starter out | factor | n |
+|---|---|---|---|---|---|
+| RB | 2 | 8.28 | 16.11 | **1.95** | 486 |
+| RB | 3 | 4.33 | 9.04 | 2.09 | 419 |
+| WR | 2 | 5.73 | 6.65 | 1.16 | 517 |
+| TE | 2 | 1.78 | 3.28 | 1.84 | 592 |
+| QB | 2 | 5.96 | 30.17 | **5.06** | 501 |
+
+Within player — same man, both situations, 952 player-seasons — the median
+factors are RB 1.96, TE 1.78, WR 1.29, QB 2.72.
+
+### What survives out of sample, which is less
+
+Factors fitted on 2018-23 and tested on 2024-25, predicting a promoted backup's
+usage. Three predictors: his trailing usage times the production discount, times
+nothing, and times the fitted factor.
+
+| position | rank | n | actual | production discount | no discount | fitted factor | fit |
+|---|---|---|---|---|---|---|---|
+| RB | 2 | 108 | 15.75 | 8.543 | 7.387 | **6.628** | 1.42 |
+| RB | 3 | 100 | 8.96 | 6.575 | 5.510 | **5.409** | 1.43 |
+| WR | 2 | 178 | 6.78 | 2.665 | **2.594** | 2.594 | 1.00 |
+| WR | 3 | 176 | 4.69 | 2.558 | **2.337** | 2.342 | 0.97 |
+| TE | 2 | 140 | 2.99 | 2.087 | **1.837** | 1.852 | 1.10 |
+| QB | 2 | 139 | 29.85 | 23.325 | 13.331 | **11.901** | 1.29 |
+
+Two things, in order of size:
+
+**Dropping the discount helps at every position and every rank.** RB2 8.54 to
+7.39, QB2 23.33 to 13.33 (-43%), TE2 2.09 to 1.84, WR2 2.67 to 2.59. There is no
+case where charging a promoted player a backup's rate is right.
+
+**An extra factor beyond that helps only the backfield and quarterback** — RB
+x1.42, QB x1.29. For receivers the fitted factor came back at 1.00 and 0.97, and
+for tight ends 1.10 made 2024-25 slightly worse. Left at 1.0 for both.
+
+The within-player medians (RB 1.96, QB 2.72) are **not** what shipped, because
+they are ratios of a player's own means and the out-of-sample fit against
+trailing usage is the number that holds up. That is the second time in two
+entries that a within-group statistic overstated what survived validation — it
+is worth treating as a standing bias of this kind of measurement rather than two
+separate mistakes.
+
+### Shipped
+
+`roles.effective_rank(depth_rank, out_ranks)` promotes a player past absences
+**strictly above** him, so an RB1 out moves RB2 to 1 and RB3 to 2, and an RB2 out
+promotes nobody. `roles.promotion_multiplier` returns the total adjustment
+relative to the static multiplier, so RB2 with his starter out is
+(1/0.80) x 1.42 = **x1.78**, and QB2 is (1/0.35) x 1.29 = **x3.69**.
+
+`predict.py` builds the absence map once per week (`_out_ranks`, cached — it
+needs a roster pass and is then asked for on every player) and applies the
+promotion after the static discount, scaling the components as well as the
+points so a yardage prop cannot disagree with the fantasy number.
+
+**Not yet validated end to end.** This is measured against actual usage, not
+against the board's own FanDuel-point error through the trained model. Weeks
+where a starter sits are about 16% of player-weeks, so the effect on aggregate
+weekly MAE will be small even if the affected projections move a lot; the
+prospective scorecard is where that shows up.
