@@ -31,6 +31,16 @@ from . import roles
 
 SKILL = ("QB", "RB", "WR", "TE")
 _TEAM_COLS = ("team", "recent_team", "team_abbr", "club_code")
+# Weight on a mover's share from his PREVIOUS team, swept through
+# backtest_shares: movers' MAE runs 0.0654 at zero, 0.0622 at 0.3, 0.0638 at 0.6
+# and back to 0.0666 at 0.8. Zero reproduces the old model, which gave an
+# arriving veteran nothing but a depth rank.
+#
+# A standalone regression put the weight near 0.64, and that was measured
+# against an ordinal depth rank rather than against the fitted rank-share prior
+# this model actually uses — a weaker baseline flatters the new term. The
+# production harness is the one that decides.
+MOVER_BLEND = 0.3
 # positions that pool each resource (for team-level normalization)
 _CARRY_POS = ("RB", "QB", "WR")
 _TARGET_POS = ("WR", "RB", "TE")
@@ -161,12 +171,23 @@ def prior_season_shares(share_table: pd.DataFrame, season: int) -> pd.DataFrame:
 
 
 def project_shares(roster: pd.DataFrame, dataset: pd.DataFrame, season: int, *,
-                   blend: float = 0.6, coaching_mult: dict | None = None) -> pd.DataFrame:
+                   blend: float = 0.6, mover_blend: float = MOVER_BLEND,
+                   coaching_mult: dict | None = None) -> pd.DataFrame:
     """Validated share model (backtest_shares): predict each rostered player's carry/target
-    share for ``season``. For a player returning to the same team, blend his own prior-year
-    share (weight ``blend``) with the depth-rank prior; for a moved/new player, use the rank
-    prior alone (which beats repeat-last-year decisively on changed roles). ``roster`` needs
-    team / position / player_id / depth_rank."""
+    share for ``season``.
+
+    Three cases, because they carry different information:
+
+      returning to the same team   blend his own prior-year share (weight ``blend``) with the
+                                   depth-rank prior.
+      arriving from another team   blend the share he held THERE (weight ``mover_blend``) with
+                                   the rank prior. A depth rank says where he sits; it says
+                                   nothing about how big that role is, and the size travels
+                                   with the player (EXPERIMENTS.md, "Vacated share").
+      no NFL history               the rank prior alone; the rookie draft-capital prior in
+                                   rookies.py is what sharpens this case.
+
+    ``roster`` needs team / position / player_id / depth_rank."""
     share_table = season_share_table(dataset)
     prior = fit_share_prior(share_table, max_season=season - 1)
     out = roster.drop_duplicates(["player_id", "team"]).copy()
@@ -183,6 +204,9 @@ def project_shares(roster: pd.DataFrame, dataset: pd.DataFrame, season: int, *,
         if pid in prev.index and prev.at[pid, "team"] == team:
             cs.append(blend * float(prev.at[pid, "carry_share"]) + (1 - blend) * rc)
             ts.append(blend * float(prev.at[pid, "target_share"]) + (1 - blend) * rt)
+        elif pid in prev.index and mover_blend > 0:
+            cs.append(mover_blend * float(prev.at[pid, "carry_share"]) + (1 - mover_blend) * rc)
+            ts.append(mover_blend * float(prev.at[pid, "target_share"]) + (1 - mover_blend) * rt)
         else:
             cs.append(rc)
             ts.append(rt)
@@ -220,7 +244,7 @@ def _entering_rank(share_table: pd.DataFrame) -> pd.DataFrame:
 
 
 def backtest_shares(dataset: pd.DataFrame, *, test_seasons=None, min_games: int = 4,
-                    blend: float = 0.6) -> dict:
+                    blend: float = 0.6, mover_blend: float = MOVER_BLEND) -> dict:
     """Validate the share model out of sample: predict each player's actual season share from
     his ENTERING depth rank (prior-year production), fitting the prior only on earlier seasons,
     and compare to naive baselines. ``model`` is the shipped hybrid (own prior-year share blended
@@ -265,15 +289,27 @@ def backtest_shares(dataset: pd.DataFrame, *, test_seasons=None, min_games: int 
                               float(pred.at[(pid, team), "target_share"])) \
                 if (pid, team) in pred.index else (0.0, 0.0)
             # shipped model: blend own prior-year share for returners, rank prior for movers
+            # old-team share for an arriving veteran (prev is his primary team, any team)
+            had_history = pid in prev.index
+            old_c = float(prev.at[pid, "carry_share"]) if had_history else 0.0
+            old_t = float(prev.at[pid, "target_share"]) if had_history else 0.0
             if same_team:
                 mc = blend * naiveA_c + (1 - blend) * rank_c
                 mt = blend * naiveA_t + (1 - blend) * rank_t
+                rank_only_c, rank_only_t = mc, mt
+            elif had_history:
+                mc = mover_blend * old_c + (1 - mover_blend) * rank_c
+                mt = mover_blend * old_t + (1 - mover_blend) * rank_t
+                rank_only_c, rank_only_t = rank_c, rank_t
             else:
                 mc, mt = rank_c, rank_t
+                rank_only_c, rank_only_t = rank_c, rank_t
             rows.append({
                 # "changed" = not on this team last year (moved / rookie / returning to a new role)
                 "season": Y, "position": p["position"], "changed": bool(not same_team),
+                "mover": bool(not same_team and had_history),
                 "err_model": abs(mc - actual_c) + abs(mt - actual_t),
+                "err_rankonly": abs(rank_only_c - actual_c) + abs(rank_only_t - actual_t),
                 "err_naiveA": abs(naiveA_c - actual_c) + abs(naiveA_t - actual_t),
                 "err_naiveB": abs(naiveB_c - actual_c) + abs(naiveB_t - actual_t),
             })
@@ -281,9 +317,11 @@ def backtest_shares(dataset: pd.DataFrame, *, test_seasons=None, min_games: int 
     if res.empty:
         return {"n": 0}
     def mae(sub):
-        return {k: round(sub[f"err_{k}"].mean(), 4) for k in ("model", "naiveA", "naiveB")}
+        return {k: round(sub[f"err_{k}"].mean(), 4)
+                for k in ("model", "rankonly", "naiveA", "naiveB")}
     summary = {"n": len(res), "overall": mae(res),
                "stable": mae(res[~res["changed"]]),
                "changed": mae(res[res["changed"]]),
+               "movers": mae(res[res["mover"]]),
                "by_position": {pos: mae(res[res["position"] == pos]) for pos in SKILL}}
     return summary

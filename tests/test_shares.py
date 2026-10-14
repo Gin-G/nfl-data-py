@@ -74,3 +74,78 @@ def test_backtest_model_beats_repeat_baseline():
     res = shares.backtest_shares(ds, test_seasons=[2024])
     assert res["n"] > 0
     assert res["overall"]["model"] <= res["overall"]["naiveA"] + 1e-9
+
+
+def _two_team_dataset():
+    """Two teams over two seasons, with one back who changes teams.
+
+    BBB's lead back vacates the role after 2021; AAA's lead back moves there for
+    2022 and slots in at rank 1. Both teams' rank-1 slot therefore looks the
+    same to a depth chart, while the two players carry very different histories —
+    which is the distinction the mover term exists to make.
+    """
+    rows = []
+
+    def add(season, team, pid, pos, carries, targets, fppg, snap):
+        for wk in range(1, 5):
+            rows.append({"season": season, "week": wk, "team": team, "position": pos,
+                         "player_id": pid, "player_display_name": pid,
+                         "carries": carries, "targets": targets,
+                         "fanduel_fantasy_points": fppg, "offensive_snap_pct": snap})
+
+    # 2021: a workhorse on AAA, a modest lead back on BBB
+    add(2021, "AAA", "workhorse", "RB", 20, 3, 21.0, 90)
+    add(2021, "AAA", "aaa_sub", "RB", 3, 1, 5.0, 25)
+    add(2021, "AAA", "aaa_wr", "WR", 0, 8, 14.0, 88)
+    add(2021, "BBB", "bbb_lead", "RB", 9, 3, 11.0, 55)
+    add(2021, "BBB", "bbb_sub", "RB", 8, 3, 10.0, 50)
+    add(2021, "BBB", "bbb_wr", "WR", 0, 8, 14.0, 88)
+    # 2022: the workhorse is on BBB; bbb_lead is gone
+    add(2022, "BBB", "workhorse", "RB", 18, 3, 20.0, 88)
+    add(2022, "BBB", "bbb_sub", "RB", 5, 2, 7.0, 35)
+    add(2022, "BBB", "bbb_wr", "WR", 0, 8, 14.0, 88)
+    add(2022, "AAA", "aaa_sub", "RB", 14, 2, 15.0, 80)
+    add(2022, "AAA", "aaa_wr", "WR", 0, 8, 14.0, 88)
+    return pd.DataFrame(rows)
+
+
+def test_mover_carries_his_old_team_share():
+    """A rank-1 arrival with a workhorse history must project above the rank prior."""
+    data = _two_team_dataset()
+    roster = pd.DataFrame([
+        {"team": "BBB", "position": "RB", "player_id": "workhorse", "depth_rank": 1},
+        {"team": "BBB", "position": "RB", "player_id": "bbb_sub", "depth_rank": 2},
+    ])
+    with_mover = shares.project_shares(roster, data, 2022).set_index("player_id")
+    without = shares.project_shares(roster, data, 2022, mover_blend=0.0).set_index("player_id")
+    assert with_mover.loc["workhorse", "carry_share"] > without.loc["workhorse", "carry_share"]
+
+
+def test_mover_blend_zero_reproduces_the_rank_prior():
+    """The old behaviour has to stay reachable, or the change cannot be measured."""
+    data = _two_team_dataset()
+    roster = pd.DataFrame([
+        {"team": "BBB", "position": "RB", "player_id": "workhorse", "depth_rank": 1},
+    ])
+    prior = shares.fit_share_prior(shares.season_share_table(data), max_season=2021)
+    rank_only = shares.predict_shares(roster, prior).set_index("player_id")
+    off = shares.project_shares(roster, data, 2022, mover_blend=0.0).set_index("player_id")
+    assert abs(off.loc["workhorse", "carry_share"]
+               - rank_only.loc["workhorse", "carry_share"]) < 1e-9
+
+
+def test_returner_is_untouched_by_the_mover_term():
+    """A player staying put must blend his own history, not the mover weight."""
+    data = _two_team_dataset()
+    roster = pd.DataFrame([
+        {"team": "BBB", "position": "RB", "player_id": "bbb_sub", "depth_rank": 2},
+    ])
+    a = shares.project_shares(roster, data, 2022).set_index("player_id")
+    b = shares.project_shares(roster, data, 2022, mover_blend=0.0).set_index("player_id")
+    assert a.loc["bbb_sub", "carry_share"] == b.loc["bbb_sub", "carry_share"]
+
+
+def test_backtest_reports_the_mover_split():
+    summary = shares.backtest_shares(_two_team_dataset(), test_seasons=[2022], min_games=4)
+    if summary.get("n"):
+        assert "movers" in summary and "rankonly" in summary["overall"]

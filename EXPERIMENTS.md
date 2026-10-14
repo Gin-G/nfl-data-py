@@ -2026,3 +2026,98 @@ numbers a model is fitted on.
 untested and untestable from nflverse, which has no offensive-line-coach field —
 a change in the profile is detectable, its cause is not. And nothing here tested
 scheme against a *back's fit*, only against team-level structure.
+
+---
+
+## Vacated share: the assumption held, and the gap was somewhere else (2026-10-14)
+
+`shares.py` carried one untested assumption, written in its own design notes:
+vacated share is *"handled implicitly: a new depth chart re-ranks the
+returners/newcomers and shares renormalize within the team, so a departed
+starter's touches flow to whoever now sits at that rank."* This tests it, because
+share is the quantity that actually moves projections and an untested assumption
+sitting inside the model that works is worth more attention than another matchup
+feature. Harness: `experiments/vacated_share.py`, 2018-25.
+
+Teams vacate a lot: mean 34.5% of the carry pool and 31.2% of the target pool
+every offseason, up to 90%.
+
+### For returners, the assumption is right
+
+1,813 returning player-seasons, leave-one-season-out, predicting this season's
+share.
+
+| predictor | carry share MAE | target share MAE |
+|---|---|---|
+| own prior share | 0.0357 | 0.0331 |
+| own prior + rank | 0.0357 | 0.0332 |
+| **+ team's vacated share** | 0.0358 | 0.0331 |
+| + vacated x prior interaction | 0.0352 | 0.0331 |
+
+**Knowing how much share a team vacated tells you nothing about its returners.**
+The coefficient is +0.018 carry share per unit vacated: a team losing 30% of its
+carries lifts a returner by half a percentage point. Splitting on teams that
+vacated 15%+ of a pool changes nothing (0.0348 to 0.0349).
+
+### Because the touches do not go to the returners
+
+| vacated | team-seasons | mean vacated | share now held by players who were not here |
+|---|---|---|---|
+| 5-20% | 47 | 0.125 | 0.232 |
+| 20-40% | 59 | 0.284 | 0.295 |
+| 40-60% | 42 | 0.509 | 0.494 |
+| 60%+ | 45 | 0.726 | 0.633 |
+
+**Vacated share is replaced about one for one by players who were not on the
+roster the year before** — median absorption 1.04 for carries, 1.03 for targets,
+correlation 0.688 and 0.706. The next man up does not inherit the role; a new
+body does, and at the low end newcomers take *more* than was vacated, displacing
+returners at the margin.
+
+So the model's renormalization is fine, and the prose describing it was
+misleading in an instructive way: the player who now sits at rank 1 is usually
+someone who was not there last year. Which relocates the question entirely —
+**the accuracy of a big-vacancy team depends on getting the newcomer right.**
+
+### The gap, and what shipped
+
+Rookie arrivals already have a prior that wins (`rookies.py`). Veterans who
+change teams had nothing: the model gave an arriving veteran his new depth rank
+and discarded the share he held elsewhere. 661 such player-seasons.
+
+Swept through `backtest_shares`, the production harness:
+
+| mover_blend | overall MAE | changed roles | movers only |
+|---|---|---|---|
+| 0.0 (old model) | 0.0658 | 0.0700 | 0.0654 |
+| 0.2 | 0.0652 | 0.0688 | 0.0627 |
+| **0.3 (shipped)** | **0.0651** | **0.0686** | **0.0622** |
+| 0.5 | 0.0652 | 0.0689 | 0.0629 |
+| 0.6 | 0.0654 | 0.0693 | 0.0638 |
+| 0.8 | 0.0660 | 0.0705 | 0.0666 |
+
+**Movers improve 4.9%** (0.0654 to 0.0622) and overall share error 1.1%. Shipped
+at `MOVER_BLEND = 0.3` in `project_shares`, with `backtest_shares` now reporting
+`rankonly` beside `model` so the gain stays visible.
+
+**A correction worth recording.** A standalone regression on the same data put
+the weight near 0.64 and the improvement near 47%, because it compared against an
+ordinal depth rank rather than the fitted rank-share prior the model actually
+uses. Against the real baseline the gain is a fifth of that. The lesson is the
+one this file keeps relearning from the other direction: a new feature's value is
+whatever it adds to the thing already shipped, and any weaker baseline will
+flatter it.
+
+### Where this sits
+
+This is the first feature in a while that is about **how much** rather than how,
+and it is also the first to survive since the usage-decomposition work. That is
+not a coincidence — it is the same lesson as the six negative results, read
+forwards: a mover's previous share is an opportunity quantity, and a depth rank
+tells you where he sits while saying nothing about how big the role is.
+
+**Still untested**: whether a mover's share should be scaled by the specific
+vacancy he is walking into. Adding team vacancy on top of old-team share was
+flat here (0.0366 to 0.0371 for carries), but the test was crude — a signing's
+share should plausibly depend on what opened up, and 661 rows split by vacancy
+size gets thin fast.
