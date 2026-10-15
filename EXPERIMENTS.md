@@ -2208,6 +2208,13 @@ where a starter sits are about 16% of player-weeks, so the effect on aggregate
 weekly MAE will be small even if the affected projections move a lot; the
 prospective scorecard is where that shows up.
 
+*Settled the next day — see "The promotion fix, scored the way the board is
+scored". The re-ranking pays in points (+4.8% on the player-weeks it touches,
+16.0% of them, almost exactly the share predicted above). The fitted factors
+did not survive the change of currency: RB x1.42 is now 1.0, because it was
+fitted to hit a promoted back's mean usage and the mean is not what MAE or the
+ordering wants. QB x1.29 stands.*
+
 ## The mid-season mover, and two instruments that lie about him (2026-10-14)
 
 The season-scale finding was that the SIZE of a role travels with the player: an
@@ -2383,3 +2390,241 @@ not the −1.88 a trade gets.
 So the two kinds of mid-season arrival want opposite corrections, the current
 code applies one rule to both, and on this evidence that rule is the right one
 for each. Nothing to change.
+
+## The promotion fix, scored the way the board is scored (2026-10-15)
+
+The previous entry shipped `roles.promotion_multiplier` and left a debt in
+writing: *"Not yet validated end to end. This is measured against actual usage,
+not against the board's own FanDuel-point error through the trained model."*
+Three entries in a row had ended on some version of that sentence, so it had
+stopped being a caveat and become the binding constraint.
+
+Closing it says the mechanism pays and **one of its two parameters does not**.
+`PROMOTION_FACTOR["RB"]` is now 1.0.
+
+There were two gaps in that sentence, not one.
+
+**The currency.** `starter_out.py` scored a multiplier against a trailing usage
+average. The number the multiplier actually lands on in production has been
+through the network, which shrinks hard toward the positional mean, then the
+form blend, then the static depth-rank discount. The mover entry measured
+exactly what that does to a multiplicative term fitted on a raw average: the
+gain decayed monotonically as the base took on the network's shrinkage, +7.3%
+to ~3%. A term fitted against trailing usage has not been tested until it is
+tested on the base it ships against.
+
+**The trigger.** This one was not written down anywhere. The factors were fitted
+with an **oracle** absence signal — snap counts, which state who played.
+`predict.py` fires on the injury report plus roster status, before the game. A
+correct multiplier on the wrong player is a loss, not a wash.
+
+### Why the standing harness could not see any of this
+
+`evaluate.backtest` contains no reference to `roles`, to a depth chart, or to
+the promotion — it runs network → form blend → MAE and stops. Every volume
+mechanism in `roles.py` was therefore outside the only automated scorer in the
+repo, which is how a term could ship on usage evidence and stay there.
+
+So the harness is new: `experiments/promotion_endtoend.py` reproduces the weekly
+points path exactly, batching the model call because `_predict_roster_row` costs
+855ms a row — over two hours for one pass of this grid on a single-seed model,
+and worse with the five-seed ensemble. `verify()` then runs production's
+own function on a sample of each season and asserts the batched path reproduces
+it — **54 and 57 players, worst deviation 0.000**. It is not decoration; see the
+rounding trap below.
+
+It reaches 2025 and 2026 only. `DepthChartAnalyzer` raises `KeyError: 'pos_abb'`
+on a 2024 depth chart, so the shipped role code cannot run on the older format
+at all — a consequence of the format break in the entry above, and the reason
+this is 23 weeks rather than eight seasons.
+
+**2025 weeks 1-18 and 2026 weeks 1-5, 7,334 scored player-weeks**, 5-seed
+ensemble, model trained on seasons before the target. Arms are the same chain
+with one link changed, paired on identical model output:
+
+| arm | what it is |
+|---|---|
+| `net_only` | network + form blend, no role layer — what `evaluate.backtest` scores |
+| `discount` | + the static depth-rank multiplier (the pre-fix board) |
+| `lift` | + promotion to the rank he is actually filling, **no fitted factor** |
+| `as_measured` | + the shipped factors, RB x1.42 / QB x1.29 |
+
+### The injury report is not the weak link
+
+The promotion fires on **1,172 player-weeks, 16.0%** of those scored. The usage
+entry put the entering rank-1 player's absence rate at 16.3%, over
+team-position-weeks rather than player-weeks — a different denominator, so the
+agreement is a sanity check and not a replication.
+
+| trigger | fires | precision vs oracle | recall |
+|---|---|---|---|
+| production (injury report + roster status) | 1,172 | **1.000** | 0.690 |
+| practice report alone, no Friday designation | 1,276 | 0.925 | 0.695 |
+
+Precision 1.000 is not a rounding artifact: in 23 weeks **not one** promoted
+player's superior went on to take an offensive snap. Separately, of the **2,605**
+player-weeks production zeroed outright, **zero** recorded a stat line and
+**zero** took an offensive snap — two independent signals, every week, no
+exceptions. What the report misses is the other 31%: **526 player-weeks** a
+perfect signal would have promoted and it did not, the late scratches. It never
+invents one.
+
+I expected to have to discount all of this, because production runs Tuesday and
+Wednesday while `report_status` is the Friday designation, and nflverse ships one
+row per player-week with no timestamp, so the mid-week view cannot be
+reconstructed. The nearest strictly-weaker signal that *is* mid-week information
+is "did not practise", ignoring `report_status` entirely. It fires on **more**
+player-weeks than the Friday report, at 0.925 precision, and on the whole board
+gives 4.0095 MAE against the Friday trigger's 4.0084. **Running early costs
+nothing measurable.**
+
+### The mechanism pays
+
+| arm | whole board (n=7,334) | the promoted (n=1,172) | bias on the promoted |
+|---|---|---|---|
+| `net_only` | 4.2223 | 3.3578 | −0.76 |
+| `discount` | 4.0422 | 3.4648 | −2.46 |
+| `lift` | **4.0084** | **3.2535** | −1.45 |
+| `as_measured` | 4.0158 | 3.2994 | −0.96 |
+
+Cluster bootstrap over weeks, because a week shares an injury report, a slate
+and a model:
+
+| | gain | 90% interval |
+|---|---|---|
+| shipped vs pre-fix, whole board | +0.65% | [+0.31%, +1.01%] |
+| shipped vs pre-fix, the promoted | +4.77% | [+2.34%, +7.08%] |
+| parameter-free vs pre-fix, the promoted | **+6.10%** | [+4.49%, +7.74%] |
+| **shipped vs parameter-free** | **−1.41%** | **[−2.76%, −0.26%]** |
+
+The debt is discharged on the first line and the last line is the finding: the
+re-ranking is worth more without the fitted factors than with them, and that
+interval excludes zero.
+
+**The placebo holds.** Count the same absences as if they sat BELOW the player —
+the direction `effective_rank` ignores by design, since an RB2 being out does
+not promote the RB1. Same report, same teams, same arithmetic, 3,477
+player-weeks, and on that one population:
+
+| | MAE | gain vs pre-fix |
+|---|---|---|
+| promote on absences above (the real term) | 2.9885 | **+1.31%** |
+| promote on the same absences, mirrored below | 3.2477 | **−7.25% [−8.71%, −5.77%]** |
+
+The gain is the re-ranking, not "teams with injuries are different".
+
+### Which half of the fix is real, by position
+
+| position | n | pre-fix | parameter-free | shipped | parameter-free vs pre-fix | shipped vs parameter-free |
+|---|---|---|---|---|---|---|
+| QB | 61 | 9.709 | 6.418 | **6.263** | +33.9% [+24.5%, +42.1%] | +2.4% [−6.0%, +10.4%] |
+| RB | 309 | 3.404 | **3.381** | 3.585 | +0.7% [−2.0%, +3.2%] | **−6.1% [−10.6%, −2.1%]** |
+| WR | 660 | 3.218 | **3.152** | 3.152 | +2.1% [+0.9%, +3.3%] | factor is 1.0 |
+| TE | 142 | 2.060 | 2.092 | 2.092 | −1.5% [−8.4%, +4.3%] | factor is 1.0 |
+
+The promotion is **overwhelmingly a quarterback effect** — a third of the error
+on a QB2 whose starter sits — plus a small, reliable receiver gain. At RB and TE
+the re-ranking alone straddles zero. And the RB factor is the one term here that
+is reliably *harmful*.
+
+### The bias that should not be corrected, a third time
+
+| promoted RBs, n=309 | MAE | bias | mean projected | mean actual |
+|---|---|---|---|---|
+| pre-fix discount | 3.404 | −2.156 | 2.27 | 4.42 |
+| parameter-free | **3.381** | −1.274 | 3.15 | 4.42 |
+| shipped x1.42 | 3.585 | **+0.050** | 4.47 | 4.42 |
+
+x1.42 was fitted to hit a promoted back's mean usage and it hits it almost
+exactly — bias +0.05 points. That is the trap in "Four weeks in, and the bias
+that should not be corrected", arriving from the opposite direction: there the
+lesson was not to inflate projections to remove a downward bias, and here is a
+term that was inflated to remove one, costing 5.7% MAE for the privilege.
+
+What closes the argument is that it costs the **ordering** too, which is usually
+the defence against an MAE-only verdict. Per position per week over every scored
+player at the position:
+
+| RB arm | spearman | mean weekly top-12 overlap | mean actual points of the top 12 |
+|---|---|---|---|
+| pre-fix discount | 0.7318 | 0.4348 | 16.155 |
+| parameter-free | **0.7319** | **0.4384** | **16.245** |
+| shipped x1.42 | 0.7261 | 0.4275 | 15.997 |
+
+Every metric that matters agrees, so there is no trade to adjudicate. At QB the
+factor is also no better on ordering (top-6 overlap 0.3116 against 0.3188), but
+its MAE point estimate is positive and 61 player-weeks cannot resolve its size.
+
+### Shipped
+
+`PROMOTION_FACTOR` RB **1.42 → 1.0**. QB stays at 1.29: confirmed in sign, not
+in size. WR and TE were already 1.0, so the promotion is now parameter-free
+everywhere but quarterback.
+
+| | whole board | the promoted | promoted RBs |
+|---|---|---|---|
+| MAE, before → after | 4.0158 → 4.0071 | 3.2994 → 3.2454 | 3.5854 → 3.3806 |
+| gain | +0.21% [+0.07%, +0.35%] | +1.64% [+0.54%, +2.78%] | **+5.71% [+2.04%, +9.60%]** |
+| weeks favouring it | 15 of 23 | 15 of 23 | 15 of 23 |
+
+The three weekly counts are identical because they have to be: the change moves
+only promoted RBs, so a week where it helps them helps every aggregate they sit
+in.
+
+**Replicated on the production training window.** The live model trains on the
+current season alone, so the whole grid was re-run that way — 15 weeks, 4,796
+scored player-weeks, a model retrained per week. Every number moves by less than
+its interval: trigger precision 1.000 / recall 0.709, shipped vs pre-fix on the
+promoted +5.53% [+2.97%, +8.16%], parameter-free vs pre-fix +6.49% [+5.01%,
++7.98%], the change +4.67% [+1.13%, +7.98%] on promoted RBs, placebo −14.7%.
+The verdict does not depend on the window. The one line that reads weaker is
+shipped vs parameter-free pooled across positions, −1.04% [−2.60%, +0.50%]
+against the historical window's [−2.76%, −0.26%] — same sign, straddling zero on
+849 player-weeks instead of 1,172. The RB-specific interval, which is what the
+change rests on, excludes zero on both.
+
+### The static discount, validated on the way past
+
+The arm that exists only as a control turns out to answer an older question. The
+depth-rank multiplier is a much larger term than the promotion and had never been
+scored in points either:
+
+| | n | `net_only` | `discount` | gain |
+|---|---|---|---|---|
+| whole board | 7,334 | 4.2223 | 4.0422 | +4.26% [+3.65%, +4.87%] |
+| nobody promoted, the term acting alone | 6,162 | 4.3867 | 4.1520 | +5.35% [+4.69%, +6.01%] |
+| QB | 811 | 6.7352 | 6.4332 | +4.48% [+2.49%, +6.39%] |
+| RB | 1,903 | 4.3761 | 4.2197 | +3.57% [+2.08%, +5.11%] |
+| WR | 3,048 | 3.9631 | 3.7629 | +5.05% [+4.16%, +5.94%] |
+| TE | 1,572 | 3.2420 | 3.1353 | +3.29% [+1.81%, +4.76%] |
+
+Positive and clear of zero everywhere. The one blemish is that at TE the
+ordering is flat to slightly worse (spearman 0.5891 undiscounted against 0.5829
+discounted) while the MAE gain is clear, which is the only place in this entry
+the two metrics disagree.
+
+### The instrument that lied this time: `Series.round`
+
+`verify` failed on exactly one player — Davante Adams, production 13.90 against
+the harness's 14.00 — with every multiplier in agreement. `round(13.95, 1)` is
+**13.9** and `pd.Series([13.95]).round(1)` is **14.0**: numpy scales by ten and
+rints to even, Python rounds the decimal correctly. In 2,000,000 uniform draws
+the two never disagree, which is why this looks safe and is not: every chain here
+is a 2-decimal network output times a short multiplier, so it lands on an exact
+half constantly. One player in 111 was enough to find it, and had the check been
+`abs(diff) < 0.11` instead of exact, it would have passed silently and every
+margin in this entry would have carried a few hundredths of unexplained noise.
+
+A second one of the same shape: re-running the whole grid after the change was
+meant to prove the entry's numbers reproduce from committed code, and every row
+did except the placebo, which moved from −14.4% to −7.3%. Its multiplier was
+still reading `roles.PROMOTION_FACTOR`, so lowering the constant quietly made the
+placebo weaker. Both arms under comparison had been pinned against exactly that;
+the control had not. It is now parameter-free like the arm it mirrors, and the
+corrected number is the one in the table above.
+
+Three entries running, the harness has been the thing that was wrong first — the
+circular rank, the chart-format break, now the rounding and the constant leak.
+Each was caught by checking the instrument against something independent rather
+than by the result looking implausible. The reproducibility re-run is cheap once
+the trained models are cached and has now earned its place in the routine.

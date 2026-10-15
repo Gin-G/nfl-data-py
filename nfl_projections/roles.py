@@ -73,17 +73,30 @@ _EXPECTED_GAMES_DEEP = {"QB": 0.3, "RB": 4.0, "WR": 5.0, "TE": 4.0}
 DEFAULT_BUDGETS = {"QB": 22.4, "RB": 31.0, "WR": 41.9, "TE": 14.4}
 
 # Extra lift for a backup who has been promoted by an absence, ON TOP of losing
-# his depth-rank discount. Fitted on 2018-23 and tested on 2024-25
-# (experiments/starter_out.py): dropping the discount helps at every position
-# and rank, and only the backfield and quarterback want anything beyond it.
+# his depth-rank discount. Fitted on 2018-23 and tested on 2024-25 against
+# actual usage (experiments/starter_out.py): dropping the discount helps at
+# every position and rank, and only the backfield and quarterback wanted
+# anything beyond it — RB x1.42, QB x1.29, WR and TE 1.0.
 #
-#   RB2 promoted, MAE predicting his usage: 8.54 discounted -> 7.39 undiscounted
-#                                           -> 6.63 with this factor
-#   QB2 promoted:                          23.33 -> 13.33 -> 11.90
-#   WR and TE:                              the fitted factor came back at 1.00
-#                                           and 1.10, the second of which made
-#                                           2024-25 slightly worse. Left at 1.0.
-PROMOTION_FACTOR = {"RB": 1.42, "QB": 1.29, "WR": 1.0, "TE": 1.0}
+# RB IS NOW 1.0, because the backfield's factor did not survive being scored in
+# FanDuel points through the trained model (experiments/promotion_endtoend.py,
+# 2025 + 2026 to date, 7,334 scored player-weeks). The re-ranking itself pays;
+# the extra factor on top of it does not:
+#
+#   on the 309 promoted-RB player-weeks   MAE 3.585 with x1.42 -> 3.381 without
+#   same, as a cluster bootstrap over weeks          +5.7% [+2.0%, +9.6%]
+#   RB ordering, mean weekly top-12 overlap           0.428 -> 0.438
+#   replicated on the current-season-only window      +4.7% [+1.1%, +8.0%]
+#
+# The reason is the one in EXPERIMENTS.md, "the bias that should not be
+# corrected": x1.42 was fitted to hit a promoted back's MEAN usage and it does,
+# almost exactly (bias +0.05 points against an actual of 4.42, against -1.27 for
+# the parameter-free version). Fantasy points are right-skewed, so the mean is
+# not the error-minimising projection, and here chasing it costs the ordering as
+# well, which removes the usual defence. QB x1.29 stays: it is the one position
+# where the factor's point estimate is positive in points too (+2.4% MAE), on 61
+# player-weeks that cannot resolve its size — confirmed in sign, not in size.
+PROMOTION_FACTOR = {"RB": 1.0, "QB": 1.29, "WR": 1.0, "TE": 1.0}
 
 _SKILL = ("RB", "WR", "TE")
 

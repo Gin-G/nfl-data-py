@@ -115,11 +115,32 @@ def test_promotion_is_neutral_when_nobody_above_is_out():
     assert roles.promotion_multiplier("RB", 1, [2, 3]) == 1.0
 
 
-def test_promotion_undoes_the_discount_and_adds_the_measured_lift():
-    """RB2 with RB1 out: the 0.80 discount goes, times the fitted 1.42."""
+def test_promotion_undoes_the_discount():
+    """RB2 with RB1 out is charged the rate of the rank he is filling.
+
+    The 0.80 discount goes and nothing is added on top: the fitted 1.42 was
+    withdrawn when it failed to pay in FanDuel points through the trained model
+    (experiments/promotion_endtoend.py). Asserted against the constant rather
+    than a literal so the test states the composition, not the number.
+    """
     promo = roles.promotion_multiplier("RB", 2, [1])
     expected = (1.0 / 0.80) * roles.PROMOTION_FACTOR["RB"]
     assert promo == pytest.approx(expected, rel=1e-6)
+    assert roles.PROMOTION_FACTOR["RB"] == 1.0
+
+
+def test_only_the_quarterback_keeps_an_extra_factor():
+    """QB is the one position with a lift beyond the rank change.
+
+    Everywhere else the promotion is parameter-free, which is what the
+    end-to-end test preferred at every position it could resolve.
+    """
+    assert roles.PROMOTION_FACTOR["QB"] > 1.0
+    for position in ("RB", "WR", "TE"):
+        assert roles.PROMOTION_FACTOR[position] == 1.0
+        promo = roles.promotion_multiplier(position, 2, [1])
+        static = roles.per_game_role_multiplier(position, 2)
+        assert promo == pytest.approx(1.0 / static, rel=1e-6)
 
 
 def test_promotion_is_larger_for_a_deeper_backup():
@@ -136,7 +157,7 @@ def test_quarterback_promotion_is_the_biggest():
 
 
 def test_receivers_get_the_discount_back_and_no_more():
-    """The fitted extra factor was 1.00 for WR and TE, so only the discount goes."""
+    """The fitted extra factor is 1.00 for WR and TE, so only the discount goes."""
     for position in ("WR", "TE"):
         promo = roles.promotion_multiplier(position, 2, [1])
         static = roles.per_game_role_multiplier(position, 2)
