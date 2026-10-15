@@ -2207,3 +2207,179 @@ against the board's own FanDuel-point error through the trained model. Weeks
 where a starter sits are about 16% of player-weeks, so the effect on aggregate
 weekly MAE will be small even if the affected projections move a lot; the
 prospective scorecard is where that shows up.
+
+## The mid-season mover, and two instruments that lie about him (2026-10-14)
+
+The season-scale finding was that the SIZE of a role travels with the player: an
+arriving veteran's share on his old team carries information his new depth rank
+does not, and `shares.py` ships that as `MOVER_BLEND = 0.3`. That model runs once
+a year over free agency. The weekly path has the same case and no term for it —
+`predict.py` reads a mover's last game row, whose rolling usage and scoring form
+are entirely his old team's, and then applies `per_game_role_multiplier` for his
+new rank. So the obvious next move was the weekly analogue of MOVER_BLEND.
+
+It is not there. The mechanism is real and the fix does not pay.
+
+Harness: `experiments/midseason_mover.py`, 2013-25 (snap counts start in 2013),
+**1,533 mid-season team changes** at skill positions — RB 422, WR 615, TE 325,
+QB 171. Identification is from WEEKLY ROSTERS, not stats rows: a traded player
+who never touches the ball still appears on the new roster, and conditioning on
+having a stats row keeps only the moves that worked out. Those moves yield **369
+arrival player-weeks** in the four weeks after one — he played, he had in-season
+form for the path to carry, and the new chart listed him — against **62,853
+control player-weeks** for everyone who did not just move.
+
+### Two instruments that lie, found the hard way
+
+**Ranking an arrival among his new teammates by trailing usage is circular.** The
+first pass did exactly that — a busy player is mechanically slotted high — so
+"moved up the chart" and "was productive" were the same variable, and every
+rank-based predictor silently double-counted the trailing number. A rank-ratio
+predictor came back at MAE 6.93 against a baseline of 2.69, which read as a
+catastrophic result for the idea when it was a catastrophic result for the
+instrument. Same trap as the team-line-yards leak in "The trench report", and it
+is worth stating as a rule: **if a candidate rank is built from the feature
+being tested, it is not a rank.**
+
+**nflverse's two depth-chart formats are different instruments**, and pooling them
+would have shipped a baseline table understating every mover's new role by nearly
+half:
+
+Mean targets per game for a receiver the chart calls WR1 / WR2, and how many
+players each format lists at those ranks:
+
+| | WR1 | WR2 | players listed at rank 1 / 2 |
+|---|---|---|---|
+| 2013-24 weekly charts | 6.47 | **2.66** | 2.09 / 1.71 |
+| 2025 ESPN snapshots | 7.55 | **5.42** | 1.00 / 1.00 |
+
+The old weekly charts stop at rank 3 and pile ties on each number, so their "WR2"
+is the real #2 blended with the #3 and #4. The snapshots list one player per rank
+and run deeper. Production reads the snapshot format. The fix is the **ordinal
+slot** — the nth player the room lists — which reconciles them, because both
+formats list the same NUMBER of players per room (WR 4.34 vs 4.56, RB 2.54 vs
+2.54, TE 2.69 vs 2.84). Any future experiment keyed on a historical depth-chart
+rank needs this.
+
+### What a mover actually does
+
+With a rank on both sides of the move, and trailing usage frozen before it:
+
+| on paper | n | old chart rank | new chart rank | trailing | actual |
+|---|---|---|---|---|---|
+| moved down | 117 | 1.55 | 2.94 | 5.70 | **5.38** |
+| level | 113 | 2.23 | 2.23 | 6.22 | 6.46 |
+| moved up | 32 | 3.50 | 2.06 | 7.06 | **9.28** |
+
+**A player who drops a full rank does essentially his old usage.** The new, worse
+rank carries almost nothing about what he will actually do; his old role does.
+Moving up lifts him 31%, on 32 rows.
+
+### The blend looked good and then dissolved
+
+A multiplier `w + (1-w) * baseline(slot) / trailing`, replacing the discount,
+fitted leave-one-season-out:
+
+| window | n | production | blend | gain | w | cap |
+|---|---|---|---|---|---|---|
+| weeks 1-2 | 135 | 3.810 | 3.563 | +6.5% | 0.65 | 2.0 |
+| weeks 1-3 | 256 | 3.360 | 3.055 | **+9.1%** | 0.65 | 3.0 |
+| weeks 1-4 | 369 | 3.469 | 3.291 | +5.1% | 0.65 | 3.0 |
+| weeks 6-12 | 434 | 2.947 | 2.994 | **−1.6%** | 0.65 | 2.0 |
+
+The last row is the falsification and it passes: once the trailing window has
+refilled with new-team games there is nothing stale left and the term is worth
+nothing. So the staleness is real and the window is right.
+
+Then the base. Everything above compares predictors built on a raw trailing
+average, and the discount's defence is that it is not applied to one — it is
+applied to the network's output blended 50/50 with form, and the network shrinks
+hard toward the positional mean (blend.py: predicted spread 0.33 of actual at QB,
+~0.70 at RB/WR/TE). Shrinkage lifts a low-usage player, which is part of what the
+blend was being paid for. Rebuilding the base with that shrinkage in it, and
+**refitting the weight at each level** (a weight fitted against a raw average and
+then applied to a shrunk base is not a fair test — it makes the fit's failure look
+like the term's):
+
+| shrinkage λ | arrivals gain | control gain | fitted w |
+|---|---|---|---|
+| 1.0 (raw average) | +7.3% | +3.8% | 0.55 / 0.65 |
+| 0.8 | +3.7% | +1.3% | 0.65 / 0.85 |
+| 0.6 | +1.7% | −1.4% | 0.75 / 0.85 |
+| 0.4 | −1.4% | −4.5% | 0.85 / 0.85 |
+
+Monotone decay, and at the λ production actually carries it is ~3% with the
+fitted weight against the grid boundary. The control is the useful half: the
+blend's apparent universal win at λ=1.0 **reverses** by λ=0.6, which means the
+discount is doing real work for the general population and the "the discount
+hurts everyone" reading I had at λ=1.0 was an artifact of the base.
+
+### Dropping the discount instead, which needs no parameters
+
+At every shrinkage level, simply not discounting an arrival beat the fitted
+blend. That is a far better change — one boolean, no constants, no cap, the same
+shape as the promotion fix. Cluster bootstrap over seasons (clustered because the
+per-season sign flipped 7 times in 13), λ = 0.70:
+
+| group | n | gain | 90% interval |
+|---|---|---|---|
+| all arrivals | 369 | +4.0% | **[−8.6%, +16.0%]** |
+| QB | 18 | +19.9% | [−54.6%, +55.0%] |
+| RB | 110 | +3.9% | [−6.2%, +11.9%] |
+| TE | 61 | −1.7% | [−24.5%, +14.1%] |
+| WR | 180 | −6.5% | **[−11.9%, −1.4%]** |
+| control | 20,000 | +0.4% | [−0.8%, +1.5%] |
+
+**Nothing survives.** Every interval straddles zero except WR, where dropping the
+discount is reliably worse. **Not shipped.**
+
+### The bias is real, and it still should not be corrected
+
+| group | n | actual | production bias | as a share | without the discount |
+|---|---|---|---|---|---|
+| all arrivals | 369 | 5.85 | **−1.879** | −32.1% | −0.165 |
+| control | 62,853 | 8.22 | −0.729 | −8.9% | +0.020 |
+
+A mid-season arrival is priced about **3.6x harder, proportionally,** than a
+settled player — he is listed deeper than his usage warrants because he just got
+there. The bias is not in doubt; correcting it just does not improve MAE, because
+the downward bias is buying variance reduction on a right-skewed target. This is
+the same conclusion as "Four weeks in, and the bias that should not be corrected"
+and for the same structural reason: MAE is minimised by the conditional median
+and fantasy scoring has its mean above its median. Anything needing a mover's
+expected points should take it from the simulator, not from un-discounting him.
+
+One piece of the current behaviour is positively validated: a mover the new chart
+does not list at all gets `roles._UNKNOWN_RANK = 3`, which is a guess rather than
+a reading — and on 203 such weeks it is the right guess (MAE 2.673 discounted vs
+2.907 undiscounted; trailing 4.39, actual 3.62).
+
+### The other kind of arrival pulls the other way
+
+Everything above is a TRADE: a player with in-season form on another team. The
+other population is the mid-season SIGNING — free agent or practice-squad
+promotion, no game yet this season, so the last game row the path reads is from
+last season and the staleness is months rather than weeks. `signings()` finds 68
+such weeks where he played.
+
+| | last season's trailing | new slot's baseline | actual |
+|---|---|---|---|
+| mid-season signing, n=68 | 5.58 | 4.99 | **4.68** |
+
+| predictor | MAE | bias |
+|---|---|---|
+| **production (base x discount)** | **2.739** | −0.549 |
+| no discount | 3.566 | +1.117 |
+| slot baseline alone | 2.802 | |
+
+**Here the discount is correct and necessary**, and dropping it costs 30% —
+bootstrap −30.2% [−65.9%, +0.1%], the one interval in this entry that does not
+straddle zero on the harmful side. His stale form OVER-states him, which is the
+opposite sign from the traded player, and it should be: a skill player who is out
+of the league until October is usually there because he declined, and the deep
+slot the new chart gives him knows that. Production's bias on a signing is −0.55,
+not the −1.88 a trade gets.
+
+So the two kinds of mid-season arrival want opposite corrections, the current
+code applies one rule to both, and on this evidence that rule is the right one
+for each. Nothing to change.
