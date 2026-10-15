@@ -2628,3 +2628,99 @@ circular rank, the chart-format break, now the rounding and the constant leak.
 Each was caught by checking the instrument against something independent rather
 than by the result looking implausible. The reproducibility re-run is cheap once
 the trained models are cached and has now earned its place in the routine.
+
+## Charted line play: yards before contact, and the pressure field that exists (2026-10-15)
+
+`trenches.py` grades four units off play-by-play and explains two of its choices
+as workarounds: adjusted line yards uses Football Outsiders' banding "because
+the first four yards of a carry belong to the line and the eleventh does not",
+and pressure is sack-or-hit per dropback "because nflverse publishes no pressure
+field". The first is a proxy for a measurement. The second is simply **not
+true** — it is published, through Pro Football Reference's charting, weekly back
+to 2018:
+
+    rushing_yards_before_contact / _after_contact / rushing_broken_tackles
+    times_pressured, times_hurried, times_blitzed, times_hit, times_sacked
+    def_pressures, def_sacks, def_missed_tackles
+
+`nflreadpy` 0.1.3 has no `load_pfr_advstats` (the R package does), so
+`experiments/trench_charted.py` reads the nflverse-data release assets directly,
+one parquet per season per stat type. 4,190 team-weeks, 2018-25.
+
+Split-half within season over 2022-25, the same protocol and window as "The
+trench report" above — but the shipped metrics are **recomputed through this
+harness** rather than quoted from that entry, because its split-half ran over
+raw plays and this one runs over team-week rates, and comparing a new metric
+measured one way against an old one measured another way is not a comparison.
+
+| metric | offence r | defence r | meant to measure |
+|---|---|---|---|
+| charted yards before contact / carry | **0.367** | 0.356 | the line |
+| charted yards after contact / carry | 0.065 | 0.049 | the back |
+| charted broken tackles / carry | 0.210 | 0.088 | the back |
+| *shipped:* adjusted line yards | 0.339 | **0.418** | the line |
+| *shipped:* stuff rate | 0.304 | 0.431 | the line |
+| charted pressure rate | 0.377 | 0.160 | protection / rush |
+| charted hurry rate | 0.125 | **−0.054** | protection / rush |
+| charted blitz rate faced | 0.286 | **0.659** | scheme, not the line |
+| *shipped:* pressure proxy (sack or hit) | **0.566** | **0.336** | protection / rush |
+| *shipped:* sack rate | 0.510 | 0.040 | protection / rush |
+
+Populations are 94% shared on the rushing side — PFR is per-rusher so QBs are
+dropped entirely, while `trenches.plays` drops scrambles and keeps designed QB
+runs — and 100.5% on dropbacks.
+
+### Yards before contact is the right idea and a lateral move
+
+As an offence trait it beats the banding, 0.367 against 0.339. As a defence trait
+it loses, 0.356 against 0.418, and the rating blends the banding with stuff rate
+precisely because stuff rate is the half that survives opponent adjustment on
+defence. Year over year the same: 0.287/0.242 against 0.308/0.367. A new data
+dependency for ±0.03 of split-half correlation in opposite directions by side is
+not worth taking, so **nothing changes.**
+
+What it does buy is the explanation the banding never had. **Yards after contact
+is not a team trait at all** — 0.065 on offence, 0.049 on defence, which is zero
+either way — and broken tackles barely more. So the carry really does divide into
+a stable part and a noise part at roughly the halfway mark (before-contact is
+0.50-0.60 of yardage, league-wide, by season), and FO's decision to count the
+first four yards fully and nothing past ten was a good guess at where that line
+falls. The proxy works because the thing it discards is unpredictable.
+
+It also closes off a plausible-sounding defensive metric: **yards after contact
+allowed cannot grade a front** (0.049). Tackling is not a measurable unit trait
+at team-week scale, so "our line gets pushed around after contact" is not a
+thing the data can say.
+
+### The pressure field exists and is worse than the proxy
+
+This is the one I expected to go the other way. Charted pressure is 1.6x the
+volume of sack-or-hit and correlates with it at only 0.717, so it is genuinely
+different information — and it is **materially less stable**: 0.377 against 0.566
+on offence, and on defence 0.160 against 0.336, less than half. Charted hurry
+rate on defence is **−0.054**, anti-correlated with itself across halves of the
+same season, which is what a field reads like when the charting varies more than
+the thing being charted.
+
+A sack and a QB hit are scorebook events. A "pressure" is a judgment, and the
+judgment moves between games. So the free proxy beats the hand-charted
+measurement here, which is the reverse of the assumption the trench work started
+from — that the subscription product has something nflverse cannot rebuild.
+
+`trenches.py`'s docstring now says this instead of claiming the field does not
+exist. The reason for the choice is stronger than the one it replaces: measured,
+not unavailable.
+
+### The one thing here with no counterpart in the ratings
+
+**Blitz rate faced is a defensive trait at r = 0.659**, the most stable defensive
+number anywhere in the trench work and second only to FTN role (0.748) in this
+file. Nothing in `trenches.py` uses it, and defensive pass rush is the unit with
+the weakest claim to being a trait at all (0.040 by sacks, 0.160 by charted
+pressure, 0.336 by the shipped proxy).
+
+That is a candidate and not a finding. "Blocking scheme is the most stable trait
+in this file and predicts nothing" is two entries back, and blitz rate is the
+same shape of thing: a scheme identity, stable because coordinators are
+consistent, with no demonstrated link to anything a projection needs. It should
+be tested against quarterback output and sack props before anyone believes it.

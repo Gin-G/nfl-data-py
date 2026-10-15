@@ -25,10 +25,21 @@ with the rating rather than living in a file nobody opens, and the dashboard
 shows what each band actually delivered.
 
 Metric choices follow the same work: adjusted line yards uses FO's banding
-because the first four yards of a carry belong to the line and the eleventh
-does not, and pressure is sack-or-hit per dropback because nflverse publishes
-no pressure field. Gap-level ratings are deliberately absent — cut by run gap
-the signal collapses to r = 0.09, about twenty carries a side.
+because the first four yards of a carry belong to the line and the eleventh does
+not, and pressure is sack-or-hit per dropback. Gap-level ratings are deliberately
+absent — cut by run gap the signal collapses to r = 0.09, about twenty carries a
+side.
+
+Both metric choices were then checked against the charted alternatives, which DO
+exist — Pro Football Reference publishes yards before contact and a real pressure
+count weekly through nflverse (EXPERIMENTS.md, "Charted line play"). Neither
+replaced what is here. Yards before contact is a better offence trait than the
+banding (split-half 0.367 vs 0.339) and a worse defence one (0.356 vs 0.418), so
+it is a lateral move for a new data dependency. Charted pressure is worse on both
+sides, 0.377 vs 0.566 on offence and 0.160 vs 0.336 on defence, because a sack and
+a hit are scorebook events while a pressure is a judgment that moves between
+games. Yards AFTER contact is not a team trait at all (0.065 / 0.049), which is
+why the banding works: what it discards is unpredictable.
 """
 from __future__ import annotations
 
