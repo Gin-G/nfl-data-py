@@ -2963,3 +2963,133 @@ What would change the answer: a scoring system that charges for sacks, a target 
 is passing yardage rather than fantasy points, or a market price for a back's rushing
 yardage against a specific front. The first two are not this board and the third is a
 line, which this test does not get to use.
+
+## Per-corner coverage grades: the yards are not a trait (2026-10-16)
+
+"Coverage matchup — a null result, and one narrow win" tested this at the team
+level and found wide receiver **actively worse** (MAE 26.73 → 26.94, correlation
+0.472 → 0.457). The diagnosis written there was specific, and half of it turns
+out to be wrong:
+
+> "yards allowed to WR" is spread across a defence's whole secondary and a
+> team's whole receiving corps... The thing that would — which corner travels
+> with him and whether he is any good — is a shadow-coverage assignment, and
+> nflverse has no such field.
+
+**Whether he is any good is published.** Pro Football Reference charts coverage
+*per defender*, weekly back to 2018, through the same nflverse release assets
+the trench work reads: targets, completions, yards, touchdowns and passer rating
+allowed, plus how deep he was tested. 16,832 corner-weeks, 646 corners. Only the
+assignment is genuinely missing. Harness: `experiments/coverage_grades.py`.
+
+### A corner sees 26 targets a season, and it decides everything
+
+Median targets per corner-season is **26** (25th percentile 8, 75th 60). That
+number governs the whole file. Within-season split-half, 2022-25, is hopeless
+for every outcome metric — yards allowed per target comes in at **0.037**. The
+question is whether that is noise or absence, so the threshold was raised and
+then the sample was maximised by correlating each corner against himself across
+**odd versus even weeks of his entire career** (125 corners with 100+ targets a
+side, which no single game can straddle):
+
+| metric | within-season | career odd/even | what it is |
+|---|--:|--:|---|
+| targets per game | 0.293 | **0.728** | role: is he thrown at |
+| average depth of target | 0.403 | **0.733** | role: how deep is he tested |
+| completion % allowed | 0.220 | **0.519** | outcome, and it survives |
+| yards after catch per completion | 0.232 | 0.341 | outcome |
+| passer rating allowed | 0.119 | 0.204 | outcome |
+| **yards allowed per target** | **0.037** | **0.188** | outcome |
+| TDs allowed per target | 0.082 | 0.086 | outcome |
+
+Raising the within-season minimum does not rescue the yardage either — 0.037 at
+20 targets, 0.028 at 30, 0.054 at 40 — and at the tighter career threshold (200+
+targets a side) yards per target goes **negative, −0.208**, as do YAC and TDs.
+That is the signature of nothing being there, not of something being hard to see.
+
+**So the number a corner ranking most wants to use is the one that does not
+persist.** The mechanism is arithmetic: yards per target is completion rate times
+yards per completion, and the second factor rides on a handful of long plays. One
+70-yard touchdown on a 60-target season moves a corner's yards per target by 1.2.
+Completion rate is a per-event binary on the identical sample, which is why it
+survives at 0.519 where the yardage built on top of it does not.
+
+The two strongest numbers in the table are **role, not quality** — how often and
+how deep a corner is thrown at. That is the same shape as FTN role (0.748) and
+blocking scheme, and it carries the same warning: a corner who is avoided and a
+corner who is good are indistinguishable in an outcome rate. Only the volume
+column tells them apart, which is why the shipped page puts them side by side.
+
+### Against the board's own error
+
+Grades were assembled into a team coverage number — target-weighted over the
+corners who actually played, prior weeks only, shrunk toward the league rate by
+60 targets, built from completion rate alone because putting yardage in would
+import the noise the table above just rejected. Plus `cover_spread`: the
+completion-rate gap between a secondary's best and worst regular corner, which
+is the part of a "pick on him" read that does **not** need the assignment.
+
+Scored against the production board's residual, reusing the backtest rows cached
+by `blitz_qb.py` — 2021-25, `opponent=False` as served, so the board carries no
+coverage information of any kind. 34,640 player-weeks. `+quality` is the same
+slope fit beside points the defence has already conceded to that position:
+
+| pos | grade | n | slope | 95% CI | +quality |
+|---|---|--:|--:|---|--:|
+| **WR** | completion % allowed | 16,380 | −0.005 | [−0.116, +0.101] | −0.017 |
+| **WR** | corner spread | 16,380 | +0.068 | [−0.027, +0.166] | +0.061 |
+| **WR** | corner aDOT | 15,554 | +0.113 | [−0.015, +0.228] | +0.099 |
+| TE | corner spread | 5,938 | +0.126 | [+0.023, +0.226] | **+0.107** |
+| RB | completion % allowed | 9,122 | +0.355 | [+0.219, +0.501] | **+0.304** |
+| RB | corner aDOT | 8,678 | −0.249 | [−0.406, −0.105] | **−0.222** |
+| QB | corner spread | 3,200 | +0.460 | [+0.197, +0.756] | **+0.327** |
+| QB | corner aDOT | 3,034 | +0.334 | [+0.055, +0.626] | **+0.292** |
+
+**Wide receiver is null on all three grades**, which is the third independent
+failure for the WR coverage matchup — team-level yards allowed, per-corner
+grades, and now the board's residual. The positions that light up are the ones
+nobody asked about: a secondary whose corners allow completions and are tested
+shallow concedes underneath, which is where a back's receiving work lives, and
+an uneven secondary shows up for tight ends and quarterbacks. Twelve tests were
+run, so read the survivors as candidates.
+
+### And nothing pays
+
+Each position's best grade, fitted leave-one-season-out, applied as one additive
+term with the intercept dropped (#31 again):
+
+| pos | grade | board MAE | corrected | gain | 95% paired CI | top-N delta |
+|---|---|--:|--:|--:|---|--:|
+| WR | aDOT | 3.9783 | 3.9815 | **−0.0032** | [−0.0059, −0.0007] | −0.0000 |
+| TE | spread | 3.1469 | 3.1466 | +0.0003 | [−0.0026, +0.0033] | +0.0019 |
+| RB | cmp % | 4.2899 | 4.2896 | +0.0003 | [−0.0073, +0.0080] | −0.0065 |
+| QB | spread | 6.5116 | 6.4971 | +0.0145 | [−0.0031, +0.0320] | −0.0019 |
+
+Wide receiver is the only interval clear of zero and it is on the harmful side.
+The rest are zero, and the ordering column is flat or slightly negative
+everywhere. This is the blitz-rate result again, arrived at from a completely
+different direction: a clear slope against the board's residual, worth nothing
+once it is actually applied.
+
+### Shipped as a report, not as an input
+
+`nfl_projections/coverage.py` — per-corner grades, secondary grades with
+`cover_spread`, and a weekly matchup table — plus `/coverage/{corners,
+secondaries,matchups}` on NFL-API and a Coverage Report tab beside the Trench
+Report. 13 tests, including one that asserts `predict.py`, `blend.py`, `roles.py`
+and `model.py` do not import the module, so the measured decision cannot be
+undone by accident.
+
+The page shows yards per target greyed out with the 0.19 next to it, shows
+target volume beside every grade, and labels every wide receiver `context only`.
+The one coverage adjustment that remains shipped anywhere is still tight-end
+receiving in sharp-edge `nfl/matchup.py`, from the team-level work.
+
+Sanity check against an outside source, which is a check and not evidence: a
+podcast segment this week named Washington, Chicago and Arizona as the softest
+coverage, and Mike Sainristil as the corner to attack in Washington. This module
+independently puts Washington 7th and Chicago 8th of 32 and names Sainristil as
+Washington's weakest regular corner. Arizona comes out 12th, softer than average
+rather than bottom three. Both readings may well be derived from the same PFR
+charting, so agreement here means the pipeline is wired up correctly and nothing
+more.
