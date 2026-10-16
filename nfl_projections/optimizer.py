@@ -103,10 +103,18 @@ def normalize_name(name):
     return name.replace(".", "").lower().strip()
 
 
-def merge_fanduel_salaries(fanduel_df, predictions_df):
+def merge_fanduel_salaries(fanduel_df, predictions_df, opportunity_context=None):
     """Join a FanDuel salary export with our projections by normalized name.
 
     Adds a 'value' column (projected points per $1000 of salary).
+
+    `opportunity_context` is the frame from `nfl_projections.opportunity`, and
+    it is **context only**: it adds columns beside `value` and never enters the
+    objective. That boundary is measured, not cautious — opportunity share and
+    volume-implied points are both null against the board's own error, because
+    the board already carries volume as input features, and the one piece left
+    over (`volume_td_gap`) buys 0.2 points of top-24 overlap in 4 weeks out of
+    83. The optimizer reads nothing but the order, so it stays outside.
     """
     fanduel_df = fanduel_df.copy()
     predictions_df = predictions_df.copy()
@@ -116,6 +124,10 @@ def merge_fanduel_salaries(fanduel_df, predictions_df):
     merged = pd.merge(fanduel_df, predictions_df, on="Normalized_Name", how="left")
     merged = merged.drop(columns=["Normalized_Name"])
     merged["value"] = (merged["fanduel_fantasy_points"] / merged["Salary"]) * 1000
+    if opportunity_context is not None:
+        from . import opportunity
+
+        merged = opportunity.attach(merged, opportunity_context)
     return merged
 
 
@@ -271,7 +283,9 @@ def display_lineups(lineups):
     for i, lineup in enumerate(lineups, 1):
         print(f"\nLineup {i}:")
         cols = [c for c in ["Roster Position", "Nickname", "Salary", "lineup_points",
-                            "floor", "ceiling", "Injury Indicator"] if c in lineup.columns]
+                            "floor", "ceiling", "opp_per_game", "opp_share",
+                            "volume_td_gap", "Injury Indicator"]
+                if c in lineup.columns]
         print(lineup[cols])
         print(f"Total Salary: ${lineup['Salary'].sum():,.0f}")
         print(f"Projected Points: {lineup['lineup_points'].sum():.2f}")

@@ -3093,3 +3093,145 @@ Washington's weakest regular corner. Arizona comes out 12th, softer than average
 rather than bottom three. Both readings may well be derived from the same PFR
 charting, so agreement here means the pipeline is wired up correctly and nothing
 more.
+
+## Opportunity share: the premise is right, the board already has it (2026-10-16)
+
+The ask was for the optimizer to prefer players who "have their hands on the
+ball a lot ... underpriced wide receivers that get volume, but maybe haven't
+scored a lot of touchdowns", with targets and rush attempts both counting for a
+running back. Harness: `experiments/opportunity_share.py`, 58,940 player-weeks,
+2018-26, 1,561 players.
+
+**One part of the ask cannot be measured at all.** There are no historical
+FanDuel salaries in either repo and no free source for them (DFS pricing
+sources were swept 2026-10-07; only the CSV upload and paid feeds survive). So
+nothing here compares a player to his price. Everything below is measured
+against the **board**, and "underpriced" follows only if FanDuel's salary tracks
+recent fantasy points — an assumption about FanDuel, not a result in this file.
+
+Opportunity is `targets + carries` for a skill position. For a quarterback it is
+`attempts + carries`: fitting points on targets for a quarterback returns 5.1
+points per target off a column that is almost entirely zeroes, which is how that
+definition announced itself as wrong.
+
+### The premise is not just right, it is the strongest signal in this file
+
+Odd weeks against even weeks, per player:
+
+| | in season | career |
+|---|--:|--:|
+| opportunities / game | **0.974** | **0.987** |
+| opportunity share | **0.977** | **0.986** |
+| targets or attempts / game | 0.979 | 0.989 |
+| snap share | 0.963 | 0.979 |
+| FanDuel points / game | 0.847 | 0.942 |
+| touchdowns / game | 0.810 | 0.928 |
+| **touchdowns / opportunity** | **0.178** | **0.288** |
+
+Volume is very nearly deterministic; scoring is not; and the part of scoring
+volume cannot explain — touchdowns per opportunity — is close to a coin flip.
+Two players with the same volume are very nearly the same bet however
+differently they finished. That is the ask's reasoning, and it holds.
+
+(These levels are inflated by between-player spread, since a star and a scrub
+are both in the pool. The ordering is the finding, not the absolute values.)
+
+### But the board carries volume already, so only the residual is news
+
+The board's features include `targets`, `carries`, `target_share`,
+`air_yards_share`, `wopr` and an `opportunity_score`. Against its own error on
+the cached 2021-25 production backtests (27,297 scored player-weeks, board MAE
+4.1935), volume by itself is **nothing**, and that is the correct result:
+
+| position | opp share | xFP | volume-TD gap | gap, +predicted held |
+|---|--:|--:|--:|--:|
+| QB | −0.025 | −0.015 | +0.072 (p=0.53) | −0.163 |
+| RB | +0.102 | −0.012 | **+0.611** [+0.385, +0.827] | +0.515 |
+| WR | +0.061 | −0.040 | **+0.633** [+0.452, +0.806] | +0.415 |
+| TE | +0.654 | +0.202 | **+0.722** [+0.488, +0.977] | +0.685 |
+
+Twelve slopes tested. `opp share` and `xFP` alone are null everywhere the sample
+is large — the board has them. What it does **not** have is the *gap* between
+volume-implied points and points actually scored: p=0.003 at RB, WR and TE, same
+sign, and it survives holding the board's own projection. The board is partly
+chasing recent touchdown luck, exactly as the ask supposed.
+
+### What it is worth: MAE yes, order barely
+
+Leave one season out, slope only (#31: a per-position bias shift is a separate
+result and would be charged to this term):
+
+| | MAE gain | 95% paired CI | weeks won | top-N delta | 95% paired CI |
+|---|--:|--:|--:|--:|--:|
+| WR gap | +0.33% | [+0.0008, +0.0279] | 43/83 | +0.0035 | [−0.0060, +0.0131] |
+| WR opp share | +0.14% | [+0.0020, +0.0091] | 51/83 | **+0.0020** | **[+0.0005, +0.0040]** |
+| TE gap | +0.46% | [+0.0007, +0.0300] | 45/77 | −0.0044 | [−0.0200, +0.0111] |
+| TE opp share | **+1.95%** | [+0.0535, +0.0763] | **72/77** | −0.0044 | [−0.0123, +0.0022] |
+| RB gap | +0.20% | [−0.0066, +0.0249] | 47/83 | +0.0042 | [−0.0105, +0.0190] |
+| QB (all) | ≤0 | — | — | ≤0 | — |
+
+`WR opp share` is the **first ordering gain of this whole run of entries whose
+interval clears zero** — and it is 0.2 points of top-24 overlap, improving 4 of
+83 weeks. The mean is carried by a handful of weeks and the rest are ties.
+
+`TE opp share` is the instructive one: it wins **72 of 77 weeks on MAE, 1.95%**,
+and makes the order *worse*. A term can compress errors without reordering
+anything, and the optimizer reads nothing but the order.
+
+### The promoted backup is backwards
+
+"Backups starting due to injury" was tested as last week's opportunity share
+against the season's, which is the form the board's season-rolling features
+would miss:
+
+| position | slope on board error | 95% CI | +predicted |
+|---|--:|--:|--:|
+| QB | +0.133 | [−0.007, +0.287] | +0.132 |
+| RB | −0.141 | [−0.290, +0.006] | −0.067 |
+| WR | **−0.964** | [−1.204, −0.715] | −0.769 |
+| TE | **−0.640** | [−0.993, −0.292] | −0.566 |
+
+Negative. On the clearest promotions — last week's share at least double the
+season's — receivers actually scored **3.688 against a 4.470 projection**, 997
+of them. A one-week volume spike is mostly a blowout or a garbage-time binge,
+the board chases it, and the player disappoints. Chasing last week's volume is a
+trap at receiver and tight end. The one place the instinct may hold is
+quarterback (+2.134 residual on 56 cases) where a replacement starter inherits
+the entire workload, but 56 cases and an interval touching zero is not a finding.
+The *real* version of this is a known depth-chart or injury change, which
+`roles.py` already handles and which the promotion entry already scored.
+
+### Matchups move volume and still do not pay
+
+This was the one matchup term with a measured reason to exist: the blitz entry
+found a defence's blitz rate moves running-back carries (−0.320) and receiver
+targets (+0.193) while leaving points alone, so volume is where an opponent
+effect was last seen alive. Opponent opportunity allowed, from that defence's
+prior weeks only, does move a player's own opportunities (QB +1.082, WR +0.151
+p=0.003) and does predict the board's error — **QB +1.554 [+0.498, +2.582],
+p=0.003, surviving the projection control at +1.524, the largest single slope in
+the file.** The negative control is clean: the same number joined to the
+player's *own* defence straddles zero at every position, so the merge is right.
+
+Held out, it is **harmful**: QB −1.89% of MAE [−0.2150, −0.0281], TE −3.96%,
+RB −1.26%, and QB ordering −0.0103. The biggest slope in the file costs about
+two percent of quarterback MAE when it is not allowed to see its own season.
+
+### Decision
+
+**Nothing changes `lineup_points` and nothing changes the board.** The ordering
+bar is the one the optimizer actually reads, and the single term that clears it
+is worth 0.2 points of top-24 overlap in 4 weeks out of 83.
+
+What ships is **visibility, not scoring**: the optimizer frame carries
+`opp_per_game`, `opp_share`, `xfp_per_game` and `volume_td_gap` beside `value`,
+so the player who gets volume and has not scored is *legible* in the pool the
+lineups are built from. The same shape as the Coverage Report — a measured
+number shown next to the board, explicitly not inside it. Tests assert the
+optimizer's objective columns are untouched.
+
+Three things are now measured and should stop being re-asked: volume is a trait
+and touchdown rate is not (so a volume-light, touchdown-heavy player is the one
+to fade, which the board partly knows); last week's volume spike is a fade at
+WR/TE, not a buy; and an opponent's volume allowed is the fourth matchup
+instrument to produce a real slope and fail out of sample.
