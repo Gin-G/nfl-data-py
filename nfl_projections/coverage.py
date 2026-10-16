@@ -92,8 +92,8 @@ def load_charting(seasons) -> pd.DataFrame:
         try:
             frames.append(pd.read_parquet(_RELEASE % season))
         except Exception as exc:          # a season not yet published
-            logger.warning("PFR def charting %d unavailable: %s", season,
-                           type(exc).__name__)
+            logger.warning("PFR def charting %d unavailable: %s: %s", season,
+                           type(exc).__name__, exc)
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
