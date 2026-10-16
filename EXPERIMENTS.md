@@ -2724,3 +2724,242 @@ in this file and predicts nothing" is two entries back, and blitz rate is the
 same shape of thing: a scheme identity, stable because coordinators are
 consistent, with no demonstrated link to anything a projection needs. It should
 be tested against quarterback output and sack props before anyone believes it.
+
+*Tested the same day against quarterback output — see "Blitz rate against
+quarterback output" below. It is inert for quarterbacks even with the rate read
+out of the game itself, real for backs and receivers, and worth zero on the
+board. Sack props were not used and will not be: a line cannot be a regressor
+in a test for edges against lines.*
+
+## Blitz rate against quarterback output — and the two positions it actually moves (2026-10-15)
+
+The entry above left blitz rate faced as the one charted number with no counterpart
+in the ratings: a defensive trait at r = 0.659 split-half, the most stable defensive
+measurement anywhere in the trench work, and unused. It also left the reason not to
+believe it yet — "blocking scheme is the most stable trait in this file and predicts
+nothing" is three entries back, and a blitz rate is the same shape of claim. So:
+does a defense's blitz rate move the quarterback it is pointed at?
+
+**No betting lines anywhere in this test**, on instruction and on the merits. A sack
+prop or an implied total already contains whatever the market knows about the
+matchup, so conditioning on one measures what survives after the edge has been taken
+out, which is the opposite of the question. A line is a benchmark to score against
+later, never a regressor here.
+
+`experiments/blitz_qb.py`. 3,889 quarterback starts (10+ attempts) 2018-25, 89
+passers, matched to 98.6% of charted defense-weeks. 2026 is absent for a structural
+reason: every outcome is scored against the passer's own season mean, and that needs
+more games than the season has played.
+
+### Three instruments, because one would not be believable
+
+| instrument | what it is | r against the rate in the game |
+|---|---|--:|
+| in-season | the defense's rate over its own prior weeks, read at 100+ dropbacks | 0.450 |
+| last-season | the same defense over the whole previous season | 0.283 |
+| oracle | the rate in the game itself — not a forecast, a ceiling | 1.000 |
+
+A blitz rate spans a lot: the bottom decile of defense-weeks blitzes 15.4% of
+dropbacks, the top decile 39.4%, and one standard deviation is 7.3 points of rate.
+Year over year the trait holds at r = 0.499 on 222 team-seasons. The instrument was
+never the problem.
+
+### The quarterback: nothing, by every instrument and at every control
+
+Slope in FanDuel points per +1 sd of blitz rate, each week scored against the same
+passer's own season mean with that week left out, so quarterback quality cancels
+exactly. Intervals are a cluster bootstrap over (season, week); the p-value is a
+permutation that reshuffles which defense each passer faced *inside its own week*,
+holding the slate, the weather and the injury report fixed rather than modelling them.
+
+| fit | n | slope | 95% CI | perm p |
+|---|--:|--:|---|--:|
+| raw, in-season | 3,130 | −0.083 | [−0.369, +0.211] | 0.604 |
+| own-mean, in-season | 3,130 | −0.097 | [−0.366, +0.177] | 0.522 |
+| own-mean, last-season | 3,431 | +0.191 | [−0.067, +0.438] | 0.172 |
+| **own-mean, oracle** | 3,889 | **+0.043** | [−0.194, +0.295] | 0.780 |
+| own-mean, in-season + points allowed | 3,130 | −0.117 | [−0.387, +0.151] | — |
+| own-mean, in-season + 3 model columns | 3,130 | −0.114 | [−0.408, +0.180] | — |
+| own-mean, oracle + 3 model columns | 3,130 | −0.037 | [−0.312, +0.257] | — |
+
+The oracle row is the one that closes it. Knowing *exactly* how often a defense will
+blitz — which no Thursday knows — is worth 0.04 ± 0.25 FanDuel points. There is no
+forecast of a quantity that can beat perfect knowledge of it, so the two forecastable
+instruments were never going to find anything, and a feature built on either cannot.
+
+Nor is it hiding in the shape of the distribution. By tercile of the in-season rate
+the residual means are −0.145 / −0.164 / +0.004, the residual spreads 8.11 / 8.12 /
+8.29, the share of 20-point weeks 0.353 / 0.354 / 0.367 and the bust rate below ten
+0.221 / 0.206 / 0.209. By decile the top-minus-bottom residual gap is −0.65 points
+across a 15.4% → 39.4% span in blitz rate, inside the week-to-week noise. "A blitz
+creates variance even if it does not move the mean" is a reasonable guess and it is
+also false here.
+
+### What *does* move, and why it cancels
+
+The stat line is not inert — it moves in offsetting directions, per +1 sd of the
+in-season rate:
+
+| outcome | mean | slope | 95% CI |
+|---|--:|--:|---|
+| attempts | 32.7 | **+0.497** | [+0.175, +0.803] |
+| sacks suffered | 2.28 | **+0.095** | [+0.036, +0.145] |
+| sack rate | 0.066 | **+0.002** | [+0.000, +0.003] |
+| passing yards | 236.2 | +2.448 | [−0.252, +5.096] |
+| EPA per play | 0.058 | **−0.015** | [−0.027, −0.002] |
+| carries | 3.73 | **−0.097** | [−0.167, −0.026] |
+| air yards per attempt | 7.90 | −0.021 | [−0.099, +0.056] |
+
+A blitz-heavy defense gives a quarterback half an extra throw and takes a little off
+every one of them. **FanDuel does not charge for a sack** — sack yardage is not
+subtracted from passing yards — so the volume gain and the efficiency loss meet in
+the middle and the fantasy total does not know anything happened. The effect is real
+in football and absent in the scoring system, which is a distinction this ledger has
+not had to make before.
+
+The folk version fails too. Mobile quarterbacks (top tercile of own carries per game,
+5.0) are supposed to punish a blitz; their slope is **−0.543 [−1.085, +0.004]**,
+pointing the wrong way, against +0.050 for pocket passers. Three bands, one that
+grazes zero: not a finding, but nobody should repeat the opposite as though it were.
+
+### The oracle is not clean either, which is why it is only a ceiling
+
+Reading the rate out of the game being predicted buys a correlation with the game.
+A defense that is behind blitzes more (r = −0.124 against its own mean scoreboard),
+so the oracle's components are contaminated by score: oracle → interceptions is
+**−0.087 per sd [−0.113, −0.063]**, and nobody believes a blitz *prevents* picks.
+That is the feedback loop being read backwards as an effect. Holding the scoreboard
+moves the quarterback's FanDuel slope from +0.043 to −0.144 [−0.384, +0.094] —
+still nothing, from the other side of zero.
+
+### The two positions that were not the question
+
+The frame was already built, so the same test ran for the skill positions, on weeks
+where the player took 40% of his offense's snaps. Slope in FanDuel points per +1 sd,
+own-mean scored, same cluster bootstrap and same within-week permutation:
+
+| pos | n | in-season | 95% CI | perm p | + points allowed | + 3 model cols |
+|---|--:|--:|---|--:|--:|--:|
+| **RB** | 3,573 | **−0.541** | [−0.807, −0.271] | **0.000** | −0.444 | −0.414 |
+| **WR** | 10,246 | **+0.219** | [+0.064, +0.392] | **0.003** | +0.209 | +0.173 |
+| TE | 3,713 | −0.057 | [−0.221, +0.121] | 0.515 | −0.050 | −0.043 |
+| QB | 3,130 | −0.097 | [−0.366, +0.177] | 0.522 | −0.117 | −0.114 |
+
+Backs lose and receivers gain, and both survive being fit beside the points that
+defense has already conceded to that very position — the production model's own
+coarse opponent column, rebuilt here on a longer memory than the real one, so if
+anything a harder control than the model would apply. The components say the same
+thing: RB carries −0.320 [−0.494, −0.136] and rushing yards −1.960 [−3.157, −0.817];
+WR targets +0.193 [+0.120, +0.265] and receiving yards +1.057 [+0.296, +1.842].
+Blitz-heavy fronts put bodies near the line and leave fewer behind it. **The
+check-down story is backwards** — the ball goes outside, not to the back, and the
+back's running room is what pays for it.
+
+The weaker instruments do not contradict this; they are attenuated by a known
+amount. A regression on a noisy regressor shrinks by the ratio of the instruments'
+correlations with the thing itself, 0.283 / 0.450 = 0.630:
+
+| pos | in-season | last-season predicted | last-season observed | 95% CI | consistent |
+|---|--:|--:|--:|---|---|
+| RB | −0.541 | −0.341 | −0.198 | [−0.516, +0.129] | yes |
+| WR | +0.219 | +0.138 | +0.072 | [−0.086, +0.231] | yes |
+| TE | −0.057 | −0.036 | +0.054 | [−0.107, +0.227] | yes |
+
+And the oracle agrees once the scoreboard is held: WR +0.193 [+0.035, +0.330] on its
+own strength (perm p 0.000), RB from +0.078 to **−0.176** [−0.440, +0.087]. Three
+instruments, one direction per position. "Two instruments that lie" is two entries
+back; this time checking whether the weak one's interval contains the *attenuated*
+prediction, rather than whether it clears zero, is what kept them from looking like
+a contradiction.
+
+### Real, and worth almost nothing
+
+Across the whole league span — bottom decile to top, 15.4% to 39.4%, about 3.3 sd —
+the effect is **−1.8 FanDuel points for a back** on a 13.6 mean and **+0.7 for a
+receiver** on a 9.0 mean. That sounds usable right up to the moment it is held out
+of sample. Leave one season out, baseline carrying the points-allowed column:
+
+| pos | n | base MAE | with blitz | gain | seasons won |
+|---|--:|--:|--:|--:|--:|
+| RB | 3,573 | 6.2791 | 6.2708 | **+0.0083** | 6/8 |
+| WR | 10,246 | 5.1191 | 5.1186 | +0.0005 | 5/8 |
+| TE | 3,713 | 3.9838 | 3.9832 | +0.0006 | 5/8 |
+| QB | 3,130 | 6.4713 | 6.4746 | −0.0033 | 4/8 |
+
+### Against the board itself, which is the only test that settles it
+
+A slope against a player's own season mean is not a slope against what production
+serves. That gap is what the promotion entry had to come back for a day ago, so this
+one does not leave it open. `evaluate.backtest` over 2021-25, one seed, `opponent=False`
+exactly as the board is served — the model carries **no opponent column at all**, the
+three matchup entries above being why — so a blitz rate here is not competing against a
+weaker version of itself. 31,574 scored player-weeks, board MAE 4.1791.
+
+**The board's error does know about blitz rate.** Regressing the residual on the rate
+the model never saw:
+
+| pos | n | board bias | slope | 95% CI | perm p |
+|---|--:|--:|--:|---|--:|
+| QB | 2,372 | +0.483 | +0.103 | [−0.217, +0.434] | 0.550 |
+| **RB** | 6,776 | +0.160 | **−0.284** | [−0.458, −0.128] | **0.000** |
+| **WR** | 12,184 | +0.078 | **+0.136** | [+0.022, +0.256] | **0.013** |
+| TE | 4,435 | −0.068 | −0.057 | [−0.206, +0.085] | 0.370 |
+
+So the information is real, it is forecastable, and it is genuinely missing from
+production. Everything up to here says build the feature. Then it gets scored.
+
+One additive term per position, fitted leave-one-season-out, applied two ways —
+the whole fitted line, and the slope with the intercept dropped, because a
+per-position bias shift is **#31, the bias that should not be corrected**, and would
+otherwise be charged to the blitz term:
+
+| pos | board MAE | bias + slope | slope only | slope-only gain | 95% paired CI | weeks won |
+|---|--:|--:|--:|--:|---|--:|
+| QB | 6.4280 | 6.4606 | 6.4310 | −0.0031 | [−0.0086, +0.0025] | 37/79 |
+| RB | 4.2513 | 4.3096 | 4.2529 | −0.0016 | [−0.0100, +0.0065] | 39/79 |
+| WR | 3.9774 | 3.9998 | 3.9777 | −0.0003 | [−0.0036, +0.0027] | 44/79 |
+| TE | 3.1671 | 3.1854 | 3.1685 | −0.0014 | [−0.0033, +0.0006] | 35/79 |
+
+The slope is worth **nothing**: every interval straddles zero and the point estimates
+are a thousandth of a FanDuel point. Splitting it from the intercept mattered —
+`bias + slope` lost 1.37% of RB MAE, and essentially all of that was the bias term,
+which is #31 reproducing itself in a second, independent place. That result now has two
+sightings and should be treated as a property of the target rather than a quirk of the
+week it was found in.
+
+Ordering is worse, not merely flat. A per-position shift cannot reorder a
+within-position board, so this arm is the slope alone:
+
+| pos | top-N overlap | board | corrected | delta | 95% paired CI | weeks improved |
+|---|--:|--:|--:|--:|---|--:|
+| QB | 12 | 0.5631 | 0.5586 | **−0.0045** | [−0.0090, −0.0011] | 0/74 |
+| RB | 12 | 0.4278 | 0.4211 | −0.0067 | [−0.0178, +0.0033] | 9/75 |
+| WR | 24 | 0.4222 | 0.4178 | **−0.0044** | [−0.0083, −0.0006] | 3/75 |
+| TE | 12 | 0.4833 | 0.4856 | +0.0022 | [−0.0022, +0.0067] | 3/75 |
+
+The correction improved **nought of 74** quarterback weeks and three of 75 receiver
+weeks, and the QB and WR intervals are clear of zero on the wrong side. A term fitted
+to the mean residual, applied to a board that is read as an order, moves players the
+wrong way more often than the right way.
+
+### Verdict
+
+**Nothing ships.** The question as asked is answered flatly: a defense's blitz rate
+does not move quarterback FanDuel output, and the oracle version of the test means no
+better forecast of it could. The two real effects it did turn up — backs down,
+receivers up, roughly −1.8 and +0.7 points across the league's whole blitz-rate range
+— are present in the board's own error and still worth zero MAE and slightly negative
+ordering when they are put in.
+
+This is the fourth stable trait in the ledger that predicts nothing a board can use
+— success rate allowed (0.618), FTN role (0.748), blocking scheme, and now blitz
+rate (0.659) — and the pattern is sharp enough to state as a rule: **stability is a property of the
+measurement and says nothing about whether the quantity is in the scoring system.**
+The blitz effect is the cleanest illustration yet — it moves attempts and sacks in
+opposite directions and FanDuel charges for one of them and not the other, so a real
+football result arrives at the board as exactly zero.
+
+What would change the answer: a scoring system that charges for sacks, a target that
+is passing yardage rather than fantasy points, or a market price for a back's rushing
+yardage against a specific front. The first two are not this board and the third is a
+line, which this test does not get to use.
