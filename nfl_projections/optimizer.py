@@ -159,22 +159,197 @@ def _check_usage_limit(nickname, current_lineups, num_lineups, max_usage_percent
     return (current + 1) / num_lineups * 100 <= max_usage_percentage
 
 
+def _pareto(frontier):
+    """Drop entries a cheaper-and-better one dominates.
+
+    Safe for combining: if A costs less than B and scores more, swapping B for A
+    keeps every budget feasible and raises the total, so B cannot be part of any
+    optimal lineup. On a real slate this collapses the table hard, which is what
+    keeps the exact solve fast enough to sit inside a request.
+    """
+    out, best = {}, float("-inf")
+    for cost in sorted(frontier):
+        points, picks = frontier[cost]
+        if points > best:
+            out[cost] = (points, picks)
+            best = points
+    return out
+
+
+def _slot_frontier(pool, k, budget, step):
+    """{cost_buckets: (points, picks)} for EXACTLY `k` players from `pool`.
+
+    The whole cost profile, not just the best under one cap — the profile is
+    what lets slots be combined exactly, because the cheapest way to fill one
+    slot is not generally part of the best way to fill the roster.
+    """
+    if k <= 0:
+        return {0: (0.0, ())}
+    rows = [(idx, int(row["Salary"] // step), float(row["lineup_points"]))
+            for idx, row in pool.iterrows()
+            if row["Salary"] == row["Salary"] and row["Salary"] >= 0]
+    if len(rows) < k:
+        return {}
+    best = [dict() for _ in range(k + 1)]
+    best[0][0] = (0.0, ())
+    for idx, cost, points in rows:
+        for count in range(k - 1, -1, -1):
+            for spent, (total, picks) in list(best[count].items()):
+                new_spent = spent + cost
+                if new_spent > budget:
+                    continue
+                current = best[count + 1].get(new_spent)
+                if current is None or total + points > current[0]:
+                    best[count + 1][new_spent] = (total + points, picks + (idx,))
+    return _pareto(best[k])
+
+
+def _combine(a, b, budget):
+    """Max-plus convolution of two cost profiles under a shared budget."""
+    out = {}
+    if not a or not b:
+        return {}
+    bs = sorted(b)
+    for cost_a, (points_a, picks_a) in a.items():
+        for cost_b in bs:
+            total_cost = cost_a + cost_b
+            if total_cost > budget:
+                break               # bs ascending, so nothing further fits
+            points_b, picks_b = b[cost_b]
+            current = out.get(total_cost)
+            if current is None or points_a + points_b > current[0]:
+                out[total_cost] = (points_a + points_b, picks_a + picks_b)
+    return _pareto(out)
+
+
+def _flex_expansions(roster_slots):
+    """Every way to turn the FLEX units into concrete slots.
+
+    After the expansion the slot pools are disjoint by position, which is what
+    makes the rest exact: QB, RB, WR, TE and DEF selections then interact only
+    through the shared salary budget.
+    """
+    import itertools
+
+    flex = int(roster_slots.get("FLEX", 0))
+    base = {slot: int(n) for slot, n in roster_slots.items() if slot != "FLEX"}
+    targets = [slot for slot in base if slot in FLEX_ELIGIBLE]
+    if not flex or not targets:
+        yield base
+        return
+    seen = set()
+    for combo in itertools.combinations_with_replacement(targets, flex):
+        need = dict(base)
+        for slot in combo:
+            need[slot] += 1
+        key = tuple(sorted(need.items()))
+        if key not in seen:
+            seen.add(key)
+            yield need
+
+
+def best_lineup(df, cap, roster_slots=None, salary_step=100):
+    """The highest-scoring legal lineup at or under `cap`, or None if none fits.
+
+    Exact, where the old fill was greedy. It filled slot by slot taking the best
+    points-per-dollar player that fit the salary left, with no budget held back
+    for the slots still to come and no way to back up when one came up empty --
+    so it reported "the salary cap or the exclusions are what nothing fits
+    under" for slates where plenty fits. A pool with expensive players who also
+    have the best value is enough to trigger it: the early slots eat the budget,
+    the tight end slot finds nothing under what is left, and the attempt is
+    abandoned rather than retried a little cheaper.
+
+    Returns (indices, salary, points).
+    """
+    roster_slots = roster_slots or ROSTER_SLOTS
+    budget = int(cap // salary_step)
+    if "_slots" not in df.columns:
+        add_eligibility(df)
+    best = None
+    for need in _flex_expansions(roster_slots):
+        # Hardest slot first: it prunes the table soonest.
+        order = sorted(need, key=lambda s: -need[s])
+        profile = {0: (0.0, ())}
+        for slot in order:
+            pool = df[[slot in s for s in df["_slots"]]]
+            frontier = _slot_frontier(pool, need[slot], budget, salary_step)
+            profile = _combine(profile, frontier, budget)
+            if not profile:
+                break
+        if not profile:
+            continue
+        cost, (points, picks) = max(profile.items(), key=lambda kv: kv[1][0])
+        if best is None or points > best[2]:
+            best = (list(picks), cost * salary_step, points)
+    return best
+
+
+def cheapest_lineup_cost(df, roster_slots=None):
+    """What the cheapest legal lineup on this slate costs, or None if the slate
+    cannot field one at any price.
+
+    So that "nothing fits under the cap" can say by how much. After a FLEX
+    expansion the slot pools are disjoint, so the minimum is just the cheapest
+    `n` players in each slot summed -- no search needed.
+    """
+    roster_slots = roster_slots or ROSTER_SLOTS
+    if "_slots" not in df.columns:
+        df = add_eligibility(df.copy())
+    best = None
+    for need in _flex_expansions(roster_slots):
+        total = 0
+        for slot, n in need.items():
+            if n <= 0:
+                continue
+            pool = df[[slot in sl for sl in df["_slots"]]]
+            salaries = sorted(pd.to_numeric(pool["Salary"], errors="coerce").dropna())
+            if len(salaries) < n:
+                total = None
+                break
+            total += sum(salaries[:n])
+        if total is not None and (best is None or total < best):
+            best = total
+    return int(best) if best is not None else None
+
+
 def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
-                     max_usage_percentage=50, objective="mean", roster_slots=None):
-    """Build diverse FanDuel lineups from a merged salary+projection frame.
+                     max_usage_percentage=50, objective="mean", roster_slots=None,
+                     salary_step=100, price_step=None):
+    """Build FanDuel lineups: the best one under the cap, then cheaper ones.
 
     Args:
         df: output of merge_fanduel_salaries (needs Salary, FPPG,
             Roster Position, Nickname, fanduel_fantasy_points columns)
-        num_lineups: how many unique lineups to generate
-        salary_cap: FanDuel salary cap
+        num_lineups: how many lineups to generate
+        salary_cap: FanDuel salary cap — a hard constraint on every lineup
         exclude_players: nicknames to leave out entirely
         max_usage_percentage: cap on how often one player appears
         objective: which projection drives value - "mean" (default),
             "ceiling" (GPP upside), "floor" (cash safety), or "median".
             Non-mean objectives need a projection made with the quantile model.
 
-    Returns a list of lineup DataFrames.
+    Each lineup is the **highest-scoring** one that fits its budget, solved
+    exactly (`best_lineup`). Lineup 1 gets the whole cap; each one after it is
+    capped `price_step` below what the previous lineup actually spent, so the
+    set walks down the price range instead of returning variations on the same
+    expensive core. That is also what makes them diverse: a strictly smaller
+    budget cannot return the same roster.
+
+    `price_step` defaults to 1% of the cap ($600 of $60,000). Stepping by the
+    $100 salary granularity instead is technically enough to force a different
+    roster, but it buys a one-player swap -- the first three lineups came back
+    at $58,800, $58,700 and $57,200 with eight names in common. A step with
+    some width in it is what makes the cheaper lineups actually cheaper.
+
+    The old builder filled greedily by points per dollar and could neither hold
+    budget back for the slots still to come nor back up when one came up empty,
+    so it returned nothing at all on slates where plenty fits. It also left
+    money on the cap for the reason `_best_under_cap` documents: cheap and
+    efficient beats expensive and better on a per-dollar measure every time,
+    and a lineup is scored on points.
+
+    Returns a list of lineup DataFrames, most expensive first.
     """
     roster_slots = roster_slots or ROSTER_SLOTS
     df = df.copy()
@@ -195,73 +370,30 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
     is_defense = [("DEF" in s) for s in df["_slots"]]
     df.loc[is_defense, "lineup_points"] = df.loc[is_defense, "FPPG"]
 
-    strategies = [("QB", 5), ("RB/FLEX", 5), ("WR/FLEX", 5), ("TE/FLEX", 5)]
+    step = int(price_step) if price_step else max(salary_step, salary_cap // 100)
     all_lineups = []
-    current_lineup = 0
-    attempts = 0
-    max_attempts = num_lineups * 10
+    budget = salary_cap
+    while len(all_lineups) < num_lineups and budget >= 0:
+        # Players already at their exposure limit are dropped from the pool
+        # rather than rejected after the fact, so the solve stays exact over
+        # whoever is actually still available.
+        pool = df[[_check_usage_limit(n, all_lineups, num_lineups, max_usage_percentage)
+                   for n in df["Nickname"]]]
+        found = best_lineup(pool, budget, roster_slots, salary_step)
+        if found is None:
+            break
+        picks, spent, _ = found
+        lineup_df = pool.loc[picks]
+        if _is_lineup_unique(lineup_df, all_lineups):
+            all_lineups.append(lineup_df)
+            print(f"Created lineup {len(all_lineups)} (${spent:,})")
+        # Next one has to be cheaper, which is both the variation that was asked
+        # for and the reason this terminates.
+        budget = spent - step
 
-    while current_lineup < num_lineups and attempts < max_attempts:
-        attempts += 1
-        focus_position, n_players = strategies[min(current_lineup // 5, len(strategies) - 1)]
-
-        for _, focus_player in _get_top_n_by_position(df, focus_position, n_players).iterrows():
-            if current_lineup >= num_lineups:
-                break
-            if not _check_usage_limit(focus_player["Nickname"], all_lineups,
-                                      num_lineups, max_usage_percentage):
-                continue
-
-            current_df = df.copy()
-            lineup = [focus_player]
-            remaining_salary = salary_cap - focus_player["Salary"]
-            positions_needed = dict(roster_slots)
-            # Spend the focus player on his own position's slot, never the FLEX:
-            # the FLEX is what the remaining positions compete for.
-            focus_slot = next((s for s in focus_player["_slots"] if s != "FLEX"), None)
-            if focus_slot not in positions_needed:
-                continue
-            positions_needed[focus_slot] -= 1
-
-            lineup_complete = True
-            for position in roster_slots:
-                if position == focus_slot:
-                    continue
-
-                available = current_df[[position in s for s in current_df["_slots"]]]
-
-                available = available.copy()
-                available["value"] = available["lineup_points"] / available["Salary"]
-                available = available.sort_values("value", ascending=False)
-
-                count = positions_needed[position]
-                for _, player in available.iterrows():
-                    if count > 0 and player["Salary"] <= remaining_salary:
-                        if _check_usage_limit(player["Nickname"], all_lineups,
-                                              num_lineups, max_usage_percentage):
-                            lineup.append(player)
-                            remaining_salary -= player["Salary"]
-                            count -= 1
-                            current_df = current_df[current_df["Nickname"] != player["Nickname"]]
-                    if count == 0:
-                        break
-                if count > 0:
-                    lineup_complete = False
-                    break
-                positions_needed[position] = count
-
-            if lineup_complete and sum(positions_needed.values()) == 0:
-                lineup_df = pd.DataFrame(lineup)
-                if _is_lineup_unique(lineup_df, all_lineups):
-                    all_lineups.append(lineup_df)
-                    current_lineup += 1
-                    print(f"Created lineup {current_lineup}")
-                    if current_lineup >= num_lineups:
-                        break
-
-    if current_lineup < num_lineups:
-        print(f"Warning: only generated {current_lineup}/{num_lineups} valid "
-              f"lineups under the usage limits")
+    if len(all_lineups) < num_lineups:
+        print(f"Warning: only generated {len(all_lineups)}/{num_lineups} lineups "
+              f"under a ${salary_cap:,} cap")
     return all_lineups
 
 

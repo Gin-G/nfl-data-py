@@ -1,3 +1,5 @@
+from collections import Counter
+
 import pandas as pd
 import pytest
 
@@ -262,3 +264,147 @@ class TestShowdownQuality:
         assert sum(limited["Position"] == "K") <= 1
         # And the limited lineup is the weaker one, which is the honest trade.
         assert limited["lineup_points"].sum() <= unlimited["lineup_points"].sum()
+
+
+class TestItBuildsWhateverFits:
+    """The greedy builder returned NOTHING on slates where plenty fits.
+
+    Reported from a real slate: "Every slot has players, so the salary cap
+    ($60,000) or the exclusions are what nothing fits under. It has to be able
+    to build something." It filled slot by slot taking the best points-per-
+    dollar player that fit the salary remaining, held nothing back for the slots
+    still to come, and abandoned the attempt rather than retrying cheaper when
+    one came up empty.
+    """
+
+    @staticmethod
+    def _trap_slate():
+        """Expensive players who ALSO have the best points-per-dollar.
+
+        Greedy spends 48,000 of the 60,000 on two backs and three receivers,
+        reaches the tight end slot with 3,000 left, finds nothing, and gives up
+        -- while a legal lineup costs 50,000.
+        """
+        rows = []
+
+        def add(name, pos, salary, pts):
+            rows.append({"Nickname": name, "Roster Position": pos, "Position": pos,
+                         "Salary": salary, "FPPG": pts, "fanduel_fantasy_points": pts})
+
+        add("QB Star", "QB", 12000, 25.0)
+        add("QB Cheap", "QB", 6000, 12.0)
+        for i in range(2):
+            add(f"RB Good {i}", "RB", 9000, 20.0)
+        for i in range(3):
+            add(f"WR Good {i}", "WR", 9000, 20.0)
+        add("TE Good", "TE", 8000, 17.0)
+        for i in range(3):
+            add(f"RB Cheap {i}", "RB", 4000, 6.0)
+        for i in range(4):
+            add(f"WR Cheap {i}", "WR", 4000, 6.0)
+        for i in range(2):
+            add(f"TE Cheap {i}", "TE", 4000, 5.0)
+        add("DEF One", "D", 5000, 8.0)
+        add("DEF Two", "D", 5000, 7.5)
+        return pd.DataFrame(rows)
+
+    def test_a_lineup_exists_so_one_is_returned(self):
+        lineups = optimizer.optimize_lineups(self._trap_slate(), num_lineups=1)
+        assert len(lineups) == 1
+        assert len(lineups[0]) == 9
+
+    def test_and_it_spends_the_cap_rather_than_banking_it(self):
+        """Value-sorting is what left money on the table; points is the score."""
+        (lineup,) = optimizer.optimize_lineups(self._trap_slate(), num_lineups=1)
+        assert lineup["Salary"].sum() > 55000
+        assert lineup["Salary"].sum() <= 60000
+
+    def test_the_cap_is_never_breached(self):
+        lineups = optimizer.optimize_lineups(self._trap_slate(), num_lineups=5)
+        assert lineups
+        for lineup in lineups:
+            assert lineup["Salary"].sum() <= 60000
+
+    def test_a_genuinely_impossible_cap_returns_nothing(self):
+        """The message the user saw is only honest when this is the case."""
+        assert optimizer.optimize_lineups(self._trap_slate(), salary_cap=20000) == []
+
+    def test_the_cheapest_lineup_cost_says_by_how_much(self):
+        cheapest = optimizer.cheapest_lineup_cost(self._trap_slate())
+        # 6000 QB + 4000x3 RB + 4000x3 WR + 4000 TE + 5000 DEF, the FLEX going
+        # to whichever group is cheapest. Nine players, not eight.
+        assert cheapest == 39000
+        assert optimizer.optimize_lineups(
+            self._trap_slate(), salary_cap=cheapest, num_lineups=1)
+        assert optimizer.optimize_lineups(
+            self._trap_slate(), salary_cap=cheapest - 100, num_lineups=1) == []
+
+    def test_a_slate_missing_a_position_has_no_cheapest_cost(self):
+        slate = self._trap_slate()
+        assert optimizer.cheapest_lineup_cost(
+            slate[slate["Position"] != "D"]) is None
+
+
+class TestPriceLadder:
+    """Several lineups spread across price points, every one under the cap."""
+
+    @staticmethod
+    def _slate():
+        rows = []
+        for pos, n, lo in (("QB", 8, 60), ("RB", 16, 45), ("WR", 22, 45),
+                           ("TE", 10, 40), ("D", 6, 30)):
+            for i in range(n):
+                salary = (lo + i * 2) * 100
+                rows.append({
+                    "Nickname": f"{pos}{i}", "Roster Position": pos, "Position": pos,
+                    "Salary": salary, "FPPG": 4.0 + salary / 900.0,
+                    "fanduel_fantasy_points": 4.0 + salary / 900.0})
+        return pd.DataFrame(rows)
+
+    def test_each_lineup_is_strictly_cheaper_than_the_last(self):
+        lineups = optimizer.optimize_lineups(self._slate(), num_lineups=5)
+        assert len(lineups) == 5
+        spends = [l["Salary"].sum() for l in lineups]
+        assert spends == sorted(spends, reverse=True)
+        assert len(set(spends)) == len(spends)
+
+    def test_the_spread_is_wide_enough_to_be_different_pricing(self):
+        """A $100 step buys a one-player swap, which is not a price variation."""
+        lineups = optimizer.optimize_lineups(self._slate(), num_lineups=5)
+        spends = [l["Salary"].sum() for l in lineups]
+        assert spends[0] - spends[-1] >= 4 * 600
+
+    def test_every_lineup_is_a_distinct_roster(self):
+        lineups = optimizer.optimize_lineups(self._slate(), num_lineups=5)
+        rosters = {tuple(sorted(l["Nickname"])) for l in lineups}
+        assert len(rosters) == len(lineups)
+
+    def test_points_fall_as_the_budget_does(self):
+        """Cheaper is a trade, not a free lunch — worth seeing in the output."""
+        lineups = optimizer.optimize_lineups(self._slate(), num_lineups=4,
+                                             max_usage_percentage=100)
+        points = [l["lineup_points"].sum() for l in lineups]
+        assert points == sorted(points, reverse=True)
+
+    def test_price_step_is_adjustable(self):
+        tight = optimizer.optimize_lineups(self._slate(), num_lineups=3,
+                                           price_step=100)
+        wide = optimizer.optimize_lineups(self._slate(), num_lineups=3,
+                                          price_step=4000)
+        tight_spread = tight[0]["Salary"].sum() - tight[-1]["Salary"].sum()
+        wide_spread = wide[0]["Salary"].sum() - wide[-1]["Salary"].sum()
+        assert wide_spread > tight_spread
+
+    def test_the_roster_is_legal_at_every_price(self):
+        for lineup in optimizer.optimize_lineups(self._slate(), num_lineups=5):
+            counts = Counter(lineup["Position"])
+            assert len(lineup) == 9
+            assert counts["QB"] == 1
+            assert counts["D"] == 1
+            assert counts["RB"] >= 2 and counts["WR"] >= 3 and counts["TE"] >= 1
+            # Exactly one of them carries the extra body: the FLEX.
+            assert counts["RB"] + counts["WR"] + counts["TE"] == 7
+
+    def test_nobody_is_rostered_twice(self):
+        for lineup in optimizer.optimize_lineups(self._slate(), num_lineups=5):
+            assert len(set(lineup["Nickname"])) == len(lineup)
