@@ -3235,3 +3235,75 @@ and touchdown rate is not (so a volume-light, touchdown-heavy player is the one
 to fade, which the board partly knows); last week's volume spike is a fade at
 WR/TE, not a buy; and an opponent's volume allowed is the fourth matchup
 instrument to produce a real slope and fail out of sample.
+
+## Scoping the defense slot: it is matchup plus noise (2026-10-16)
+
+Not an experiment yet — the reliability measurement that has to come first,
+prompted by "our defensive projections could use some work". `POSITIONS =
+["QB", "RB", "WR", "TE"]`: **the model does not project defenses at all.** The
+optimizer sets `lineup_points = FPPG` for them, so one slot in nine is picked
+from FanDuel's own season average with no view of the opponent. 4,222 team-weeks
+2018-25, FanDuel DST scoring reconstructed from `load_team_stats` plus schedule
+scores for the points-allowed tier.
+
+DST fantasy points: mean **6.36**, sd **5.64**. Odd weeks against even weeks:
+
+| component | mean | sd | in season | career |
+|---|--:|--:|--:|--:|
+| QB hits | 5.65 | 3.03 | **0.330** | **0.641** |
+| points allowed | 22.89 | 10.00 | 0.286 | 0.625 |
+| sacks | 2.40 | 1.75 | 0.282 | 0.525 |
+| points-allowed tier points | 0.48 | 2.65 | 0.254 | 0.584 |
+| passes defended | 4.26 | 2.43 | 0.185 | 0.396 |
+| interceptions | 0.77 | 0.91 | 0.155 | 0.326 |
+| takeaways (INT + fumble) | 1.29 | 1.18 | 0.109 | 0.327 |
+| **defensive / return TDs** | 0.12 | 0.34 | **−0.031** | 0.056 |
+| **safeties + blocked kicks** | 0.07 | 0.27 | **−0.026** | 0.093 |
+| **DST fantasy points** | 6.36 | 5.64 | **0.196** | 0.567 |
+
+For comparison, a receiver's own points per game split 0.847 in season. A
+defense's split **0.196**. There is a persistent team quality (career 0.567),
+but a single season barely sees it.
+
+### The variance is in the parts nobody can predict
+
+Mean contribution to a week's DST score, with its standard deviation:
+
+| source | mean | sd |
+|---|--:|--:|
+| takeaways | 2.59 | 2.36 |
+| sacks | 2.40 | 1.75 |
+| **points-allowed tier** | 0.48 | **2.65** |
+| **defensive / return TDs** | 0.69 | **2.05** |
+| safeties + blocks | 0.20 | 0.63 |
+
+The two largest sources of week-to-week swing are the tier (sd 2.65) and
+touchdowns (sd 2.05) — and touchdowns are **noise by measurement**, −0.031
+in season and 0.056 over a career. Sacks carry a comparable mean with less than
+half the spread and four times the persistence. So the scoring splits three
+ways: a predictable low-variance floor (pressure), a semi-predictable
+high-variance swing (the tier), and a high-variance component that should be
+shrunk to the league mean for every team and never modelled.
+
+### The tier is a step function, so its mean is the wrong thing to project
+
+Tier frequencies: −4 at 11.8%, −1 at 18.6%, 0 at 26.5%, +1 at 25.1%, +4 at
+13.4%, +7 at 3.6%, +10 at 1.0%. Projecting mean points allowed and reading off
+the tier is not the same as the expected tier value, and the gap is largest for
+defenses facing volatile offenses — which is precisely the case a projection
+needs to get right. This wants `simulate.py`, not a point estimate.
+
+### What this does and does not share with the earlier defense nulls
+
+"Why opponent/matchup keeps failing" found defense-vs-position barely persists
+and explains 1-4.5% of a player's single game. That was defense as an
+ADJUSTMENT to a skill player. Here the defense is the whole bet, so the null
+does not transfer — but the same instability is visibly the reason the slot is
+hard, and it caps how much any model can win.
+
+Also noted: this is the position where the no-Vegas rule bites hardest, since
+the industry estimator for points allowed is the opponent's implied team total.
+The substitutes already in the repo are `ratings.py` (SRS, team grades) and its
+`game_environments`.
+
+No decision yet. Nothing has been built or shipped.
