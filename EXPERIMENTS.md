@@ -3246,7 +3246,14 @@ from FanDuel's own season average with no view of the opponent. 4,222 team-weeks
 2018-25, FanDuel DST scoring reconstructed from `load_team_stats` plus schedule
 scores for the points-allowed tier.
 
-DST fantasy points: mean **6.36**, sd **5.64**. Odd weeks against even weeks:
+**Corrected 2026-10-16**, while writing the lineup scoring job: the first pass
+counted return touchdowns twice, adding `pt_return_tds` on top of `def_tds +
+special_teams_tds`. A team's `special_teams_tds` reconciles exactly with the sum
+of its own players' (544 of 544 team-weeks in 2025); `pt_return_tds` does not
+(it disagrees on 39), so it is a different measure and does not belong. The
+numbers below are the corrected ones. Nothing about the conclusion moves.
+
+DST fantasy points: mean **6.28**, sd **5.62**. Odd weeks against even weeks:
 
 | component | mean | sd | in season | career |
 |---|--:|--:|--:|--:|
@@ -3257,12 +3264,12 @@ DST fantasy points: mean **6.36**, sd **5.64**. Odd weeks against even weeks:
 | passes defended | 4.26 | 2.43 | 0.185 | 0.396 |
 | interceptions | 0.77 | 0.91 | 0.155 | 0.326 |
 | takeaways (INT + fumble) | 1.29 | 1.18 | 0.109 | 0.327 |
-| **defensive / return TDs** | 0.12 | 0.34 | **−0.031** | 0.056 |
+| **defensive / return TDs** | 0.10 | 0.32 | **−0.013** | 0.138 |
 | **safeties + blocked kicks** | 0.07 | 0.27 | **−0.026** | 0.093 |
-| **DST fantasy points** | 6.36 | 5.64 | **0.196** | 0.567 |
+| **DST fantasy points** | 6.28 | 5.62 | **0.192** | 0.561 |
 
 For comparison, a receiver's own points per game split 0.847 in season. A
-defense's split **0.196**. There is a persistent team quality (career 0.567),
+defense's split **0.192**. There is a persistent team quality (career 0.561),
 but a single season barely sees it.
 
 ### The variance is in the parts nobody can predict
@@ -3274,12 +3281,12 @@ Mean contribution to a week's DST score, with its standard deviation:
 | takeaways | 2.59 | 2.36 |
 | sacks | 2.40 | 1.75 |
 | **points-allowed tier** | 0.48 | **2.65** |
-| **defensive / return TDs** | 0.69 | **2.05** |
+| **defensive / return TDs** | 0.62 | **1.93** |
 | safeties + blocks | 0.20 | 0.63 |
 
 The two largest sources of week-to-week swing are the tier (sd 2.65) and
-touchdowns (sd 2.05) — and touchdowns are **noise by measurement**, −0.031
-in season and 0.056 over a career. Sacks carry a comparable mean with less than
+touchdowns (sd 1.93) — and touchdowns are **noise by measurement**, −0.013
+in season and 0.138 over a career. Sacks carry a comparable mean with less than
 half the spread and four times the persistence. So the scoring splits three
 ways: a predictable low-variance floor (pressure), a semi-predictable
 high-variance swing (the tier), and a high-variance component that should be
