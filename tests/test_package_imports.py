@@ -12,6 +12,8 @@ import subprocess
 import sys
 import textwrap
 
+import pytest
+
 
 def _run(code):
     return subprocess.run([sys.executable, "-c", textwrap.dedent(code)],
@@ -80,7 +82,13 @@ def test_pyarrow_and_numpy_can_actually_talk_to_each_other():
     So this exercises the bridge rather than reading a version number: a
     parquet round-trip through pandas is the narrowest thing that fails when
     the two are mismatched, and it needs no network.
+
+    Skipped where pyarrow is absent, which includes CI — the Tests workflow
+    installs the pandas-level dependencies only and has no parquet engine at
+    all. There is nothing to be compatible there, and the cap that stops a bad
+    pair being assembled is guarded by the test below, which does run.
     """
+    pytest.importorskip("pyarrow")
     done = _run("""
         import io
         import pandas as pd
