@@ -17,7 +17,15 @@ dependencies = [
     "nflreadpy",
     "pandas",
     "numpy",
-    "pyarrow",
+    # Capped, and the cap is load-bearing. pyarrow 18+ declares NO numpy
+    # requirement at all, so pip resolves the newest (26.0.0) against whatever
+    # numpy is present and the import then fails at runtime: "pyarrow requires
+    # NumPy 2.0 or newer, found 1.26.4". That took out NFL-API's roster sync on
+    # 2026-10-15 and every nfl-api-projections run after it, because that job
+    # pip-installs this package over an image whose own pin cannot survive a
+    # resolve it does not control. Lifting it means moving to numpy 2.x here
+    # and in NFL-API together.
+    "pyarrow>=7.0.0,<18",
     "scikit-learn",
     "tensorflow",
     "joblib",

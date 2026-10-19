@@ -2,7 +2,9 @@
 nflreadpy
 pandas
 numpy
-pyarrow
+# <18 or pip resolves pyarrow 26, which requires numpy 2.0 and fails on import.
+# See pyproject.toml for the full story.
+pyarrow>=7.0.0,<18
 
 # Model training / prediction
 tensorflow
