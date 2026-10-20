@@ -3314,3 +3314,67 @@ The substitutes already in the repo are `ratings.py` (SRS, team grades) and its
 `game_environments`.
 
 No decision yet. Nothing has been built or shipped.
+
+## The first scored lineups: the edge is real and it is in the top five (2026-10-20)
+
+The first week with built lineups scored against what happened — 2026 week 6,
+FanDuel main slate (Sunday 13:00–17:59 ET), 14 games, cap 60,000. Three builds
+off one slate: ceiling × 12 at 50% max usage, mean × 12 at 50%, median × 15 at
+40%. Baselines rebuilt from the stored slate CSV: the lineup FanDuel's own FPPG
+would have built from the same pool under the same cap scored **116.34**, and
+the best lineup the slate held, in hindsight, **212.66**.
+
+**As submitted, every build lost to FPPG. Its top five beat it by 11%.**
+
+| take top | mean actual | vs FPPG |
+|---|--:|--:|
+| 1 | 126.1 | +8.4% |
+| 2 | 126.5 | +8.7% |
+| 3 | 127.9 | +10.0% |
+| **5** | **129.1** | **+11.0%** |
+| 8 | 123.5 | +6.2% |
+| 10 | 115.7 | −0.5% |
+| 12 | 108.0 | −7.2% |
+| 15 | 100.1 | −14.0% |
+
+Per build, mean actual against a 116.34 baseline: ceiling 107.65 (6 of 12 lineups
+beat it), mean 107.67 (7 of 12), median 100.11 (7 of 15). Pooled, 20 of 39 beat
+it — a coin flip — and the mean is −10.0%. The whole edge lives in the ordering,
+and past about eight lineups it is spent.
+
+The ordering is what an optimizer is for, and it holds: projected against actual
+**within** a build correlates 0.92 (ceiling), 0.69 (mean), 0.93 (median). The
+pooled figure is +0.29 and is an artefact — the three objectives run on different
+scales (mean projection 213, 112, 91), so pooling them mixes units. Ignore it.
+
+A separate and better-than-expected signal: the `mean` objective's point total
+was **112.25 projected against 107.67 actual**, 4% high. That is the absolute
+scale, not the ordering, and nothing in this file had measured it before.
+
+### What this is not
+
+**One slate.** Thirty-nine lineups, but they share a pool, a projection vintage
+and a usage cap, so they are nothing like 39 observations; the effective n is
+about one. The sd of a single lineup is 28.5 points.
+
+**The peak at five is fitted on the data that suggested it.** 3, 5 and 8 are
+127.9 / 129.1 / 123.5, which on one slate is indistinguishable. What the week
+does support is the *shape* — a good top, a long bad tail, and a crossover under
+FPPG somewhere near ten. The location of the peak needs more weeks.
+
+**All three objectives produced the identical top lineup** — Cousins, Swift,
+Walker, Warren, Olave, Flowers, Boston, Likely, Raiders. So "top 1 = 126.1" is
+one lineup counted three times. Ceiling, mean and median are far less
+independent than three builds makes them look, which is worth knowing before
+reading anything into agreement between them.
+
+**69% of what was there.** Model best 147.6 of 212.66; FPPG 116.34, or 55%.
+Nobody reaches the hindsight best, so it marks the ceiling rather than a target.
+
+### The one thing already worth a second look
+
+Build 4 is an accidental experiment: 40% max usage and 15 lineups gave the
+**best** top five (132.3) and the **worst** overall (100.1). A tighter usage cap
+buys a better head and a longer tail. If that repeats, the cap is a dial on where
+the crossover sits, and it is free to measure — the builds are being generated
+anyway.
