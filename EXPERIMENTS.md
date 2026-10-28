@@ -3378,3 +3378,479 @@ Build 4 is an accidental experiment: 40% max usage and 15 lineups gave the
 buys a better head and a longer tail. If that repeats, the cap is a dial on where
 the crossover sits, and it is free to measure — the builds are being generated
 anyway.
+
+## Week 7 lineups: the hits and the misses differ by one player, not by one shape (2026-10-26)
+
+Second scored week, and the first with enough builds to ask the question that
+matters for actually entering a contest: given a pile of lineups, can anything
+visible beforehand tell the ones that hit from the ones that did not?
+
+2026 week 7, FanDuel main slate, 12 builds, 195 lineups, 185 scored; 170 of them
+complete classic main-slate lineups, which is the population used below. FPPG
+baseline **73.52**, hindsight best **235.58**, pool mean **92.8** (sd 27.6),
+best **190.98**, worst **31.3**, and 76% beat FPPG — a far softer baseline week
+than week 6, where only 51% did.
+
+### Thirteen lineup traits, two weeks, nine builds
+
+For every lineup: the four projection totals rebuilt from the published board
+(mean/floor/median/ceiling), salary spent, count of sub-$5k punts, max and min
+salary, QB-stack count, bring-back count, distinct games, mean pool frequency of
+its nine players ("chalk"), and its most-used player's frequency. Spearman
+against actual **inside each build** (across builds is meaningless — the
+objectives are on different scales), over the nine builds of ≥10 lineups in
+weeks 6 and 7.
+
+| trait | median rho | neg | pos |
+|---|--:|--:|--:|
+| salary spent | 0.58 | 1 | 8 |
+| ceiling total | 0.58 | 0 | 9 |
+| mean total | 0.53 | 1 | 8 |
+| median total | 0.52 | 1 | 8 |
+| punts (≤$5k) | −0.50 | 6 | 1 |
+| chalk | 0.48 | 1 | 8 |
+| max salary | 0.36 | 2 | 7 |
+| bring-back | −0.23 | 6 | 2 |
+| floor total | 0.22 | 2 | 7 |
+| max exposure | −0.13 | 5 | 2 |
+| min salary | 0.10 | 3 | 6 |
+| distinct games | −0.04 | 5 | 4 |
+| QB stack | 0.01 | 4 | 5 |
+
+The top of that table is one thing wearing four hats: the optimizer spends
+salary to buy projection and reuses the players it likes, so salary, chalk and
+the projection totals are the same variable. **Strip the projected rank out and
+nothing is left.** Correlating each trait with the residual after regressing
+actual rank on projected rank, inside each build: punts −0.26 (5 of 7 negative),
+bring-back −0.18 (5 of 8), QB stack +0.13 (6 of 9 positive, median effect a
+third of a rank), everything else inside ±0.1. Two weeks cannot separate any of
+those from zero. The one oddity worth a note is the ceiling total, positive in
+**9 of 9** builds against a mean-rank residual — tiny (+0.09) and contaminated
+by its collinearity with the mean, but it never once had the wrong sign.
+
+### What did separate them
+
+| owned | in | with | without | swing | he scored |
+|---|--:|--:|--:|--:|--:|
+| Trey McBride | 8% | 131.1 | 89.4 | +41.7 | 25.1 |
+| Tony Pollard | 33% | 114.1 | 82.4 | +31.7 | 38.0 |
+| Jonathan Taylor | 15% | 115.0 | 88.8 | +26.2 | 18.0 |
+| Bo Nix | 28% | 111.0 | 85.7 | +25.3 | 24.2 |
+| … | | | | | |
+| Brian Robinson Jr. | 13% | 69.1 | 96.4 | −27.3 | 0.0 |
+| Bryce Young | 13% | 66.3 | 96.8 | −30.5 | 7.4 |
+
+Against a pool sd of 27.6, a single name moved a lineup a full standard
+deviation. A week's hits and misses are a referendum on six or eight players,
+which is why no construction rule shows up: there is nothing left for one to
+explain.
+
+### The bigger lever was which build, not which lineup
+
+Two vintages exist for week 7. Builds 5–8 (Tuesday 10-20, one 25-lineup build
+per objective) averaged **97.6**; builds 9–16 (Saturday night, 70 lineups)
+averaged **86.1**, and six of them returned the *identical* top lineup, which
+scored 77.2. The Saturday builds converged on Hubbard / Likely / Coker / Golden
+/ LaPorta / B-Robinson / Bryce Young at ~31% each, and that core busted.
+
+Like for like — same Tuesday vintage, 25 lineups, one build per objective:
+
+| objective | top 1 | top 3 | **top 5** | top 10 | all 25 |
+|---|--:|--:|--:|--:|--:|
+| ceiling | 132.6 | 155.2 | **149.7** | 130.8 | 95.4 |
+| floor | 125.3 | 117.8 | **114.9** | 110.3 | 104.7 |
+| mean | 128.6 | 124.1 | **111.8** | 107.7 | 93.5 |
+| median | 99.6 | 100.2 | **101.2** | 93.4 | 96.7 |
+
+**Ceiling has the best head and the worst body.** That is the week-6 shape
+sharpened: good top, long bad tail, crossover near ten. It also means
+`GET /optimizer/performance`'s objective verdict for the week — floor best at
+102.7, ceiling worst at 84.7 — is an artefact of the mix: seven of the twelve
+builds were ceiling and most of those were the Saturday ones. Averaged over
+every lineup, ceiling loses; at the top five, it wins by 35 points.
+
+Rules for picking five, scored on both weeks (random five from the week's pool
+as the control):
+
+| rule | wk6 mean | wk7 mean |
+|---|--:|--:|
+| top 5 of the ceiling build | **131.9** | **149.7** |
+| top 5 of the median build | 132.3 | 101.2 |
+| top 5 of the mean build | 123.3 | 111.8 |
+| pooled across builds, top 5 by mean total | 127.0 | 85.2 |
+| pooled, top 5 by mean, 3-of-5 exposure cap | 110.2 | 85.0 |
+| random five | 104.7 | 92.8 |
+
+Pooling builds and re-ranking them on a common ruler is *worse than one build*,
+because the common ruler is the latest board and the latest board is what built
+the Saturday core.
+
+### What this is not
+
+Two slates. 170 lineups out of one pool is not 170 observations — they share a
+projection vintage, a cap and most of their players, and six builds are
+near-duplicates of each other (10 and 16 are identical). The vintage result is
+one week and the opposite of what a staleness story would predict, so it is a
+thing to watch, not a finding. And "top 5 of the ceiling build" quietly means
+*the earlier* 25-lineup ceiling build in week 7; the Saturday one's top five
+scored 84.4. Picking the build is still being done by hand, and on this evidence
+it matters more than everything measured above.
+
+## Why week 7's later builds were worse: it was a different board, not a fresher one (2026-10-26)
+
+Follow-up to the entry above, which found that week 7's Tuesday builds (5–8)
+averaged 97.6 and the Saturday-night builds (9–16) 86.1, and left the reason
+open. The reason is not staleness, and the slate is innocent.
+
+**The pricing never moved.** One week-7 CSV exists — slate_id 3, uploaded
+2026-10-20T21:30:36Z, content hash `90e662c4a394`, 723 players — and all twelve
+builds used it. Same pool, same salaries, same FPPG.
+
+**The Tuesday builds read the August preseason board.** Matching each build's
+stored per-player projection against every archived vintage of week 7, by the
+build's own objective:
+
+| build | when | best-matching vintage | mean abs diff |
+|---|---|---|--:|
+| 5 ceiling | Tue | **as_of 0** (2026-08-11) | **0.00** |
+| 6 floor | Tue | **as_of 0** | **0.00** |
+| 7 median | Tue | **as_of 0** | **0.00** |
+| 8 mean | Tue | **as_of 0** | **0.00** |
+| 9–16 | Sat | as_of 5 / 6 | 0.4–1.7 |
+
+Exact, to the cent, on every player. `player_projections` still held week 7's
+preseason row because the in-season recompute fires at 21:00 Denver on Tuesday
+and the build ran at 15:30 Denver on Tuesday — about five hours early. Build 9,
+the next afternoon, already matches the in-season board. So "earlier in the
+week" meant the ESPN-roster preseason pipeline (v1.5.0, availability-weighted),
+not a younger copy of the in-season one (v1.6.0).
+
+**The late board was sharper, exactly where it should be.** Among players the
+Tuesday ceiling build used: Tyler Warren 14.1 → 0.0 (scored 0.0), Troy Franklin
+12.4 → 3.9 (0.0), Chimere Dike 8.6 → 1.4 (0.0), Jauan Jennings 13.4 → 5.7 (4.4).
+The injury and inactive updates did their job on every one.
+
+**It lost on one team.** Carolina took 16% of all Saturday player-slots — Bryce
+Young, Hubbard, Coker, Tremble — and lost to Tampa Bay 43-13.
+
+| Panthers in the lineup | lineups | mean actual |
+|---|--:|--:|
+| 0 | 102 | 101.6 |
+| 1 | 30 | 87.5 |
+| 2 | 35 | 75.1 |
+| 3 | 3 | 54.1 |
+
+Carolina was not a wild call. Young was the board's third QB at 19.68 and
+cheap at $7,800, and the in-season QB tier is flatter than a quarterback's own
+week-to-week noise — top-1 to top-12 spans **3.36 points**, and the four best by
+value are Cousins 2.71, Stafford 2.67, Goff 2.60, Young 2.52 points per $1k.
+Three of those four hit (20.4, 18.5, 19.0) and one scored 7.4. **At the top of
+the board the optimizer is choosing between ties it cannot read, on price.**
+
+**The preseason board's handicap is what protected it.** Season-long
+availability weighting (mean exp_games 0.27 at QB, 0.79–0.83 at RB/WR) scales
+every number down and flattens the field — top-24 QB mean 11.25 against the
+in-season 16.20. Unable to tell anyone apart, the optimizer spread across 51
+players, never more than 2.13 from one team on average, and left $8,300 of the
+cap unspent. It bought an index fund by accident.
+
+**What is *not* the explanation:** the sharp board did not collapse into
+sameness. Saturday's lineups were *more* varied — mean pairwise overlap 0.21
+against Tuesday's 0.32, 65 distinct players against 51. The concentration was by
+team, not by player, which is the one axis the optimizer does not look at.
+
+### Two things this says to build
+
+1. **A build does not record the board it read.** Nothing in `lineup_builds`
+   says `computed_at`, so a two-month-old projection produced lineups with no
+   warning anywhere. Stamp the vintage on the build, and refuse — or at least
+   shout — when the board for that week predates the last completed week.
+2. **The board projects players independently and the optimizer stacks them
+   freely.** No correlation term exists, so nothing stopped three Panthers in a
+   lineup. A per-team or per-game cap is the cheap structural fix, though it
+   would not have saved this week: only 3 of 170 lineups held three Panthers.
+
+One week, and the Tuesday board's win is mostly Tony Pollard scoring 38.0
+against a 17.6 ceiling. The finding here is the vintage mix-up and the flat QB
+tier, not "build on Tuesday."
+
+## Defenses: FanDuel's FPPG is worse than a flat average, and the pieces beat both (2026-10-26)
+
+The DEF slot has always been filled with FanDuel's own season-average FPPG,
+because the board projects no defenses. That turns out to be worse than
+filling it with a constant.
+
+Walk-forward, train on every prior season, predict the next, 3,906 team-weeks
+over 2019-2026. Actual DST scores average 6.21 with an sd of 5.57.
+
+| method | MAE | RMSE | rho | top-3 picked |
+|---|--:|--:|--:|--:|
+| FanDuel FPPG | 4.63 | 6.00 | 0.113 | 7.16 |
+| trailing 4 games | 4.81 | 6.20 | 0.101 | 6.89 |
+| **flat league average** | **4.31** | **5.57** | — | 6.51 |
+| ridge on the FanDuel total | 4.21 | 5.42 | 0.237 | 8.23 |
+| **components, tier integrated** | **4.18** | **5.42** | **0.244** | **8.50** |
+
+"top-3 picked" is the mean actual score of the three defenses each method
+liked best that week — the number that pays, since the slot takes one name.
+
+**A defense's own season average is nearly worthless as a ranking.** FPPG
+correlates 0.113 with what a defense goes on to score, and it loses to a
+constant on error, because sacks and takeaways repeat weakly and most of the
+fantasy points are the points-allowed tier, which is mostly the opponent.
+
+### What the model does
+
+Four component ridges (sacks, interceptions, fumble recoveries, defensive and
+return touchdowns) on the defense's own blended rates and the offence it is
+facing, scored at FanDuel's rates, plus the points-allowed tier. The tier is
+the part worth writing down: it is a **step function**, so `E[tier(PA)]` is
+taken over a distribution — the predicted points allowed plus the empirical
+spread of the model's own residuals — rather than evaluating `tier(E[PA])` at
+the mean. A defense projected to allow 21 sits exactly on a boundary where the
+step says 0 and the distribution says about 1.2.
+
+Every rate is a three-way blend of this season to date, last season and the
+league, weighted by games, so week 2 is not decided by one fluke sack total.
+
+Per season, MAE and the weekly top three, FPPG → model:
+
+| season | MAE | top 3 |
+|---|--:|--:|
+| 2019 | 5.04 → 4.57 | 8.51 → 9.02 |
+| 2020 | 4.45 → 3.97 | 6.45 → 8.37 |
+| 2021 | 4.74 → 4.37 | 7.39 → 7.81 |
+| 2022 | 4.31 → 3.90 | 7.93 → **7.54** |
+| 2023 | 4.87 → 4.40 | 6.87 → 9.24 |
+| 2024 | 4.50 → 4.11 | 7.04 → 9.00 |
+| 2025 | 4.59 → 4.11 | 6.07 → 9.20 |
+| 2026 | 4.47 → 3.82 | 6.71 → **6.10** |
+
+Better on error in all eight; better on the top three in six.
+
+### The market is still ahead
+
+Ranking defenses by the **opponent's implied total** picks a top three worth
+about 9.0 a week, and the implied total correlates 0.396 with points allowed
+where this model manages 0.298. Lines are kept out of the features on purpose
+— they are the benchmark, not an input — so the honest statement is that this
+closes most of the gap between FPPG and the market without closing it.
+
+### Negative result
+
+Adding defensive pressure (QB hits, tackles for loss) and the opponent's pass
+rate made it *worse*: rho 0.236 → 0.229, top-3 8.45 → 8.36. The sack rate
+already carries the pressure, and the extra columns only cost degrees of
+freedom.
+
+### One bug worth remembering
+
+The running season-to-date totals were built with `cumsum`, which leaves a
+hole from the first row with no outcome onward. Invisible in a backtest, where
+every row has been played — and it zeroed the whole season's form on exactly
+the rows a live projection asks about, so the first live week came back with
+every defense projected at 9.5-10.5 against a league mean of 6.3. There is a
+test for it now. A second, smaller one went with it: the league prior was an
+expanding mean over *rows*, so a row partway through a week was handed the
+average of that same week's earlier games. Fixing it moved the model from rho
+0.236 to 0.244.
+
+Shipped as `nfl_projections.defense`, with `optimize_lineups` reading a
+`defense_points` column when one is joined on and falling back to FPPG per row
+when it is not.
+
+## The optimizer learns that nine players can be one bet (2026-10-26)
+
+Out of the week 7 post-mortem above: the board is made one player at a time
+and the builder had no way to express that nine of them can be one bet on one
+offence. Three rules now exist, all solved exactly rather than filtered after
+the fact:
+
+  * `max_per_team` — at most N of the nine from one team, defense included.
+    **Defaults to 4, which is FanDuel's own limit**: the builder could
+    previously return a lineup the site would refuse to enter.
+  * `stack_qb` — at least N WR/TE from the quarterback's team.
+  * `rb_with_qb=False` — no running back from his own quarterback.
+
+The solver is a cost-profile convolution over slot pools, which sees price and
+nothing else, so the rules needed a place to live. The teams a rule names get
+split out of every slot pool and the running state carries how many of each
+have been taken; teams nobody is asking about stay in one undifferentiated
+pool and cost nothing. The team cap is applied lazily — solve, and only count
+a team once it has actually broken the cap — because counting is what costs,
+and on a real slate the cap binds on nobody.
+
+A first attempt enforced the cap by branch and bound outside the solve,
+excluding one offending player per branch. It is exact and it passed 140
+brute-force cases, but on a slate where one team is the best value at every
+slot it needs to exclude five or six players and the branching is
+one-at-a-time: 16 seconds and then no lineup at all when the node budget ran
+out. Recorded because the failure is not obvious from the outside — it only
+shows up on the slates the rule exists for.
+
+Verified against brute force on 224 small slates across every combination of
+the three rules: no mismatches. On a real 2026 main slate (527 players), one
+lineup takes 0.15-0.36s against 0.17s unconstrained, and a 25-lineup build
+9.0s against 6.4s. Dominance pruning — dropping any player with k others
+cheaper-and-better, where k is the number that slot needs — made the plain
+path slightly faster than it was before the rules existed.
+
+Builds now also record `max_per_team`, `stack_qb`, `rb_with_qb` and
+`projection_computed_at`, which is the gap the week 7 entry above named: the
+board vintage a build read was nowhere on file.
+
+## The field, and the players it has already written off (2026-10-28)
+
+The board has never had any read on what everyone else is doing. Footballguys
+publishes projected DFS roster percentages per site and week, free, as plain
+HTML tables, and `nfl_projections/ownership.py` now reads them.
+
+The numbers are a real projection and they prove it themselves. Across a
+FanDuel classic roster the positions have to sum to one QB, one defence and
+2.4/3.2/1.2 of the flexible spots, and they do:
+
+| week | QB | RB | WR | TE | DEF |
+|---|--:|--:|--:|--:|--:|
+| 6 | 98.9% | 255.5% | 315.9% | 120.5% | 100.0% |
+| 7 | 99.1% | 236.5% | 323.8% | 121.7% | 99.3% |
+| expected | 100 | ~240 | ~320 | ~120 | 100 |
+
+That accounting is checked on every parse, because it is the cheap way to
+notice the page has changed shape.
+
+### The first thing it found was our own slate confusion
+
+Attached to the week 6 FanDuel CSV, 33 players the board projected above 8
+points had no ownership at all — Purdy, McCaffrey, Stroud, Jordan Love,
+Lawrence, Daniels. All of them played. All of them scored.
+
+They were not contrarian. The source projects **one** slate, the Sunday
+13:00–16:25 windows, which is 20 teams. The CSV FanDuel hands out is the whole
+week, 28 teams, and the eight extra were Thursday night, the London game,
+Sunday night and Monday. Filtered to the slate the optimizer already calls
+`main`, 145 of 146 published names matched.
+
+The guard for this is not the obvious one. Match rate measured on the
+published side was 145 of 146 — a *wider* pool is a superset and matches
+everything. `ownership.coverage` measures the pool side instead: of the
+players the board rates above 6 points, what share has a published number. On
+the real files that reads 63% for the full CSV and 89% for the main slate.
+
+### Unlisted is not zero, it is a scratch
+
+Inside the right slate, an omission turned out to carry information the board
+does not have.
+
+| | listed | played | unlisted | played |
+|---|--:|--:|--:|--:|
+| wk 6, projected > 10 | 40 | **100%** | 5 | **0%** |
+| wk 7, projected > 10 | 47 | **100%** | 4 | 50% |
+
+The week 6 five were Lamar Jackson (projected 16.0), Hurts (13.3), Mayfield
+(12.7), Breece Hall (11.6) and Monangai (11.5). Not one of them suited up, and
+our own `exp_games` had all five at **1.00** — in-season availability
+weighting catches none of this.
+
+So an unlisted player's ownership is NaN, never a floor, and is never charged
+for. Treated as 0% it would be the most attractive name on the board, and the
+optimizer would roster the inactive list. It is reported separately
+(`flag_unlisted`, and `unlisted_but_projected` on the API) as something to
+check rather than something to exclude: in week 7 Kirk Cousins was unlisted at
+a projected 18.4 because the field expected Penix to start, and he went 20.4.
+
+### Charging for the field costs points, as it should
+
+`optimize_lineups(ownership_weight=λ)` subtracts λ points per percent owned.
+It is linear, so the solve stays exact. 2026 week 6 main slate, best five:
+
+| build | top-5 actual | total ownership |
+|---|--:|--:|
+| no charge | 125.1 | 103.5% |
+| λ = 0.10 | 109.3 | 80.7% |
+| ceiling, λ = 0.10 | 100.1 | 88.2% |
+| ceiling, λ = 0.25 | 93.0 | 64.6% |
+
+It buys the tilt and pays for it in points, which is what a leverage dial is
+supposed to do. Nothing here says whether that trade is worth making, because
+raw score is the wrong yardstick for it — the right one is tournament finish,
+and that needs a model of the field's lineups rather than of its ownership.
+Logged as untested, not as working.
+
+## A lineup's shape is not a free parameter (2026-10-28)
+
+Built `simulate.pool_sims`, which turns a player pool into a correlated
+per-simulation matrix, and `optimize_lineups(target=…)`, which solves a
+candidate set and re-ranks it by the chance of clearing a score. The target
+was the user's: 125 points, the number that cashes.
+
+### The summed ceiling is as wrong as it looked
+
+Ranking by `objective="ceiling"` adds up nine players' individual 90th
+percentiles. A lineup's mean grows with nine players while its spread only
+grows with three, so that sum is not a ceiling, it is an impossibility. On a
+week 6 eight-player core: summed marginal p90 **238.7**, true lineup p90
+**169.9**, and the summed number sits at the **99.38th percentile** of what
+the lineup can actually do.
+
+The simulator's correlations come through as designed — Stafford↔Nacua 0.487,
+C. Williams↔Odunze 0.347, Allen↔Shakir 0.324, cross-team 0.005.
+
+### And replacing it changes nothing, for a reason worth knowing
+
+Over 343 distinct week 6 lineups, every ranking metric is the same metric:
+
+| ranked by | corr. with actual | top-5 actual | top-10 |
+|---|--:|--:|--:|
+| P(≥125) | 0.764 | 126.5 | 125.7 |
+| projected mean | 0.829 | 127.7 | 123.4 |
+| summed ceiling | 0.813 | 124.3 | 125.6 |
+| summed floor | 0.811 | 128.8 | 127.6 |
+
+Sweeping the target from 100 to 180 gives **overlap 1.00 with the mean-ranked
+five at every single target**. The reason is measurable: among the top
+quintile by projected total (mean 119.5 ± 3.8), lineup standard deviation is
+31.05 ± 0.90, and after removing the mean the residual spread in that standard
+deviation is **0.750 points — 2.4%**. Spearman between P(≥125) and projected
+mean is **0.9986**.
+
+Nine players average out. Individual players differ enormously in how volatile
+they are; a nine-player sum does not, because the differences wash out and one
+extra correlated pair out of thirty-six barely moves the total. **You cannot
+build a safe lineup and a volatile lineup at the same projected total.** There
+is only a better and a worse projected total — and then there is the field.
+
+That is a statement about this simulator, not yet about football. What would
+falsify it is real outcome variance differing by player type more than the sim
+allows, and that is the thing to measure next.
+
+P(≥target) is kept anyway, because it answers a question the projection does
+not: the best lineup on week 6 cleared 125 **48.6%** of the time, and on week
+8 it is 51%. 125 is roughly a coin flip, which is worth knowing before paying
+an entry fee. It is not wired into the API request path, since it costs a
+history download to pick the identical lineups.
+
+Calibration is monotone but flat — predicted 0.014 / 0.094 / 0.224 / 0.372 /
+0.466 against realised 0.000 / 0.016 / 0.164 / 0.543 / 0.556. One slate, where
+all 343 lineups share one set of player outcomes, so the effective n is about
+one; the ordering is the only part worth reading.
+
+### The thing that actually moved the number
+
+| build | top-5 actual | hit 125 |
+|---|--:|--:|
+| 5 lineups, 50% usage, $600 step | 104.8 | 1/5 |
+| 25 lineups, 50% usage, $600 step → take 5 | 123.4 | 3/5 |
+| 5 lineups, no cap, $100 step | 125.1 | 3/5 |
+| 25 lineups, ceiling, 50% usage → take 5 | **139.9** | **5/5** |
+
+A usage cap is a spreading rule and spreading needs lineups to spread over.
+Asked for five under a 50% cap, the builder lets each player appear twice and
+forces lineups 3–5 down the price ladder — twenty points per lineup, for
+nothing. Asking for fewer lineups should not make each one worse, so that case
+now warns.
+
+But the headline is the row that was already in production: **build 25 and
+play the top five** gets 123.4, and the ceiling objective doing it got 139.9
+with all five clearing 125. The existing workflow was not the problem. One
+slate, and a 16-point gap is inside a single lineup's noise (sd ≈ 25–31), so
+this is a reason to keep measuring and not a reason to change the objective.
