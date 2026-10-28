@@ -3854,3 +3854,61 @@ play the top five** gets 123.4, and the ceiling objective doing it got 139.9
 with all five clearing 125. The existing workflow was not the problem. One
 slate, and a 16-point gap is inside a single lineup's noise (sd ≈ 25–31), so
 this is a reason to keep measuring and not a reason to change the objective.
+
+## The starter comes back, and the fill-in keeps the job he lost (2026-10-28)
+
+`roles.promotion_multiplier` handles one direction of a role change. Nothing
+handled the other: a fill-in's network input row and trailing-5 form are built
+from games he played as the starter, so in the weeks after the starter returns
+both still describe a job he no longer has. Found on the betting board in 2026
+week 8: Josh Jacobs back from suspension, and Pierre Strong, RB3, still carrying
+24 rushing yards and 0.22 TDs off two weeks as the lead back. In week 7 he took
+8 snaps and no carries.
+
+The term is the promotion's exact mirror and has no parameters. For each game
+in the player's form window (his last five, same team only), if a teammate
+ranked above him who is playing THIS week did not take an offensive snap, that
+game was played at the promoted rank and carries `_lift(position, rank,
+absent)`; the projection is divided by the window's mean lift. Window absences
+come from snap counts, which is legitimate here — those games are in the past —
+and "playing this week" is production's own trigger. Harness:
+`experiments/starter_returns.py`, on `promotion_endtoend`'s production-identical
+chain, current-season window, 5 seeds, 2025 weeks 5-18 and 2026 weeks 5-7.
+
+### The instrument that lied this time: players with no stat line
+
+The first pass scored only player-weeks with a stats row, and came back null
+(-0.15% where it fires, RB and TE reliably worse). But a player who takes snaps
+and touches nothing has no stats row — and he is precisely the fill-in this term
+is about. Counting the **565** player-weeks with offensive snaps and no stat
+line at zero changes the answer:
+
+| population | n | gain | 90% interval |
+|---|---|---|---|
+| whole board | 5,958 | +0.34% | [+0.21%, +0.47%] |
+| where it fires | 1,870 | **+1.73%** | [+1.06%, +2.43%] |
+| QB | 51 | **+31.5%** | [+18.9%, +39.7%] |
+| WR | 1,045 | +2.2% | [+1.3%, +3.1%] |
+| TE | 409 | +1.7% | [+0.2%, +3.5%] |
+| RB | 365 | **-2.8%** | [-5.1%, -0.8%] |
+| placebo (absences below) | 1,764 | +0.4% | [-0.4%, +1.3%] |
+
+15 of 17 weeks favour it. Restricting to returning starters (rank 1 only) fires
+on 1,066 and gives the same picture (+1.65%, QB +31.9%, RB -3.2%). Ordering is
+flat either way. Strong's week 7 goes 3.8 → 2.6 against an actual 0.
+
+Every scoring harness in this file inner-joins to the stats table, so every
+one of them has been blind to zero-touch weeks. The promotion entry's numbers
+are not wrong for that reason — a promoted player is rarely invisible — but
+any term that moves projections *down* has been tested against a population
+with its best cases removed.
+
+### The same shape as the promotion
+
+A large, clean QB effect, small real gains at WR and TE, and RB the one place it
+is reliably harmful — the promotion entry found exactly this, and set
+`PROMOTION_FACTOR["RB"]` to 1.0 for it. The rank multipliers that define the
+lift (RB 1.0/0.80/0.55) are the suspect quantity at RB in both directions.
+
+**To ship:** the demotion for QB, WR and TE, not RB, in `predict.py` after the
+promotion, with the harness re-run on the shipped code so `verify()` covers it.
