@@ -89,3 +89,68 @@ def test_build_expectations_from_prior_games():
     e = sim.build_expectations(prior)
     assert abs(e["exp_targets"] - 9.0) < 1e-6
     assert 8 < e["ypt"] < 9.5   # ~80 yds / 9 targets
+
+
+class TestPoolSims:
+    """Lineup-level distributions: shape and correlation, never a new board."""
+
+    @staticmethod
+    def pool():
+        return pd.DataFrame({
+            "player_id": [None, None, None],
+            "player_name": ["A", "B", "Def"],
+            "position": ["QB", "WR", "D"],
+            "team": ["X", "X", "Y"],
+            "lineup_points": [20.0, 12.0, 7.0],
+            "is_def": [False, False, True],
+        })
+
+    def test_every_row_keeps_its_projection_as_its_mean(self):
+        # The simulator supplies shape and correlation. If it also moved the
+        # mean it would be a second, worse projection model.
+        sims = sim.pool_sims(self.pool(), None, n_sims=20000, seed=3)
+        assert sims.shape == (3, 20000)
+        np.testing.assert_allclose(sims.mean(axis=1), [20.0, 12.0, 7.0], rtol=0.03)
+
+    def test_a_defence_gets_the_measured_defensive_shape(self):
+        # 2019-2026: a defence is right-skewed with a floor near zero and a
+        # long tail, not a bell around its mean.
+        sims = sim.pool_sims(self.pool(), None, n_sims=20000, seed=3)
+        defence = sims[2]
+        assert defence.min() < 0            # 35+ points allowed is -4
+        assert np.median(defence) < defence.mean()
+        assert defence.max() > 25
+
+    def test_a_skill_player_without_history_stays_non_negative(self):
+        sims = sim.pool_sims(self.pool(), None, n_sims=5000, seed=3)
+        assert sims[0].min() >= 0
+        assert sims[1].min() >= 0
+
+    def test_a_missing_projection_does_not_become_a_nan_lineup(self):
+        pool = self.pool()
+        pool.loc[1, "lineup_points"] = np.nan
+        sims = sim.pool_sims(pool, None, n_sims=500, seed=3)
+        assert np.isfinite(sims).all()
+
+    def test_it_is_reproducible(self):
+        a = sim.pool_sims(self.pool(), None, n_sims=500, seed=11)
+        b = sim.pool_sims(self.pool(), None, n_sims=500, seed=11)
+        np.testing.assert_array_equal(a, b)
+
+
+class TestLineupTotals:
+    def test_totals_sum_the_same_simulations(self):
+        sims = np.array([[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]])
+        np.testing.assert_array_equal(sim.lineup_totals(sims, [0, 1]),
+                                      [11.0, 22.0, 33.0])
+
+    def test_p_at_least_counts_the_sims_that_clear_the_bar(self):
+        sims = np.array([[10.0, 10.0, 10.0, 10.0], [0.0, 0.0, 10.0, 10.0]])
+        assert sim.p_at_least(sims, [0, 1], 15.0) == 0.5
+
+    def test_correlated_players_do_not_average_each_other_out(self):
+        # Summing marginals independently would understate a stack's spread.
+        # Summing the same simulations keeps it, which is the whole point.
+        together = np.array([[0.0, 20.0], [0.0, 20.0]])
+        totals = sim.lineup_totals(together, [0, 1])
+        assert totals.tolist() == [0.0, 40.0]
