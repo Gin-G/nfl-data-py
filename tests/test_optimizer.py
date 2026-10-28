@@ -1,5 +1,7 @@
+import warnings
 from collections import Counter
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -408,3 +410,444 @@ class TestPriceLadder:
     def test_nobody_is_rostered_twice(self):
         for lineup in optimizer.optimize_lineups(self._slate(), num_lineups=5):
             assert len(set(lineup["Nickname"])) == len(lineup)
+
+
+class TestCorrelationRules:
+    """The three rules that say how the nine picks may relate to each other.
+
+    Every slate here is built so the *unconstrained* answer breaks the rule
+    under test — otherwise the rule passing proves nothing.
+    """
+
+    @staticmethod
+    def _slate():
+        """Three teams, with HOU far and away the best value at every slot.
+
+        Left alone the builder takes five Texans, so each rule below has
+        something real to bite on.
+        """
+        rows = []
+
+        def add(nick, team, pos, salary, points):
+            rows.append({
+                "Nickname": nick, "Team": team, "Roster Position": pos,
+                "Salary": salary, "FPPG": points,
+                "fanduel_fantasy_points": points, "ceiling": points * 2,
+                "floor": points / 2, "projection_median": points,
+                "Injury Indicator": "",
+            })
+
+        for team, edge in (("HOU", 6.0), ("DAL", 0.0), ("NYG", -1.0),
+                           ("SEA", -2.0), ("MIA", -3.0), ("CHI", -4.0)):
+            add(f"QB-{team}", team, "QB", 7000, 18 + edge)
+            for j in range(3):
+                add(f"RB{j}-{team}", team, "RB/FLEX", 6000 - j * 500, 14 + edge - j)
+                add(f"WR{j}-{team}", team, "WR/FLEX", 6000 - j * 500, 13 + edge - j)
+            add(f"TE-{team}", team, "TE/FLEX", 4500, 9 + edge)
+            add(f"TE2-{team}", team, "TE/FLEX", 4000, 7 + edge)
+            add(f"DEF-{team}", team, "DEF", 3500, 8 + edge)
+        return pd.DataFrame(rows)
+
+    def _build(self, **kwargs):
+        lineups = optimizer.optimize_lineups(self._slate(), num_lineups=1,
+                                             salary_cap=60000, **kwargs)
+        assert lineups, "no lineup was built"
+        return lineups[0]
+
+    def test_without_a_cap_the_builder_stacks_one_team(self):
+        # The premise of every test below: left alone it over-concentrates.
+        lineup = self._build(max_per_team=None)
+        assert Counter(lineup["Team"]).most_common(1)[0][1] >= 5
+
+    @pytest.mark.parametrize("cap", [2, 3, 4])
+    def test_team_cap_is_honoured(self, cap):
+        lineup = self._build(max_per_team=cap)
+        assert max(Counter(lineup["Team"]).values()) <= cap
+
+    def test_the_cap_costs_points_but_still_fills_the_roster(self):
+        free = self._build(max_per_team=None)
+        capped = self._build(max_per_team=2)
+        assert len(capped) == len(free) == 9
+        assert capped["lineup_points"].sum() < free["lineup_points"].sum()
+
+    def test_stack_puts_a_pass_catcher_with_the_quarterback(self):
+        lineup = self._build(stack_qb=1, max_per_team=None)
+        qb_team = lineup[lineup["Roster Position"] == "QB"].iloc[0]["Team"]
+        partners = lineup[(lineup["Team"] == qb_team)
+                          & (lineup["Roster Position"].isin(["WR/FLEX", "TE/FLEX"]))]
+        assert len(partners) >= 1
+
+    def test_a_two_man_stack_is_two_pass_catchers(self):
+        lineup = self._build(stack_qb=2, max_per_team=None)
+        qb_team = lineup[lineup["Roster Position"] == "QB"].iloc[0]["Team"]
+        partners = lineup[(lineup["Team"] == qb_team)
+                          & (lineup["Roster Position"].isin(["WR/FLEX", "TE/FLEX"]))]
+        assert len(partners) >= 2
+
+    def test_a_running_back_can_be_kept_off_his_own_quarterback(self):
+        lineup = self._build(rb_with_qb=False, max_per_team=None)
+        qb_team = lineup[lineup["Roster Position"] == "QB"].iloc[0]["Team"]
+        assert not ((lineup["Team"] == qb_team)
+                    & (lineup["Roster Position"] == "RB/FLEX")).any()
+
+    def test_the_rules_combine(self):
+        lineup = self._build(stack_qb=2, rb_with_qb=False, max_per_team=3)
+        qb_team = lineup[lineup["Roster Position"] == "QB"].iloc[0]["Team"]
+        catchers = lineup[(lineup["Team"] == qb_team)
+                          & (lineup["Roster Position"].isin(["WR/FLEX", "TE/FLEX"]))]
+        assert len(catchers) >= 2
+        assert not ((lineup["Team"] == qb_team)
+                    & (lineup["Roster Position"] == "RB/FLEX")).any()
+        assert max(Counter(lineup["Team"]).values()) <= 3
+
+    def test_an_impossible_combination_builds_nothing(self):
+        # A two-man stack needs three from the quarterback's team; a cap of two
+        # forbids it, and no lineup exists rather than an illegal one escaping.
+        lineups = optimizer.optimize_lineups(self._slate(), num_lineups=1,
+                                             stack_qb=2, max_per_team=2)
+        assert lineups == []
+
+    def test_a_cap_the_slate_cannot_reach_builds_nothing(self):
+        # Nine roster spots over six teams cannot be done one apiece.
+        lineups = optimizer.optimize_lineups(self._slate(), num_lineups=1,
+                                             max_per_team=1)
+        assert lineups == []
+
+    def test_rules_still_hold_across_a_whole_build(self):
+        lineups = optimizer.optimize_lineups(self._slate(), num_lineups=5,
+                                             max_usage_percentage=100,
+                                             stack_qb=1, rb_with_qb=False,
+                                             max_per_team=3)
+        assert len(lineups) >= 3
+        for lineup in lineups:
+            qb_team = lineup[lineup["Roster Position"] == "QB"].iloc[0]["Team"]
+            assert ((lineup["Team"] == qb_team)
+                    & (lineup["Roster Position"].isin(["WR/FLEX", "TE/FLEX"]))).sum() >= 1
+            assert not ((lineup["Team"] == qb_team)
+                        & (lineup["Roster Position"] == "RB/FLEX")).any()
+            assert max(Counter(lineup["Team"]).values()) <= 3
+
+    def test_a_frame_with_no_team_column_still_builds(self):
+        # The default cap cannot be applied to a frame that cannot express
+        # teams, so it stands down rather than refusing to build.
+        with pytest.warns(RuntimeWarning, match="Team"):
+            lineups = optimizer.optimize_lineups(make_merged(), num_lineups=1)
+        assert len(lineups) == 1
+
+    def test_but_an_explicit_rule_without_teams_is_an_error(self):
+        with pytest.raises(ValueError, match="Team"):
+            optimizer.optimize_lineups(make_merged(), num_lineups=1, stack_qb=1)
+
+
+class TestOwnershipAndTargets:
+    """Charging for the field, and aiming at a score instead of a projection."""
+
+    @staticmethod
+    def pool():
+        # Two interchangeable options at every slot, one chalk and one not.
+        rows = []
+        for slot, position, n in (("QB", "QB", 2), ("RB", "RB", 3), ("WR", "WR", 4),
+                                  ("TE", "TE", 2), ("D", "D", 2)):
+            for i in range(n):
+                rows.append({
+                    "Nickname": f"{position}{i}", "Position": position,
+                    "Roster Position": slot, "Salary": 5000 - 200 * i,
+                    "FPPG": 10.0 - i, "fanduel_fantasy_points": 10.0 - i,
+                    "Team": f"T{i}", "ownership": 40.0 if i == 0 else 1.0,
+                })
+        return pd.DataFrame(rows)
+
+    def test_charging_for_ownership_swaps_the_chalk_out(self):
+        plain = optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                 max_usage_percentage=100, max_per_team=None)
+        assert "QB0" in set(plain[0]["Nickname"])
+        # QB0 out-projects QB1 by 1.0 but is 39 points of ownership dearer, so
+        # at 0.1 points per percent he costs 3.9 and is no longer worth it.
+        tilted = optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                  max_usage_percentage=100, max_per_team=None,
+                                  ownership_weight=0.1)
+        assert "QB0" not in set(tilted[0]["Nickname"])
+
+    def test_a_small_charge_is_not_enough_to_move_anyone(self):
+        tilted = optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                  max_usage_percentage=100, max_per_team=None,
+                                  ownership_weight=0.001)
+        assert "QB0" in set(tilted[0]["Nickname"])
+
+    def test_charging_for_ownership_needs_the_column(self):
+        with pytest.raises(ValueError, match="ownership"):
+            optimizer.optimize_lineups(self.pool().drop(columns=["ownership"]), num_lineups=1,
+                             max_usage_percentage=100, max_per_team=None,
+                             ownership_weight=0.1)
+
+    def test_unknown_ownership_is_not_charged_for(self):
+        # An unlisted player is a player the field has written off, usually
+        # because he is inactive. Reading NaN as 0% would make him the single
+        # most attractive name on the board.
+        pool = self.pool()
+        pool.loc[pool["Nickname"] == "QB0", "ownership"] = np.nan
+        tilted = optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                  max_usage_percentage=100, max_per_team=None,
+                                  ownership_weight=0.1)
+        assert "QB0" in set(tilted[0]["Nickname"])   # charged 0, still the best
+
+    def test_a_target_needs_simulations(self):
+        with pytest.raises(ValueError, match="sims"):
+            optimizer.optimize_lineups(self.pool(), num_lineups=1, max_usage_percentage=100,
+                             max_per_team=None, target=125.0)
+
+    def test_misaligned_simulations_are_refused(self):
+        with pytest.raises(ValueError, match="sims has"):
+            optimizer.optimize_lineups(self.pool(), num_lineups=1, max_usage_percentage=100,
+                             max_per_team=None, target=125.0,
+                             sims=np.zeros((3, 100)))
+
+    def test_a_duplicated_index_is_refused(self):
+        pool = self.pool()
+        pool.index = [0] * len(pool)
+        with pytest.raises(ValueError, match="duplicate labels"):
+            optimizer.optimize_lineups(pool, num_lineups=1, max_usage_percentage=100,
+                             max_per_team=None, target=125.0,
+                             sims=np.zeros((len(pool), 100)))
+
+    def test_a_target_ranks_by_the_chance_of_clearing_it(self):
+        pool = self.pool()
+        # Everyone scores 10 every sim except QB1, who scores 30 half the time.
+        sims = np.full((len(pool), 200), 10.0)
+        sims[pool.index[pool["Nickname"] == "QB1"][0], :100] = 30.0
+        built = optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                 max_usage_percentage=100, max_per_team=None,
+                                 target=95.0, sims=sims, candidates=20,
+                                 salary_step=200, price_step=200)
+        assert "QB1" in set(built[0]["Nickname"])
+        assert built[0].attrs["p_target"] == pytest.approx(0.5)
+
+    def test_a_target_reports_what_it_found(self):
+        pool = self.pool()
+        sims = np.full((len(pool), 50), 10.0)
+        built = optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                 max_usage_percentage=100, max_per_team=None,
+                                 target=80.0, sims=sims, candidates=4)
+        assert built[0].attrs["p_target"] == 1.0
+        assert built[0].attrs["sim_mean"] == pytest.approx(90.0)
+
+    def test_a_target_does_not_spread_by_default(self):
+        # Five near-identical lineups is the right answer to "clear 125", and
+        # the usage cap must not quietly override that.
+        pool = self.pool()
+        sims = np.full((len(pool), 50), 10.0)
+        built = optimizer.optimize_lineups(pool, num_lineups=3, salary_cap=60000,
+                                 max_usage_percentage=40, max_per_team=None,
+                                 target=80.0, sims=sims, candidates=20,
+                                 salary_step=200, price_step=200)
+        assert len(built) == 3
+        counts = Counter(n for l in built for n in l["Nickname"])
+        assert max(counts.values()) == 3          # the best name is in all three
+
+    def test_spreading_skips_a_lineup_that_would_break_the_cap(self):
+        # Tested on the selection directly: with nine of thirteen players in
+        # every lineup, no fixture can give three genuinely disjoint ones.
+        def lineup(names):
+            return pd.DataFrame({"Nickname": list(names)})
+
+        ranked = [lineup("ABCDEFGHI"), lineup("ABCDEFGHJ"), lineup("KLMNOPQRS")]
+        chosen = optimizer._select_diverse(ranked, 2, max_usage_percentage=50)
+        assert [list(l["Nickname"])[0] for l in chosen] == ["A", "K"]
+
+    def test_spreading_falls_back_rather_than_returning_too_few(self):
+        # A cap no candidate set can satisfy should cost diversity, not lineups.
+        def lineup(names):
+            return pd.DataFrame({"Nickname": list(names)})
+
+        ranked = [lineup("ABCDEFGHI"), lineup("ABCDEFGHJ")]
+        assert len(optimizer._select_diverse(ranked, 2, max_usage_percentage=50)) == 2
+
+    def test_a_tight_cap_on_a_small_build_is_called_out(self):
+        with pytest.warns(RuntimeWarning, match="usage cap"):
+            optimizer.optimize_lineups(self.pool(), num_lineups=5, salary_cap=60000,
+                             max_usage_percentage=50, max_per_team=None)
+
+    def test_a_big_build_under_the_same_cap_is_quiet(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            optimizer.optimize_lineups(self.pool(), num_lineups=25, salary_cap=60000,
+                             max_usage_percentage=50, max_per_team=None)
+
+
+def upload_lineup(positions, *, ids=True, points=None):
+    """A lineup frame shaped for the upload exporter."""
+    rows = []
+    for i, position in enumerate(positions):
+        rows.append({
+            "Id": f"135359-{100 + i}" if ids else None,
+            "Nickname": f"{position}{i}",
+            "Position": position,
+            "Roster Position": "DEF" if position == "D" else f"{position}/FLEX",
+            "Salary": 5000,
+            "lineup_points": (points[i] if points else 10.0 - i),
+        })
+    return pd.DataFrame(rows)
+
+
+CLASSIC = ["QB", "RB", "RB", "RB", "WR", "WR", "WR", "TE", "D"]
+
+
+class TestFanduelUpload:
+    """The CSV FanDuel's bulk entry accepts."""
+
+    def test_columns_are_fanduels_own_order(self):
+        assert optimizer.FANDUEL_UPLOAD_COLUMNS == (
+            "QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "DEF")
+
+    def test_the_surplus_running_back_becomes_the_flex(self):
+        slots = optimizer.assign_upload_slots(upload_lineup(CLASSIC))
+        placed = dict(zip(optimizer.FANDUEL_UPLOAD_COLUMNS,
+                          [r["Position"] for r in slots]))
+        assert placed["QB"] == "QB"
+        assert placed["TE"] == "TE"
+        assert placed["DEF"] == "D"
+        assert [r["Position"] for r in slots][7] == "RB"
+
+    def test_a_surplus_receiver_becomes_the_flex(self):
+        slots = optimizer.assign_upload_slots(
+            upload_lineup(["QB", "RB", "RB", "WR", "WR", "WR", "WR", "TE", "D"]))
+        assert slots[7]["Position"] == "WR"
+
+    def test_a_surplus_tight_end_becomes_the_flex(self):
+        slots = optimizer.assign_upload_slots(
+            upload_lineup(["QB", "RB", "RB", "WR", "WR", "WR", "TE", "TE", "D"]))
+        assert slots[7]["Position"] == "TE"
+
+    def test_the_flex_is_the_weakest_of_its_group(self):
+        # Cosmetic, but deterministic: the named starters should read as the
+        # starters rather than depending on row order.
+        lineup = upload_lineup(CLASSIC, points=[20, 18, 5, 12, 15, 14, 13, 9, 7])
+        slots = optimizer.assign_upload_slots(lineup)
+        assert slots[7]["Nickname"] == "RB2"       # the 5.0-point back
+        assert {slots[1]["Nickname"], slots[2]["Nickname"]} == {"RB1", "RB3"}
+
+    def test_every_player_appears_exactly_once(self):
+        slots = optimizer.assign_upload_slots(upload_lineup(CLASSIC))
+        assert len({r["Nickname"] for r in slots}) == 9
+
+    def test_a_short_lineup_is_refused(self):
+        with pytest.raises(ValueError, match="nine players"):
+            optimizer.assign_upload_slots(upload_lineup(CLASSIC[:8]))
+
+    def test_a_lineup_without_a_flex_is_refused(self):
+        with pytest.raises(ValueError, match="cannot fill the FLEX"):
+            optimizer.assign_upload_slots(
+                upload_lineup(["QB", "QB", "RB", "RB", "WR", "WR", "WR", "TE", "D"]))
+
+    def test_a_spare_defence_cannot_fill_the_flex_either(self):
+        with pytest.raises(ValueError, match="cannot fill the FLEX"):
+            optimizer.assign_upload_slots(
+                upload_lineup(["QB", "RB", "RB", "WR", "WR", "WR", "TE", "D", "D"]))
+
+    def test_an_unplaceable_position_says_so(self):
+        with pytest.raises(ValueError, match="upload column"):
+            optimizer.assign_upload_slots(
+                upload_lineup(["QB", "RB", "RB", "WR", "WR", "WR", "TE", "K", "D"]))
+
+    def test_the_csv_has_a_header_and_one_row_per_lineup(self):
+        text = optimizer.write_fanduel_upload([upload_lineup(CLASSIC)] * 2)
+        lines = text.strip().split("\r\n")
+        assert lines[0] == "QB,RB,RB,WR,WR,WR,TE,FLEX,DEF"
+        assert len(lines) == 3
+        assert all(len(line.split(",")) == 9 for line in lines)
+
+    def test_cells_carry_the_id_and_the_name(self):
+        text = optimizer.write_fanduel_upload([upload_lineup(CLASSIC)])
+        assert "135359-100:QB0" in text
+
+    def test_ids_alone_are_also_accepted_by_fanduel(self):
+        text = optimizer.write_fanduel_upload([upload_lineup(CLASSIC)],
+                                              include_names=False)
+        assert "135359-100:" not in text
+        assert "135359-100" in text
+
+    def test_the_contest_half_of_the_id_can_be_rewritten(self):
+        # An id is "<contest>-<player>". Priced from one contest's list and
+        # entered in another, the whole file is rejected.
+        text = optimizer.write_fanduel_upload([upload_lineup(CLASSIC)],
+                                              contest_id="135859")
+        assert "135859-100:QB0" in text
+        assert "135359" not in text
+
+    def test_a_player_with_no_fanduel_id_is_refused(self):
+        with pytest.raises(ValueError, match="no FanDuel `Id`"):
+            optimizer.write_fanduel_upload([upload_lineup(CLASSIC, ids=False)])
+
+    def test_more_than_fanduels_limit_is_refused_not_truncated(self):
+        # A silently truncated upload looks exactly like a successful one.
+        with pytest.raises(ValueError, match="250 lineups"):
+            optimizer.write_fanduel_upload([upload_lineup(CLASSIC)] * 251)
+
+    def test_it_writes_crlf_because_fanduel_reads_it_back(self):
+        text = optimizer.write_fanduel_upload([upload_lineup(CLASSIC)])
+        assert "\r\n" in text
+
+    def test_it_writes_to_a_path_when_given_one(self, tmp_path):
+        out = tmp_path / "upload.csv"
+        text = optimizer.write_fanduel_upload([upload_lineup(CLASSIC)], out)
+        # read_bytes, not read_text: read_text would translate the CRLF away
+        # and the test would pass whatever the file holds.
+        assert out.read_bytes().decode() == text
+
+
+class TestReadFanduelCsv:
+    """Both files FanDuel hands out, including the ragged upload template."""
+
+    PLAIN = ("Id,Position,First Name,Nickname,Last Name,FPPG,Played,Salary,Game,"
+             "Team,Opponent,Injury Indicator,Injury Details,Tier,,,Roster Position\r\n"
+             "135359-1,QB,Josh,Josh Allen,Allen,28.4,6,9400,BAL@BUF,BUF,BAL,,,,,,QB\r\n")
+
+    TEMPLATE = (
+        'QB,RB,RB,WR,WR,WR,TE,FLEX,DEF,"","Instructions"\r\n'
+        '"","","","","","","","","","","1) Create a lineup"\r\n'
+        '"","","","","","","","","",""\r\n'
+        '"","","","","","","","","","",Player ID + Player Name,Id,Position,'
+        'First Name,Nickname,Last Name,FPPG,Played,Salary,Game,Team,Opponent,'
+        'Injury Indicator,Injury Details,Tier,,,Roster Position\r\n'
+        '"","","","","","","","","","",135859-1:Josh Allen,135859-1,QB,Josh,'
+        'Josh Allen,Allen,28.4,6,9400,BAL@BUF,BUF,BAL,,,,,,QB\r\n')
+
+    def test_reads_the_plain_players_list(self, tmp_path):
+        path = tmp_path / "players.csv"
+        path.write_text(self.PLAIN, newline="")
+        frame = optimizer.read_fanduel_csv(path)
+        assert list(frame["Nickname"]) == ["Josh Allen"]
+        assert frame["Salary"].iloc[0] == 9400
+
+    def test_reads_the_ragged_upload_template(self, tmp_path):
+        # Eleven fields on the instruction rows, twenty-eight on the player
+        # rows: read_csv calls that a broken file.
+        path = tmp_path / "template.csv"
+        path.write_text(self.TEMPLATE, newline="")
+        frame = optimizer.read_fanduel_csv(path)
+        assert list(frame["Nickname"]) == ["Josh Allen"]
+        assert frame["Id"].iloc[0] == "135859-1"
+
+    def test_the_template_carries_the_contest_you_are_entering(self, tmp_path):
+        # The whole reason to prefer it over the players list.
+        path = tmp_path / "template.csv"
+        path.write_text(self.TEMPLATE, newline="")
+        frame = optimizer.read_fanduel_csv(path)
+        assert frame["Id"].iloc[0].split("-")[0] == "135859"
+
+    def test_numbers_come_back_as_numbers(self, tmp_path):
+        path = tmp_path / "template.csv"
+        path.write_text(self.TEMPLATE, newline="")
+        frame = optimizer.read_fanduel_csv(path)
+        assert frame["FPPG"].iloc[0] == pytest.approx(28.4)
+
+    def test_it_accepts_a_file_object(self, tmp_path):
+        import io as _io
+        frame = optimizer.read_fanduel_csv(_io.StringIO(self.TEMPLATE))
+        assert list(frame["Nickname"]) == ["Josh Allen"]
+
+    def test_something_else_entirely_is_refused(self, tmp_path):
+        path = tmp_path / "nope.csv"
+        path.write_text("a,b,c\r\n1,2,3\r\n", newline="")
+        with pytest.raises(ValueError, match="FanDuel player list"):
+            optimizer.read_fanduel_csv(path)
