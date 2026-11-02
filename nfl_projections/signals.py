@@ -47,8 +47,8 @@ LEAN_UP = 58.0
 ROSTERABLE = 8.0
 
 COLUMNS = ["season", "week", "player_id", "player_name", "position", "team",
-           "opponent", "projected", "run_matchup", "pass_matchup",
-           "opp_cover_grade", "run_lean", "rosterable"]
+           "opponent", "projected", "salary", "value", "run_matchup",
+           "pass_matchup", "opp_cover_grade", "run_lean", "rosterable"]
 
 
 def band(rating, bands=RUN_BANDS):
@@ -62,7 +62,7 @@ def band(rating, bands=RUN_BANDS):
 
 
 def snapshot(projections, trenches=None, coverage=None, *,
-             rosterable=ROSTERABLE):
+             salaries=None, rosterable=ROSTERABLE):
     """What the matchup signals said about a week, before it was played.
 
     `projections` needs season/week/player_id/player_name/position/team and a
@@ -71,6 +71,16 @@ def snapshot(projections, trenches=None, coverage=None, *,
     may be None or empty -- the column comes back as NaN rather than the
     snapshot failing, because a signal that could not be computed this week is
     a fact about the week and not a reason to record nothing.
+
+    `salaries` maps a normalized player name to a FanDuel salary. It is here
+    because of a specific failure: the matchup effect was measured between
+    players within 1.5 PROJECTED points of each other, where it won 63 of 90
+    pairs, and then did nothing when wired into the builder -- which decides in
+    VALUE space, so its near-ties are players with similar points per dollar
+    rather than similar points. Re-asking the question in value space is the
+    test that matters, and without a salary it cannot be asked at all. Only two
+    weeks of 2026 had a stored slate to recover salaries from, and on those the
+    swap lost about five points a lineup, which is inside one lineup's noise.
 
     No projection is adjusted. This is a record, not a model.
     """
@@ -90,6 +100,19 @@ def snapshot(projections, trenches=None, coverage=None, *,
     for column in ("run_matchup", "pass_matchup", "opponent"):
         out[column] = out["team"].map(merged.get(column, {}))
     out["opp_cover_grade"] = out["team"].map(cover.get("opp_cover_grade", {}))
+
+    if salaries:
+        from .optimizer import normalize_name
+
+        lookup = {normalize_name(str(k)): v for k, v in dict(salaries).items()}
+        out["salary"] = [lookup.get(normalize_name(str(n)))
+                         for n in out["player_name"]]
+    else:
+        out["salary"] = np.nan
+    out["salary"] = pd.to_numeric(out["salary"], errors="coerce")
+    # Points per $1,000: the units the builder actually compares.
+    out["value"] = np.where(out["salary"] > 0,
+                            out["projected"] / out["salary"] * 1000.0, np.nan)
 
     out["run_lean"] = [band(v) for v in out["run_matchup"]]
     out["rosterable"] = out["projected"] >= float(rosterable)
@@ -120,6 +143,43 @@ def score(snapshots, actuals):
     out["actual"] = out["player_id"].map(dict(actuals))
     out["miss"] = out["actual"] - out["projected"]
     return out
+
+
+def paired_verdict(scored, *, position="RB", signal="run_matchup",
+                   threshold=LEAN_UP, match_on="value", tolerance=0.15):
+    """The signal judged between players the builder would call near-tied.
+
+    `match_on` is "value" (points per $1,000, the builder's own units) or
+    "projected". The projection-space version is what gave +6.97 a pair; the
+    value-space version is the one that corresponds to a decision the builder
+    can actually be talked out of, and is the number to watch.
+    """
+    import itertools
+
+    rows = scored[(scored["position"] == position) & scored["rosterable"]
+                  & scored["miss"].notna() & scored[signal].notna()
+                  & scored[match_on].notna()]
+    wins = losses = 0
+    margins = []
+    for _, group in rows.groupby(["season", "week"]):
+        records = list(group.itertuples())
+        for a, b in itertools.combinations(records, 2):
+            if abs(getattr(a, match_on) - getattr(b, match_on)) > tolerance:
+                continue
+            up, down = (a, b) if getattr(a, signal) >= threshold else (b, a)
+            if not (getattr(up, signal) >= threshold > getattr(down, signal)):
+                continue
+            margins.append(float(up.actual - down.actual))
+            wins += up.actual > down.actual
+            losses += up.actual < down.actual
+    if not margins:
+        return {"pairs": 0, "verdict": "no comparable pairs recorded yet"}
+    return {"pairs": len(margins), "wins": wins, "losses": losses,
+            "win_rate": round(wins / max(wins + losses, 1), 3),
+            "mean_margin": round(float(np.mean(margins)), 2),
+            "match_on": match_on, "tolerance": tolerance,
+            "caveat": ("Pairs share players, so they are not independent and "
+                       "any interval over them is optimistic.")}
 
 
 def verdict(scored, *, position="RB", signal="run_matchup", threshold=LEAN_UP):

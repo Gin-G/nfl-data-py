@@ -1091,3 +1091,87 @@ class TestMatchupBoost:
         # It does not change built lineups at a safe size; see the docstring.
         assert optimizer.contest_settings("cash", 50).get("matchup_boost", 0.0) == 0.0
         assert optimizer.contest_settings("gpp", 100).get("matchup_boost", 0.0) == 0.0
+
+
+class TestMatchupSwaps:
+    """Asking the matchup question where the builder actually decides."""
+
+    @staticmethod
+    def pool():
+        rows = []
+        for team, rating in (("A", 65.0), ("B", 45.0), ("C", 50.0)):
+            for position, slot, n in (("QB", "QB", 1), ("RB", "RB/FLEX", 2),
+                                      ("WR", "WR/FLEX", 3), ("TE", "TE/FLEX", 1),
+                                      ("D", "DEF", 1)):
+                for i in range(n):
+                    rows.append({
+                        "Nickname": f"{team}-{position}{i}", "Position": position,
+                        "Roster Position": slot, "Salary": 5000,
+                        "FPPG": 10.0 - i, "lineup_points": 10.0 - i,
+                        "fanduel_fantasy_points": 10.0 - i,
+                        "Team": team, "run_matchup": rating,
+                    })
+        frame = pd.DataFrame(rows)
+        return optimizer.add_eligibility(frame)
+
+    def test_it_swaps_a_value_tied_back_into_the_better_matchup(self):
+        pool = self.pool()
+        lineup = pool.loc[[i for i in pool.index
+                           if pool["Nickname"][i] in (
+                               "B-QB0", "B-RB0", "B-RB1", "B-WR0", "B-WR1",
+                               "C-WR0", "B-TE0", "C-RB0", "B-D0")]]
+        picks, swaps = optimizer.matchup_swaps(lineup, pool, 60000, tolerance=0.15)
+        assert swaps
+        assert all(s["matchup"] == 65.0 for s in swaps)
+        assert len(set(picks)) == 9
+
+    def test_it_never_breaks_the_cap(self):
+        pool = self.pool()
+        pool.loc[pool["Nickname"] == "A-RB0", "Salary"] = 40000
+        lineup = pool.loc[[i for i in pool.index
+                           if pool["Nickname"][i] in (
+                               "B-QB0", "B-RB0", "B-RB1", "B-WR0", "B-WR1",
+                               "C-WR0", "B-TE0", "C-RB0", "B-D0")]]
+        picks, _ = optimizer.matchup_swaps(lineup, pool, 46000, tolerance=5.0)
+        assert pool["Salary"].reindex(picks).sum() <= 46000
+
+    def test_it_will_not_pair_players_the_builder_calls_different(self):
+        # A value gap the builder would never treat as a tie is not a tiebreak.
+        pool = self.pool()
+        pool.loc[pool["Nickname"] == "A-RB0", "lineup_points"] = 2.0
+        lineup = pool.loc[[i for i in pool.index
+                           if pool["Nickname"][i] in (
+                               "B-QB0", "B-RB0", "B-RB1", "B-WR0", "B-WR1",
+                               "C-WR0", "B-TE0", "C-RB0", "B-D0")]]
+        _, swaps = optimizer.matchup_swaps(lineup, pool, 60000, tolerance=0.05)
+        assert not any(s["in"] == "A-RB0" for s in swaps)
+
+    def test_it_respects_the_team_limit(self):
+        pool = self.pool()
+        lineup = pool.loc[[i for i in pool.index
+                           if pool["Nickname"][i] in (
+                               "A-QB0", "A-RB0", "A-RB1", "A-WR0", "B-WR1",
+                               "C-WR0", "B-TE0", "C-RB0", "B-D0")]]
+        picks, _ = optimizer.matchup_swaps(lineup, pool, 60000, tolerance=5.0,
+                                           max_per_team=4)
+        counts = Counter(str(pool["Team"][i]).upper() for i in picks)
+        assert max(counts.values()) <= 4
+
+    def test_it_only_touches_the_positions_it_was_measured_on(self):
+        pool = self.pool()
+        lineup = pool.loc[[i for i in pool.index
+                           if pool["Nickname"][i] in (
+                               "B-QB0", "B-RB0", "B-RB1", "B-WR0", "B-WR1",
+                               "C-WR0", "B-TE0", "C-RB0", "B-D0")]]
+        _, swaps = optimizer.matchup_swaps(lineup, pool, 60000, tolerance=0.15,
+                                           positions=("RB",))
+        assert all(s["out"].split("-")[1].startswith("RB") for s in swaps)
+
+    def test_an_already_flagged_lineup_is_left_alone(self):
+        pool = self.pool()
+        lineup = pool.loc[[i for i in pool.index
+                           if pool["Nickname"][i] in (
+                               "A-QB0", "A-RB0", "A-RB1", "A-WR0", "B-WR1",
+                               "C-WR0", "B-TE0", "B-RB0", "B-D0")]]
+        _, swaps = optimizer.matchup_swaps(lineup, pool, 60000, tolerance=0.15)
+        assert all(s["out"] != "A-RB0" for s in swaps)

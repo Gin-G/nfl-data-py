@@ -147,3 +147,70 @@ class TestVerdict:
         rows = self.recorded([5])
         rows.loc[rows.player_id == "up1", "miss"] = np.nan
         assert signals.verdict(rows)["flagged"] == 0
+
+
+class TestSalaryAndValue:
+    """Salary is recorded because the builder decides in value space."""
+
+    def test_salary_and_value_are_recorded(self):
+        out = signals.snapshot(projections(), trenches(), coverage(),
+                               salaries={"Back A": 6900, "Back B": 5200})
+        a = out[out.player_id == "p1"].iloc[0]
+        assert a.salary == 6900
+        assert a.value == pytest.approx(14.0 / 6900 * 1000)
+
+    def test_a_player_with_no_salary_has_no_value(self):
+        out = signals.snapshot(projections(), trenches(), coverage(),
+                               salaries={"Back A": 6900})
+        assert np.isnan(out[out.player_id == "p2"].iloc[0].value)
+
+    def test_names_are_matched_the_way_the_optimizer_does(self):
+        # The slate writes "T.J. Hockenson"; the board writes "TJ Hockenson".
+        out = signals.snapshot(projections(), salaries={"back a": 6900})
+        assert out[out.player_id == "p1"].iloc[0].salary == 6900
+
+    def test_no_salaries_at_all_is_fine(self):
+        out = signals.snapshot(projections(), trenches(), coverage())
+        assert out.salary.isna().all()
+        assert out.value.isna().all()
+
+
+class TestPairedVerdict:
+    @staticmethod
+    def pairs(margins, match_on="value"):
+        rows = []
+        for week, margin in enumerate(margins, start=1):
+            for tag, rating, actual in (("up", 65.0, 12.0 + margin),
+                                        ("dn", 45.0, 12.0)):
+                rows.append(dict(
+                    season=2026, week=week, player_id=f"{tag}{week}",
+                    player_name=tag, position="RB", team="A", opponent="B",
+                    projected=12.0, salary=6000, value=2.0, run_matchup=rating,
+                    pass_matchup=50.0, opp_cover_grade=40.0,
+                    run_lean="lean up" if rating >= 58 else "neutral",
+                    rosterable=True, actual=actual, miss=actual - 12.0))
+        return pd.DataFrame(rows)
+
+    def test_it_pairs_players_the_builder_would_call_tied(self):
+        out = signals.paired_verdict(self.pairs([5.0, 3.0, -2.0]))
+        assert out["pairs"] == 3
+        assert out["wins"] == 2 and out["losses"] == 1
+        assert out["mean_margin"] == pytest.approx(2.0)
+
+    def test_it_can_pair_on_projection_instead(self):
+        out = signals.paired_verdict(self.pairs([4.0]), match_on="projected",
+                                     tolerance=1.5)
+        assert out["pairs"] == 1
+
+    def test_players_too_far_apart_are_not_a_choice(self):
+        rows = self.pairs([5.0])
+        rows.loc[rows.player_id == "up1", "value"] = 9.0
+        assert signals.paired_verdict(rows)["pairs"] == 0
+
+    def test_nothing_comparable_says_so(self):
+        assert "no comparable pairs" in signals.paired_verdict(
+            self.pairs([5.0]), position="WR")["verdict"]
+
+    def test_it_states_that_pairs_are_not_independent(self):
+        out = signals.paired_verdict(self.pairs([5.0]))
+        assert "not independent" in out["caveat"]

@@ -4415,3 +4415,59 @@ it is noted and not believed.
 Default 0. The effect is real where it was measured, the implementation is
 honest about the size, and it has not been shown to improve a lineup. The
 prospective record is what settles it.
+
+## Asking the matchup question where the builder decides, and the split that eats it (2026-11-02)
+
+`matchup_boost` added points before the solve and did nothing, because the
+builder decides in value space: its near-ties are players with similar points
+per dollar, not similar points. So the question was re-asked properly --
+`matchup_swaps` looks, after a lineup is solved, at the players who could have
+filled each slot within a tolerance in **points per $1,000**, and takes the one
+in the best matchup.
+
+**The player-level evidence survives the change of units.** Weeks 6 and 8,
+the only two with a stored slate to recover salaries from:
+
+| matched on | window | pairs | flagged wins | margin |
+|---|---|--:|--:|--:|
+| projection | ±1.5 pts | 27 | 74% | +6.85 |
+| **value** | ±0.05 pts/$1k | 11 | 73% | +5.08 |
+| **value** | ±0.10 | 16 | 69% | +6.68 |
+| **value** | ±0.15 | 23 | 70% | +4.50 |
+| **value** | ±0.25 | 44 | 68% | +4.65 |
+
+**And the swap still loses.** Week 6, ten lineups, tolerance 0.15: four swaps,
+actual 477.8 down to 425.4.
+
+Which looks damning until the four swaps are read:
+
+```
+L7  Chuba Hubbard  -> Kyren Williams   value gap 0.036  projection +2.44
+L8  Chuba Hubbard  -> Kyren Williams   value gap 0.036  projection +2.44
+L9  D'Andre Swift  -> Kyren Williams   value gap 0.026  projection +2.93
+L10 D'Andre Swift  -> Kyren Williams   value gap 0.026  projection +2.93
+```
+
+They are **one decision**, taken four times. Every swap was into Kyren
+Williams, whose team graded 67.5 on run blocking and who returned 12.4 against
+a 16.0 projection. The mechanism is working — the swaps are genuinely
+value-tied, and they even raise projected points — and the sample is a single
+running back.
+
+### The thing the signal does not know
+
+Los Angeles was flagged because the Rams block well. Whether a Rams back banks
+that depends on how the carries divide, and they divided: Kyren 12.4, Corum
+13.3, neither paying. The trench report rates a **team**; a lineup slot holds a
+**player**. Nothing in the signal carries workload share, so it will keep
+pointing at split backfields with the same confidence it points at bellcows.
+
+Worth recording that this was called in advance, from the outside, by someone
+reading the same report: *"I really liked the LAR RBs too because of the trench
+report, but didn't like the split."* That is the missing term stated plainly,
+and it is the next thing to test — the matchup signal conditioned on carry
+share, rather than the matchup signal alone.
+
+So `matchup_swaps` ships off by default. `signals` now records salary and
+value alongside the projection, which is what makes the value-space question
+answerable on a real sample instead of on one week and one running back.

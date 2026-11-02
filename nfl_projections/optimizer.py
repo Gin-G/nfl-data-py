@@ -817,6 +817,97 @@ def contest_settings(contest="cash", aggression=50, num_lineups=None):
     )
 
 
+def matchup_swaps(lineup, pool, cap, *, column="run_matchup", threshold=58.0,
+                  positions=("RB",), tolerance=0.15, points_col="lineup_points",
+                  max_per_team=None):
+    """Trade a near-tied player for one in a better matchup, after the solve.
+
+    `matchup_boost` adds points before the solve and mostly fails to reach
+    anything, because the builder decides in VALUE space: two players are
+    near-tied for it when their projections differ by roughly the marginal
+    points per dollar times their price difference, not when their projections
+    are close. A projection-space nudge of a point and a half moved the number
+    of flagged backs in a week 8 lineup from 0.0 to 0.1.
+
+    This asks the question where the decision actually happens. For each slot
+    the lineup filled with an unflagged player, it looks at the players who
+    could have gone there -- same slot, affordable out of this lineup's own
+    leftover salary -- and swaps when one is flagged and costs no more than
+    `tolerance` projected points. That is the window the effect was measured
+    in: among backs within 1.5 projected points, the flagged one won 63 of 90
+    head-to-head pairs by a mean 6.97.
+
+    Returns (indices, swaps) where `swaps` describes what moved. The cap and
+    the team limit are rechecked, so a swap can never produce a lineup the
+    builder would not have returned.
+
+    **Off by default, and the reason is a backfield split.** On 2026 week 6 --
+    one of the two weeks with a stored slate to test on -- this made four
+    swaps across ten lineups and cost 52 points. All four were the same
+    decision: into Kyren Williams, whose team was rated 67.5 on run blocking
+    and who returned 12.4 against a 16.0 projection. The effective sample is
+    one player, not four swaps.
+
+    But that one case is the shape of the problem. The trench report rates a
+    TEAM's run blocking; whether any individual back banks it depends on how
+    the carries are split, which the signal knows nothing about. Los Angeles
+    was flagged and the carries went two ways. A matchup signal conditioned on
+    workload share is the version worth testing, and `signals` now records
+    salary and value so the question can be asked on a real sample rather than
+    on one week and one running back.
+    """
+    frame = pool if "_slots" in pool.columns else add_eligibility(pool.copy())
+    rating = pd.to_numeric(frame[column], errors="coerce")
+    base = (frame.get("Position", pd.Series("", index=frame.index)).astype(str)
+                 .str.upper().str.replace("/FLEX", "", regex=False))
+    wanted = {p.upper() for p in positions}
+    flagged = base.isin(wanted) & (rating >= float(threshold))
+    points = pd.to_numeric(frame[points_col], errors="coerce")
+    salary = pd.to_numeric(frame["Salary"], errors="coerce")
+    # Points per $1,000 -- the units the builder compares, and therefore the
+    # units a near-tie has to be measured in.
+    value = (points / salary * 1000.0).where(salary > 0)
+
+    picks = list(lineup.index)
+    spent = float(salary.reindex(picks).sum())
+    swaps = []
+    for slot_player in list(picks):
+        if flagged.get(slot_player, False) or not base.get(slot_player, "") in wanted:
+            continue
+        spare = cap - spent + salary[slot_player]
+        slots = frame["_slots"][slot_player]
+        here = value[slot_player]
+        # Matched on VALUE, not projection. Filtering on projection and then
+        # taking the best affordable flagged player is not a tiebreak: with
+        # leftover salary it reaches up the board for an expensive flagged
+        # name, which is exactly the chase that lost 4.06 points a week. The
+        # first version of this did that, and duly made lineups worse while
+        # RAISING their projected total.
+        options = frame.index[
+            flagged & (salary <= spare) & (value - here).abs().le(float(tolerance))
+            & ~frame.index.isin(picks)
+            & [bool(slots & frame["_slots"][i]) for i in frame.index]]
+        if not len(options):
+            continue
+        # Among the value-tied flagged options, the strongest matchup.
+        best = max(options, key=lambda i: (rating[i], points[i]))
+        trial = [i if i != slot_player else best for i in picks]
+        if max_per_team and "Team" in frame.columns:
+            counts = Counter(str(frame["Team"][i]).upper() for i in trial)
+            if max(counts.values()) > max_per_team:
+                continue
+        swaps.append({"out": frame["Nickname"][slot_player],
+                      "in": frame["Nickname"][best],
+                      "projection_cost": round(float(points[slot_player]
+                                                     - points[best]), 2),
+                      "value_gap": round(float(abs(value[best] - here)), 3),
+                      "matchup": round(float(rating[best]), 1),
+                      "salary_change": int(salary[best] - salary[slot_player])})
+        spent += float(salary[best] - salary[slot_player])
+        picks = trial
+    return picks, swaps
+
+
 def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
                      max_usage_percentage=50, objective="mean", roster_slots=None,
                      salary_step=100, price_step=None, max_per_team=4,
