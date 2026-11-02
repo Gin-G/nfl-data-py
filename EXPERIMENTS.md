@@ -4157,3 +4157,110 @@ Two of the week's best scores, Tyler Allgeier (36.6, the top back on the slate)
 and Emmett Johnson (25.8), were unlisted even on the final page — so the tail
 of genuinely unrostered players who go off is real. It is just not the same set
 as the Friday tail.
+
+## Cash and tournament builds, and the dial that cannot be set from two weeks (2026-11-02)
+
+Rebuilt the optimizer around what the last three weeks measured. The useful
+part of this entry is which of the intended changes survived contact.
+
+### What the best lineups actually look like
+
+| | week 6 | week 8 |
+|---|--:|--:|
+| best lineup that existed | 206.1 | 265.7 |
+| our median POINT rank at position | 8 | 6 |
+| its worst-ranked player | #42 | #46 |
+| its projected pts/$1k | 1.54 | 1.75 |
+| what our mean build spent per point | 2.08 | 2.13 |
+
+So the best lineup is *less* efficient than ours and its tail is deep-board
+flukes. It is not a target, which the earlier entries already said.
+
+### "Build the best, not the most valuable" cannot be done with a dial
+
+Tried it as a continuous tilt, `objective = projection + alpha * salary/1000`,
+swept alpha 0 to 3. Projected pts/$1k moved 2.10 to **2.09** and median rank
+4.9 to 4.5. Nothing. The reason is structural: **the optimizer already pays
+up.** Every lineup it builds spends $59,000-$60,000, so there is no withheld
+salary to reward, and it skips an expensive top-ranked player only because the
+board says nine cheaper points beat his eight.
+
+The real obstacle is the board, and it is worse than compression. Regressing
+actual on projected over 669 player-weeks the slope is **0.909** — the scale is
+right, not compressed. But among the 136 players a lineup would actually
+consider, projection SD is **3.67** against an outcome SD of **9.40**, and the
+rank correlation is **+0.316**. Inside the usable set the board barely
+discriminates. No objective over those numbers can find "the best nine", so
+the optimizer's job is to avoid self-defeating shapes, not to rank harder.
+
+### What shipped, and the evidence for each
+
+**`rb_vs_opposing_def`** — no running back facing the lineup's own defence.
+The largest pairing measured (-0.339; 18.79 points in the worst quartile of
+opposing defence against 11.22 in the best). Solved exactly by enumerating the
+defence, verified against brute force on 80 small slates. On week 6 **six of
+ten** lineups broke it unprompted and enforcing it cost **0.1** projected
+points. It is not free in time: 1.5 s a lineup against 0.11 s, because it
+solves once per defence, and the bound only prunes 27 solves to 17. Week 8 it
+never bound at all and cost nothing.
+
+**`ownership_exempt_rank`** — the fade skips each position's top few, so
+leverage is taken in the slots that can carry it instead of by downgrading the
+best player on the slate.
+
+**Defence correlation in `pool_sims`** — defences were drawn independently.
+Now -0.45 against the opposing offence's total, +0.09/-0.07/-0.06 with their
+own RB/QB/WR and -0.34 with the opposing back, all matched to measurement.
+**It did not do what I expected.** I had logged this as the first candidate
+that would make the target objective rank lineups differently from the mean.
+It does not: lineup SD residual is still 0.9% and spearman(P, mean) is still
+0.9995, top five overlap 5/5. Nine players average out even with the defence
+wired in, so P(target) is redundant with the mean full stop — not for want of
+a correlation. The fix is kept because the simulator is now right about
+something it was wrong about, not because it unlocked anything.
+
+### And the dial that two weeks cannot set
+
+Cash aggression was going to mean "don't spread, play the best lineup", on week
+6's evidence that five lineups under a 50% cap scored 104.8 against 125.1
+uncapped. Week 8 says the exact opposite, and says it just as cleanly:
+
+| cash aggression | week 6 | week 8 |
+|---|--:|--:|
+| 0 (hedge) | 105.6 | **106.9** |
+| 50 | 116.2 | 96.5 |
+| 100 (commit) | **123.5** | 88.9 |
+
+Monotone in opposite directions. Spreading is not exposure management here, it
+is a hedge against **our own error**, and whether the hedge pays depends on
+whether the board was right that week — week 6 it was, week 8 its top picks
+(Cooper Jr., Brissett, Javonte Williams, Tre Tucker) all failed together.
+
+With a rank correlation of +0.316 inside the usable set, there is no basis for
+picking a side, so the dial spans it and says so in the tooltip. That is the
+honest answer and it is not the answer I set out to build.
+
+GPP presets at the same aggressions: week 6 gave 127.3 / 121.9 / 98.3 mean
+with a best top-five of **143.1** at aggression 50 and 8 of 12 lineups
+clearing 125; week 8 gave 110.6 / 106.7 / 91.2. Aggression 100 was worst in
+both weeks, which is consistent with the fade losing on the mean.
+
+### The trench report against the board's error
+
+Weeks 3-8, 1,938 player-weeks at their pre-week vintage, against
+`/trenches/matchups`:
+
+| position | run_matchup vs miss | pass_matchup vs miss |
+|---|--:|--:|
+| QB | +0.047 | +0.011 |
+| RB | **+0.166** | +0.036 |
+| WR | +0.102 | -0.143 |
+| TE | -0.144 | -0.077 |
+
+Backs projected above 8 in a "lean up" run matchup beat their projection by
+**+5.49** (n=23). That is the most promising of sixteen tests run here, which
+is exactly when to distrust it: at n=134 a correlation of +0.166 is around
+p=0.05 before any correction for having looked sixteen times. Not wired into
+anything. It is mechanically the same story as the RB/defence pairing — both
+are rushing volume in a game going one way — so it is worth a proper
+prospective test rather than a coefficient.

@@ -851,3 +851,170 @@ class TestReadFanduelCsv:
         path.write_text("a,b,c\r\n1,2,3\r\n", newline="")
         with pytest.raises(ValueError, match="FanDuel player list"):
             optimizer.read_fanduel_csv(path)
+
+
+class TestContestPresets:
+    """One dial, two contests, and every setting traceable to a measurement."""
+
+    def test_the_two_contests_are_the_ones_offered(self):
+        assert optimizer.CONTESTS == ("cash", "gpp")
+
+    def test_an_unknown_contest_is_refused(self):
+        with pytest.raises(ValueError, match="contest must be one of"):
+            optimizer.contest_settings("showdown")
+
+    def test_cash_never_charges_for_ownership(self):
+        # Fading the field costs points in the mean; a cash game pays on the
+        # mean. The dial must not be able to turn that on by accident.
+        for a in (0, 25, 50, 75, 100):
+            assert optimizer.contest_settings("cash", a)["ownership_weight"] == 0.0
+
+    def test_cash_commits_harder_as_the_dial_turns(self):
+        # Aggression in cash is "how much do I trust the board". At 0 it
+        # hedges our own error with a looser exposure cap and more lineups; at
+        # 100 it plays the single best lineup the board can find. Measured both
+        # ways: week 6 rewarded committing (105.6 -> 123.5 across the dial) and
+        # week 8 punished it (106.9 -> 88.9).
+        quiet = optimizer.contest_settings("cash", 0)
+        loud = optimizer.contest_settings("cash", 100)
+        assert quiet["max_usage_percentage"] < loud["max_usage_percentage"] == 100
+        assert quiet["num_lineups"] > loud["num_lineups"]
+
+    def test_cash_blocks_a_back_facing_its_own_defence(self):
+        assert optimizer.contest_settings("cash", 50)["rb_vs_opposing_def"] is False
+
+    def test_cash_keeps_the_mean_objective_at_every_setting(self):
+        # Floor and ceiling are nearly the same lineup as the mean at a fixed
+        # projected total, so there is nothing for the dial to buy by swapping
+        # objectives -- only concentration.
+        for a in (0, 50, 100):
+            assert optimizer.contest_settings("cash", a)["objective"] == "mean"
+
+    def test_gpp_opens_up_as_the_dial_turns(self):
+        low = optimizer.contest_settings("gpp", 10)
+        high = optimizer.contest_settings("gpp", 100)
+        assert high["num_lineups"] > low["num_lineups"]
+        assert high["max_usage_percentage"] < low["max_usage_percentage"]
+        assert high["ownership_weight"] > low["ownership_weight"]
+        assert high["stack_qb"] >= low["stack_qb"]
+
+    def test_gpp_does_not_fade_the_field_until_it_is_aggressive(self):
+        # The one measurement says fading loses points. It should take a
+        # deliberate turn of the dial, not a default.
+        assert optimizer.contest_settings("gpp", 0)["ownership_weight"] == 0.0
+        assert optimizer.contest_settings("gpp", 30)["ownership_weight"] == 0.0
+        assert optimizer.contest_settings("gpp", 100)["ownership_weight"] > 0
+
+    def test_gpp_exempts_the_top_of_each_position_from_the_charge(self):
+        assert optimizer.contest_settings("gpp", 100)["ownership_exempt_rank"] == 3
+
+    def test_the_dial_is_clamped(self):
+        assert (optimizer.contest_settings("gpp", -50)
+                == optimizer.contest_settings("gpp", 0))
+        assert (optimizer.contest_settings("gpp", 500)
+                == optimizer.contest_settings("gpp", 100))
+
+    def test_an_explicit_lineup_count_wins(self):
+        assert optimizer.contest_settings("gpp", 100, num_lineups=7)["num_lineups"] == 7
+
+    def test_the_settings_are_accepted_by_the_builder(self):
+        pool = TestOwnershipAndTargets.pool()
+        pool["Opponent"] = ["T1" if t == "T0" else "T0" for t in pool["Team"]]
+        for contest in optimizer.CONTESTS:
+            kw = optimizer.contest_settings(contest, 50, num_lineups=1)
+            kw.pop("objective")
+            built = optimizer.optimize_lineups(pool, objective="mean",
+                                               salary_cap=60000, max_per_team=None,
+                                               **{k: v for k, v in kw.items()
+                                                  if k != "max_per_team"})
+            assert len(built) >= 1
+
+
+class TestOpposingDefenceRule:
+    """No running back facing the defence in the lineup."""
+
+    @staticmethod
+    def pool():
+        rows = []
+        # Two games: A vs B, C vs D. A's backs are the cheap value plays, and
+        # B's defence is the best one — so the unconstrained optimum pairs them.
+        for team, opp in (("A", "B"), ("B", "A"), ("C", "D"), ("D", "C")):
+            for position, slot, n in (("QB", "QB", 1), ("RB", "RB/FLEX", 2),
+                                      ("WR", "WR/FLEX", 3), ("TE", "TE/FLEX", 1),
+                                      ("D", "DEF", 1)):
+                for i in range(n):
+                    points = 10.0 - i
+                    if team == "A" and position == "RB":
+                        points = 30.0 - i          # irresistible backs
+                    if team == "B" and position == "D":
+                        points = 25.0              # irresistible defence
+                    rows.append({
+                        "Nickname": f"{team}-{position}{i}", "Position": position,
+                        "Roster Position": slot, "Salary": 5000,
+                        "FPPG": points, "fanduel_fantasy_points": points,
+                        "Team": team, "Opponent": opp,
+                    })
+        return pd.DataFrame(rows)
+
+    @staticmethod
+    def pairs(lineup):
+        defence = lineup[lineup["Position"] == "D"]
+        against = defence["Opponent"].iloc[0]
+        backs = lineup[lineup["Position"] == "RB"]
+        return any(t == against for t in backs["Team"])
+
+    def test_unconstrained_it_takes_the_bad_pairing(self):
+        built = optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None)
+        assert self.pairs(built[0])
+
+    def test_the_rule_removes_it(self):
+        built = optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None,
+                                           rb_vs_opposing_def=False)
+        assert not self.pairs(built[0])
+
+    def test_it_still_returns_the_best_legal_lineup(self):
+        # Giving up the pairing should cost the defence, not the backs: the
+        # backs are worth 30 each and the next defence is worth 10.
+        built = optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None,
+                                           rb_vs_opposing_def=False)
+        assert "A-RB0" in set(built[0]["Nickname"])
+        assert "B-D0" not in set(built[0]["Nickname"])
+
+    def test_it_reads_the_game_column_when_there_is_no_opponent(self):
+        pool = self.pool()
+        pool["Game"] = [f"{t}@{o}" for t, o in zip(pool["Team"], pool["Opponent"])]
+        pool = pool.drop(columns=["Opponent"])
+        built = optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None,
+                                           rb_vs_opposing_def=False)
+        defence = built[0][built[0]["Position"] == "D"]["Team"].iloc[0]
+        backs = set(built[0][built[0]["Position"] == "RB"]["Team"])
+        assert {"A": "B", "B": "A", "C": "D", "D": "C"}[defence] not in backs
+
+    def test_without_a_schedule_it_warns_rather_than_silently_ignoring(self):
+        pool = self.pool().drop(columns=["Opponent"])
+        with pytest.warns(RuntimeWarning, match="rb_vs_opposing_def"):
+            optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                       max_usage_percentage=100, max_per_team=None,
+                                       rb_vs_opposing_def=False)
+
+
+class TestOwnershipExemption:
+    def test_the_top_of_a_position_is_not_charged(self):
+        pool = TestOwnershipAndTargets.pool()
+        # QB0 out-projects QB1 by 1.0 and is 39 points of ownership dearer, so
+        # a 0.1 charge would normally drop him — unless he is exempt.
+        built = optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None,
+                                           ownership_weight=0.1, ownership_exempt_rank=1)
+        assert "QB0" in set(built[0]["Nickname"])
+
+    def test_below_the_exemption_the_charge_still_bites(self):
+        pool = TestOwnershipAndTargets.pool()
+        built = optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None,
+                                           ownership_weight=0.1, ownership_exempt_rank=0)
+        assert "QB0" not in set(built[0]["Nickname"])

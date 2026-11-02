@@ -267,8 +267,42 @@ def _recentred(mean, shape, n_sims, rng):
     return draws - shape.mean() + mean
 
 
+# A defence is not independent of the game it is in, and drawing it that way
+# was understating exactly the lineup shapes people build. Measured over 3,982
+# team-games, 2019-2026, lead scorer per team:
+#
+#   RB carries vs own DST      +0.177      QB vs own DST    -0.074
+#   RB points  vs own DST      +0.087      WR vs own DST    -0.056
+#   RB points  vs OPPOSING DST -0.339
+#
+# Both run through the scoring margin -- partial it out and the own-team link
+# vanishes -- so this is a correlated bet on the game going one way, which is
+# precisely what a stack is. The opposing-side number is the big one and it is
+# the one nobody states as a rule: a back and the defence he is running at.
+_DST_RHO = {"RB": 0.09, "QB": -0.07, "WR": -0.06, "TE": -0.03}
+_DST_RHO_AGAINST = -0.34
+
+
+def _blend(target, driver, rho, rng):
+    """Re-draw `target` so it correlates `rho` with `driver`, keeping its shape.
+
+    Gaussian-copula style: rank-match the target onto a latent variable built
+    from the driver's ranks plus noise. The marginal is preserved exactly --
+    it is the same numbers in a different order -- so a defence keeps the
+    measured right-skewed shape and its mean stays its projection.
+    """
+    if not rho:
+        return target
+    n = len(driver)
+    dr = np.argsort(np.argsort(driver)).astype(float) / max(n - 1, 1)
+    latent = rho * (dr - 0.5) * np.sqrt(12.0) + np.sqrt(max(1 - rho * rho, 0.0)) * rng.standard_normal(n)
+    order = np.argsort(np.argsort(latent))
+    return np.sort(target)[order]
+
+
 def pool_sims(pool, history=None, *, n_sims=2000, seed=0, trailing=6,
-              points_col="lineup_points", defense_col="is_def"):
+              points_col="lineup_points", defense_col="is_def",
+              correlate_defense=True):
     """A correlated simulation matrix aligned row-for-row with a player pool.
 
     Returns an ``(len(pool), n_sims)`` array. Skill players with history are
@@ -309,7 +343,62 @@ def pool_sims(pool, history=None, *, n_sims=2000, seed=0, trailing=6,
             mean = max(means[i], 1e-6)
             shape_k = 1.0 / (_SKILL_CV ** 2)
             sims[i] = rng.gamma(shape_k, mean / shape_k, size=n_sims)
+
+    if correlate_defense and is_def.any():
+        sims = _tie_defenses_to_their_games(pool, sims, is_def, rng)
     return sims
+
+
+def _tie_defenses_to_their_games(pool, sims, is_def, rng):
+    """Correlate each defence with its own skill players and with the opponent's.
+
+    Driven by the opposing offence's simulated total, because that is what a
+    defence's score is mostly made of -- the points-allowed tier. A defence
+    whose opponent goes off scores badly, and its own backfield is running out
+    the clock in the games where it does well.
+    """
+    teams = pool["team"] if "team" in pool.columns else pool.get("Team")
+    if teams is None:
+        return sims
+    teams = teams.astype(str).str.upper().to_numpy()
+    opponents = _opponents(pool, teams)
+    positions = (pool["position"] if "position" in pool.columns
+                 else pool.get("Position", pd.Series("", index=pool.index)))
+    positions = positions.astype(str).str.upper().str.replace("/FLEX", "", regex=False).to_numpy()
+
+    for i in np.flatnonzero(is_def):
+        own, against = teams[i], opponents.get(teams[i])
+        if against is None:
+            continue
+        # The opponent's offence is the driver: more points against, worse
+        # defensive score. Its own skill players ride the same game the other
+        # way, at the measured per-position strength.
+        rival = np.flatnonzero((teams == against) & ~is_def
+                               & np.isin(positions, ("QB", "RB", "WR", "TE")))
+        if not len(rival):
+            continue
+        driver = sims[rival].sum(axis=0)
+        sims[i] = _blend(sims[i], driver, -0.45, rng)
+        for pos, rho in _DST_RHO.items():
+            mates = np.flatnonzero((teams == own) & ~is_def & (positions == pos))
+            for j in mates:
+                sims[j] = _blend(sims[j], sims[i], rho, rng)
+        for j in np.flatnonzero((teams == against) & ~is_def & (positions == "RB")):
+            sims[j] = _blend(sims[j], sims[i], _DST_RHO_AGAINST, rng)
+    return sims
+
+
+def _opponents(pool, teams):
+    """team -> opponent, from a FanDuel `Game` column like "IND@JAC"."""
+    game = pool.get("Game")
+    if game is None:
+        return {}
+    out = {}
+    for g in game.dropna().astype(str).unique():
+        parts = [p.strip().upper() for p in g.replace("@", " ").split()]
+        if len(parts) == 2:
+            out[parts[0]], out[parts[1]] = parts[1], parts[0]
+    return out
 
 
 def lineup_totals(sims, rows):

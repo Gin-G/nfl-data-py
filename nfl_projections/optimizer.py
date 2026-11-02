@@ -491,8 +491,117 @@ def _team_counts(df, picks):
     return counts
 
 
+def _opponent_of(df):
+    """team -> opponent for this slate, from `Opponent` or from `Game`."""
+    if "Opponent" in df.columns:
+        pairs = df[["Team", "Opponent"]].dropna().astype(str)
+        return {t.upper(): o.upper() for t, o in pairs.itertuples(index=False)}
+    if "Game" in df.columns:
+        out = {}
+        for game in df["Game"].dropna().astype(str).unique():
+            parts = [p.strip().upper() for p in game.replace("@", " ").split()]
+            if len(parts) == 2:
+                out[parts[0]], out[parts[1]] = parts[1], parts[0]
+        return out
+    return {}
+
+
+def _without_rb_against_def(df, cap, roster_slots, salary_step, *,
+                            max_per_team, stack_qb, rb_with_qb):
+    """`best_lineup`, with no running back facing the rostered defense.
+
+    Solved by enumerating the defense, because there is one per team and the
+    rule is a function of which one is taken -- the same shape as the
+    quarterback rules, which run once per team.
+
+    The unconstrained solve is tried FIRST and returned whenever it already
+    obeys the rule, which on a real slate it usually does: the rule costs
+    nothing most weeks and only bites when the best lineup happens to pair a
+    back with the defense he is running at. That keeps the common case at one
+    solve instead of twenty.
+    """
+    opponent = _opponent_of(df)
+    if not opponent:
+        warnings.warn(
+            "no Opponent or Game column, so `rb_vs_opposing_def` cannot be "
+            "enforced; the rule is ignored.", RuntimeWarning, stacklevel=3)
+        return best_lineup(df, cap, roster_slots, salary_step,
+                           max_per_team=max_per_team, stack_qb=stack_qb,
+                           rb_with_qb=rb_with_qb)
+
+    frame = df if "_slots" in df.columns else add_eligibility(df.copy())
+    teams = frame["Team"].astype(str).str.upper()
+    is_def = pd.Series([("DEF" in s) for s in frame["_slots"]], index=frame.index)
+    is_rb = pd.Series([("RB/FLEX" in s) for s in frame["_slots"]], index=frame.index)
+
+    def breaks(picks):
+        """The defense's opponent, if a running back in `picks` plays for it."""
+        chosen = frame.loc[list(picks)]
+        defenses = chosen.index[is_def.reindex(chosen.index, fill_value=False)]
+        if not len(defenses):
+            return None
+        against = opponent.get(teams.get(defenses[0]))
+        backs = chosen.index[is_rb.reindex(chosen.index, fill_value=False)]
+        return against if any(teams.get(i) == against for i in backs) else None
+
+    found = best_lineup(frame, cap, roster_slots, salary_step,
+                        max_per_team=max_per_team, stack_qb=stack_qb,
+                        rb_with_qb=rb_with_qb)
+    if found is None or breaks(found[0]) is None:
+        return found
+
+    # It bites. Solve once per defense, best-scoring defense first.
+    #
+    # Two bounds keep that from being twenty full solves. `ceiling` is the
+    # unconstrained optimum, which nothing here can beat, so matching it stops
+    # the loop. And `rest` is the best the other eight slots can do at the full
+    # cap with every rule relaxed, so `points(defense) + rest` bounds what any
+    # particular defense can reach -- sorted best-first, the moment that bound
+    # falls to the incumbent, no defense left can win.
+    ceiling = found[2]
+    without_def = {slot: n for slot, n in roster_slots.items() if slot != "DEF"}
+    skill = frame[~is_def]
+
+    # The bound has to know the budget the defense leaves behind, or it is
+    # useless: the best eight at the FULL cap outscores anything reachable once
+    # a defense has been paid for, so it never prunes. Solved once per distinct
+    # defense salary, with every rule relaxed, which keeps it both an upper
+    # bound and cheap -- a handful of unconstrained solves.
+    rest_at = {}
+    for price in sorted({int(p) for p in frame.loc[is_def, "Salary"]}):
+        # max_per_team is kept: the eight skill players are a subset of a legal
+        # nine, so they obey it too, and keeping it tightens the bound a lot.
+        # stack_qb and rb_with_qb are REQUIREMENTS, so they must be relaxed for
+        # this to stay an upper bound.
+        got = best_lineup(skill, cap - price, without_def, salary_step,
+                          max_per_team=max_per_team, stack_qb=0, rb_with_qb=True)
+        rest_at[price] = got[2] if got is not None else float("-inf")
+
+    order = frame.loc[is_def[is_def].index].sort_values("lineup_points", ascending=False)
+    order = sorted(
+        ((row["lineup_points"] + rest_at.get(int(row["Salary"]), float("inf")), pick, row)
+         for pick, row in order.iterrows()), key=lambda t: -t[0])
+    best = None
+    for bound, pick, row in order:
+        if best is not None and bound <= best[2]:
+            break
+        against = opponent.get(str(row["Team"]).upper())
+        keep = ~(is_def & (frame.index != pick))
+        if against:
+            keep &= ~(is_rb & (teams == against))
+        candidate = best_lineup(frame[keep], cap, roster_slots, salary_step,
+                                max_per_team=max_per_team, stack_qb=stack_qb,
+                                rb_with_qb=rb_with_qb)
+        if candidate is not None and (best is None or candidate[2] > best[2]):
+            best = candidate
+            if best[2] >= ceiling:
+                break       # cannot do better than the unconstrained optimum
+    return best
+
+
 def best_lineup(df, cap, roster_slots=None, salary_step=100, *,
-                max_per_team=None, stack_qb=0, rb_with_qb=True):
+                max_per_team=None, stack_qb=0, rb_with_qb=True,
+                rb_vs_opposing_def=True):
     """The highest-scoring legal lineup at or under `cap`, or None if none fits.
 
     Exact, where the old fill was greedy. It filled slot by slot taking the best
@@ -514,12 +623,23 @@ def best_lineup(df, cap, roster_slots=None, salary_step=100, *,
           skill players alongside their own defense is a bet against itself.
       stack_qb: at least this many WR/TE from the quarterback's team.
       rb_with_qb: when False, no running back from the quarterback's team.
+      rb_vs_opposing_def: when False, no running back who is playing AGAINST
+          the defense in the lineup. This is the largest of the pairings
+          measured (2019-2026, 3,982 team-games): a lead back correlates
+          -0.339 with the defense he is running at, and across quartiles of
+          that defense he goes from 18.79 points to 11.22. The team cap cannot
+          see it, because a back and the defense facing him are on different
+          teams. Needs an `Opponent` or `Game` column.
 
-    All three need a `Team` column, which every FanDuel player list has.
+    All four need a `Team` column, which every FanDuel player list has.
 
     Returns (indices, salary, points).
     """
     roster_slots = roster_slots or ROSTER_SLOTS
+    if not rb_vs_opposing_def:
+        return _without_rb_against_def(
+            df, cap, roster_slots, salary_step, max_per_team=max_per_team,
+            stack_qb=stack_qb, rb_with_qb=rb_with_qb)
     budget = int(cap // salary_step)
     if "_slots" not in df.columns:
         add_eligibility(df)
@@ -605,10 +725,103 @@ def cheapest_lineup_cost(df, roster_slots=None):
     return int(best) if best is not None else None
 
 
+# --- contest presets ------------------------------------------------------
+#
+# Two contests, one dial. The settings below are not taste: each is the best
+# reading of something measured on the 2026 slates, and the ones that are not
+# measured are left neutral rather than guessed.
+#
+#   * The board barely separates the players a lineup can actually use.
+#     Projection SD among them is 3.67 against an outcome SD of 9.40, and the
+#     rank correlation is +0.316. So no objective should be trusted to find
+#     "the best nine"; what it can do is avoid self-defeating shapes.
+#   * Nine players average out to one shape: at a fixed projected total the
+#     lineup SD varies by about 2%. Floor, ceiling and cash objectives are
+#     therefore nearly the same lineup, and the differences between them are
+#     not worth a slider of their own.
+#   * Spreading is a tournament idea. A usage cap over few lineups costs
+#     points for nothing (5 lineups at 50% scored 104.8 against 125.1).
+#   * Fading the field costs points in the mean -- corr(ownership, actual
+#     minus projected) was +0.130 in week 8 -- so it is a tournament trade and
+#     is off in cash at any aggression.
+#   * A running back opposite the defence you have rostered is the largest
+#     unexploited effect found: -0.339, an 18.8-to-11.2 swing across quartiles.
+#     Blocked in both contests, because it is not a preference.
+CONTESTS = ("cash", "gpp")
+
+
+def contest_settings(contest="cash", aggression=50, num_lineups=None):
+    """Optimizer keyword arguments for a contest type and an aggression dial.
+
+    `aggression` runs 0-100 and means "how far from the board's single best
+    lineup am I willing to go for a bigger tail". It is one dial because the
+    things it moves are not independent: spreading, stacking and fading the
+    field are all the same bet that the modal outcome is not the one that pays.
+
+    In **cash** the dial is deliberately short. There is one best lineup for
+    clearing a number and the evidence says to play it, so aggression only
+    decides whether to enter one of it or a few near-copies; ownership is
+    never charged for.
+
+    In **gpp** the dial opens up: it buys a quarterback stack, then exposure
+    spread, then a charge against the field -- in that order, because that is
+    the order of how well each is evidenced.
+    """
+    if contest not in CONTESTS:
+        raise ValueError(f"contest must be one of {CONTESTS}, got {contest!r}")
+    a = max(0.0, min(100.0, float(aggression))) / 100.0
+
+    if contest == "cash":
+        # Aggression here is "how much do I trust the board", and the honest
+        # answer is "not very". Spreading is usually described as exposure
+        # management, but with the board separating rosterable players at a
+        # rank correlation of only +0.316 it is mostly a hedge against our own
+        # error -- and whether that hedge pays has gone both ways:
+        #
+        #   week 6: five lineups at a 50% cap scored 104.8, uncapped 125.1
+        #   week 8: ten at a 50% cap averaged 115.5, the uncapped five 85.2
+        #
+        # Dead opposite, on the two slates there are. So the dial spans it
+        # instead of picking a side: at 0 the build hedges, at 100 it commits
+        # to the board's single best lineup.
+        return dict(
+            objective="mean",
+            num_lineups=num_lineups or int(round(6 - 3 * a)),
+            max_usage_percentage=int(round(60 + 40 * a)),
+            price_step=100,
+            max_per_team=4,
+            stack_qb=0,
+            rb_with_qb=True,
+            ownership_weight=0.0,
+            rb_vs_opposing_def=False,
+        )
+    return dict(
+        objective="ceiling",
+        num_lineups=num_lineups or int(round(5 + 15 * a)),
+        # Spread only once there are lineups to spread over.
+        max_usage_percentage=100 if a < 0.2 else int(round(100 - 60 * a)),
+        price_step=100,
+        max_per_team=4,
+        stack_qb=1 if a >= 0.25 else 0,
+        rb_with_qb=a < 0.5,
+        # Charged only outside each position's top few, so the studs stay
+        # affordable and the leverage is taken in the slots that can carry it.
+        ownership_weight=round(0.20 * max(0.0, a - 0.3) / 0.7, 3) if a > 0.3 else 0.0,
+        ownership_exempt_rank=3,
+        # Enforcing this costs about 1.5 s a lineup on a real slate, against
+        # 0.11 s without it, because it solves once per defense. Worth it for a
+        # handful of lineups and not worth a half-minute request for twenty, so
+        # a big tournament build leaves it off and the exposure spread takes
+        # the edge off any single bad pairing.
+        rb_vs_opposing_def=(num_lineups or int(round(5 + 15 * a))) > 10,
+    )
+
+
 def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
                      max_usage_percentage=50, objective="mean", roster_slots=None,
                      salary_step=100, price_step=None, max_per_team=4,
                      stack_qb=0, rb_with_qb=True, ownership_weight=0.0,
+                     ownership_exempt_rank=0, rb_vs_opposing_def=True,
                      target=None, sims=None, candidates=None, diversify=None):
     """Build FanDuel lineups: the best one under the cap, then cheaper ones.
 
@@ -631,6 +844,15 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
             0 ignores the field. The charge is linear and additive, so the
             solve stays exact; at 0.1 a 30%-owned player has to out-project a
             1%-owned one by 2.9 points to keep his place.
+        ownership_exempt_rank: leave the top N by projection at each position
+            uncharged. Fading the field costs points -- week 8's best five
+            went 125.1 to 109.3 at a charge of 0.10 -- and it costs them
+            fastest at the top of the board, where the field is expensive
+            because it is right. Exempting the first few means the leverage is
+            taken in the slots that can carry it rather than by downgrading
+            the best player on the slate.
+        rb_vs_opposing_def: when False, no running back facing the lineup's
+            own defense. See `best_lineup`.
         target: a score to aim at (125, say). Given one, the builder solves
             `candidates` lineups on the linear objective and then re-ranks them
             by the chance of CLEARING the target, which needs `sims`.
@@ -728,6 +950,11 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
             raise ValueError("ownership_weight needs an `ownership` column; see "
                              "nfl_projections.ownership.attach")
         owned = pd.to_numeric(df["ownership"], errors="coerce").fillna(0.0)
+        if ownership_exempt_rank:
+            base = (df.get("Position", pd.Series("", index=df.index)).astype(str)
+                      .str.upper().str.replace("/FLEX", "", regex=False))
+            rank = df["lineup_points"].groupby(base).rank(ascending=False, method="min")
+            owned = owned.where(rank > int(ownership_exempt_rank), 0.0)
         df["lineup_points"] = df["lineup_points"] - ownership_weight * owned
 
     # A usage cap is a spreading rule, and spreading only pays when there are
@@ -779,7 +1006,8 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
                    for n in df["Nickname"]]]
         found = best_lineup(pool, budget, roster_slots, salary_step,
                             max_per_team=max_per_team, stack_qb=stack_qb,
-                            rb_with_qb=rb_with_qb)
+                            rb_with_qb=rb_with_qb,
+                            rb_vs_opposing_def=rb_vs_opposing_def)
         if found is None:
             break
         picks, spent, _ = found
