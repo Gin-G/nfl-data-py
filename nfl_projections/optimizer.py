@@ -887,10 +887,14 @@ def matchup_swaps(lineup, pool, cap, *, column="run_matchup", threshold=58.0,
         # name, which is exactly the chase that lost 4.06 points a week. The
         # first version of this did that, and duly made lineups worse while
         # RAISING their projected total.
+        # The slot test is a Python list comprehension over frozensets, so it
+        # has to become a Series before it meets the other masks: pandas 3
+        # refuses a logical op between a Series and a bare list.
+        fits_slot = pd.Series([bool(slots & other) for other in frame["_slots"]],
+                              index=frame.index)
         options = frame.index[
             flagged & (salary <= spare) & (value - here).abs().le(float(tolerance))
-            & ~frame.index.isin(picks)
-            & [bool(slots & frame["_slots"][i]) for i in frame.index]]
+            & ~frame.index.isin(picks) & fits_slot]
         if not len(options):
             continue
         # Among the value-tied flagged options, the strongest matchup.
