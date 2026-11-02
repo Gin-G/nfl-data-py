@@ -4264,3 +4264,83 @@ p=0.05 before any correction for having looked sixteen times. Not wired into
 anything. It is mechanically the same story as the RB/defence pairing — both
 are rushing volume in a game going one way — so it is worth a proper
 prospective test rather than a coefficient.
+
+## Coverage is answered; the trench effect gets a prospective record (2026-11-02)
+
+Two questions, two different outcomes.
+
+### Coverage, tested a fourth way, is still nothing
+
+Per-player it had already failed three ways — team yards allowed, per-corner
+grades, and the board's own residual, where wide receiver came back actively
+harmful. But the hypothesis actually being proposed was different: not "does
+this receiver beat his projection" but **"does a weak secondary flag a game
+worth stacking"**, which is a game-level question and had never been run.
+
+87 games, 2026 weeks 3-8. Outcome is the game's aggregate miss — the fantasy
+points its rosterable skill players scored minus what the board projected of
+them. Significance at this n needs about |r| = 0.21:
+
+| signal | r with game miss |
+|---|--:|
+| weakest secondary in the game | **−0.125** |
+| both secondaries summed | +0.076 |
+| best run matchup in the game | +0.072 |
+| both run matchups summed | +0.078 |
+| best pass matchup | +0.035 |
+| both pass matchups summed | +0.000 |
+
+Nothing, and the coverage term has the wrong sign. Checked once more at the
+player level through the recording harness: opp_cover_grade against the board's
+error is **+0.008** for receivers and **−0.007** for tight ends. That is four
+independent tests now. It is context for a human reading a slate and nothing
+more.
+
+Cincinnati is the instructive case, because it looked like a hit. CIN was on
+the "lean up" list in week 8 — but at **66.1 run** matchup with pass at 47.6,
+dead neutral. What happened was Chase 28.6 and Higgins 35.5: a passing
+explosion in a game flagged for running. Right game, wrong mechanism, which is
+what a 0.07 correlation looks like from the inside.
+
+### The trench effect held to a proper standard
+
+Taken seriously, the running-back finding does not clear the bar:
+
+| check | result |
+|---|---|
+| full-sample r (RB, projected ≥ 8) | +0.166, n = 134 |
+| bootstrap 95% CI | **[−0.002, +0.324]** |
+| weeks 3-5 / weeks 6-8 | +0.263 / +0.099 |
+| "lean up or better" vs the rest | +5.10 against +0.13 (n = 25) |
+| **weeks pointing the right way** | **5 of 5 testable** |
+
+The interval touches zero, the effect halves out of sample, and it was the best
+of sixteen tests on one dataset. Against that, 5 of 5 on a sign test is about
+p = 0.03, the 58 threshold is the trench report's own band rather than one
+fitted here, and it is mechanically the same story as the running-back/defence
+pairing — rushing volume in a game going one way. Per week the gaps are +1.65,
++14.04, +1.30, +4.03, +5.34, so one slate is most of the pooled figure and the
+robust part is the sign, not the size.
+
+By position, the same test, which is the context that was missing:
+
+| position | gap | weeks right |
+|---|--:|--:|
+| **RB** | **+4.98** | **5/5** |
+| WR | +2.38 | 2/5 |
+| QB | −0.27 | 2/6 |
+| TE | −0.93 | 2/5 |
+
+Only running back survives. Receiver's pooled gap is one week in disguise.
+
+So nothing adjusts a projection. `nfl_projections.signals` freezes what the
+signals said before a slate, `scripts/record_signals.py` runs it Thursday and
+Saturday and scores earlier weeks as their stats land, and
+**GET /trenches/signals** reads the verdict back with `weeks_right` out of
+`weeks` and the per-week detail, so a single big week cannot hide inside a
+pooled average. Backfilled over weeks 3-8, which reproduces the table above
+exactly.
+
+This is the first thing in this file built to be judged rather than fitted. If
+it is real the record will say so by about week 14; if it is the best of
+sixteen looks, it will say that instead, and that is the point.
