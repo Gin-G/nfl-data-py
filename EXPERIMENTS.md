@@ -4540,3 +4540,77 @@ Both samples here are small — 91 rosterable player-weeks, 2 slates — and the
 only reason the price question is answerable at all is the two stored slates.
 `signals` now records salary and value every week, so this gets re-asked on a
 real sample rather than re-argued.
+
+## The second-half fade for older backs is real, mostly priced, and Henry is the case (2026-11-02)
+
+Prompted by a read from outside the data: Henry "started the season hot, but
+has cooled off ... typically doesn't deliver as many points in the second half
+once he's gotten a little tired." Distinct from the age curve already on file,
+which was about games PLAYED and did not survive out of sample. 427
+running-back seasons with five or more games in each half, 2016-2026:
+
+| age | n | 1st half pts/g | 2nd half | Δ points | Δ opportunities | Δ pts/opp |
+|---|--:|--:|--:|--:|--:|--:|
+| ≤24 | 185 | 11.76 | 12.29 | **+0.53** | +0.39 | +0.02 |
+| 25-26 | 122 | 12.18 | 11.31 | −0.87 | −0.51 | −0.03 |
+| 27-28 | 65 | 12.31 | 11.27 | −1.04 | −0.94 | −0.02 |
+| 29-30 | 32 | 11.50 | 10.35 | −1.15 | −1.39 | −0.02 |
+| 31+ | 23 | 9.57 | 8.23 | **−1.34** | −1.09 | −0.05 |
+
+Monotone, and **it is opportunity leaving rather than efficiency falling**:
+age correlates −0.151 with the change in opportunities and only −0.073 with
+the change in points per opportunity. Workload sorts it harder than age does —
+by first-half total opportunities, light +0.61, medium −0.07, **heavy −1.57**,
+again almost all of it volume (−1.56).
+
+Henry's own seasons flip exactly where claimed. Ages 22-26: +3.90, +0.89,
++12.05, +13.02, +4.85. Ages 28-30: **−5.09, −1.07, −5.82**. Age 31 bucked it at
++6.56. And 2026 to date is a textbook run:
+
+| week | opportunities | points | trailing projection |
+|---|--:|--:|--:|
+| 3-5 | 27, 25, 26 | 21.4, 14.9, 21.5 | 27.0, 25.1, 22.6 |
+| 6 | 18 | **4.5** | 18.5 |
+| 7 | 19 | **5.4** | 15.6 |
+| 8 | **13** | 13.0 | 11.6 |
+
+### But the trend is already in the projection
+
+The obvious exploit — fade a back whose opportunities are trending down — is
+nothing. 8,804 player-weeks, trend being the last two games against the three
+before them, against a trailing projection's error:
+
+| position | n | r(trend, error) |
+|---|--:|--:|
+| RB | 5,500 | **−0.010** |
+| WR | 2,872 | −0.077 |
+| TE | 432 | −0.095 |
+
+And by bucket for backs the error is −0.56 / −0.25 / −0.59 / −0.13 / −0.89
+from falling-hard to rising-hard: no pattern at all, with flat worse than
+falling. The reason is mechanical and is visible in Henry's own line above: a
+falling trend drags the trailing average down with it, so by the time anyone
+can see the decline the number has already moved. Falling-hard backs carry a
+trailing projection of 9.96 against rising-hard's 14.42. The projection chases
+the fade, and week 8 Henry duly beat his reduced number, 13.0 against 11.6.
+
+### What is left over
+
+The conjunction, which does not fully price:
+
+| second half | n | trailing | actual | error |
+|---|--:|--:|--:|--:|
+| age 28+ **and** heavy first-half workload | 198 | 9.24 | 8.59 | **−1.45** |
+| everyone else | 3,546 | — | — | −0.49 |
+
+About a point of differential. Real, mechanically sensible, large-sample — and
+a point against a back's weekly standard deviation of nine, which is why it is
+recorded rather than applied. `signals` now carries age and season-to-date
+opportunities so the rest of this season tests it.
+
+The broader observation that prompted this — those backs "would have been
+decent plays, some just didn't hit ... game script, tough matchup, weather" —
+is the correct summary of everything in this file. Walker, Bijan and Kyren took
+near-identical volume in week 6 to 29.9, 6.3 and 8.2 points. Nothing measured
+here separates those three beforehand, and the honest position is that the
+separation mostly does not exist rather than that it is waiting in a feature.

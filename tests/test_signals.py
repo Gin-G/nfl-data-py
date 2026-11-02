@@ -214,3 +214,23 @@ class TestPairedVerdict:
     def test_it_states_that_pairs_are_not_independent(self):
         out = signals.paired_verdict(self.pairs([5.0]))
         assert "not independent" in out["caveat"]
+
+
+class TestAgeAndWorkload:
+    """Recorded for the one second-half effect that is partly unpriced."""
+
+    def test_age_and_season_opportunities_are_recorded(self):
+        out = signals.snapshot(projections(), ages={"p1": 31, "p2": 24},
+                               season_opportunities={"p1": 180.0, "p2": 60.0})
+        a = out[out.player_id == "p1"].iloc[0]
+        assert a.age == 31
+        assert a.season_opportunities == pytest.approx(180.0)
+
+    def test_they_are_optional(self):
+        out = signals.snapshot(projections())
+        assert out.age.isna().all()
+        assert out.season_opportunities.isna().all()
+
+    def test_an_unknown_player_is_not_guessed_at(self):
+        out = signals.snapshot(projections(), ages={"p1": 31})
+        assert np.isnan(out[out.player_id == "p2"].iloc[0].age)

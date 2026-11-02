@@ -48,7 +48,8 @@ ROSTERABLE = 8.0
 
 COLUMNS = ["season", "week", "player_id", "player_name", "position", "team",
            "opponent", "projected", "salary", "value", "run_matchup",
-           "pass_matchup", "opp_cover_grade", "run_lean", "rosterable"]
+           "pass_matchup", "opp_cover_grade", "run_lean", "age",
+           "season_opportunities", "rosterable"]
 
 
 def band(rating, bands=RUN_BANDS):
@@ -62,7 +63,8 @@ def band(rating, bands=RUN_BANDS):
 
 
 def snapshot(projections, trenches=None, coverage=None, *,
-             salaries=None, rosterable=ROSTERABLE):
+             salaries=None, ages=None, season_opportunities=None,
+             rosterable=ROSTERABLE):
     """What the matchup signals said about a week, before it was played.
 
     `projections` needs season/week/player_id/player_name/position/team and a
@@ -81,6 +83,20 @@ def snapshot(projections, trenches=None, coverage=None, *,
     test that matters, and without a salary it cannot be asked at all. Only two
     weeks of 2026 had a stored slate to recover salaries from, and on those the
     swap lost about five points a lineup, which is inside one lineup's noise.
+
+    `ages` and `season_opportunities` map player_id to age in years and to
+    opportunities taken so far this season. They are recorded for the one
+    second-half effect that measured as partly unpriced: over 427 running-back
+    seasons the change from the first half of a season to the second runs
+    +0.53 points a game at 24 or younger down to -1.34 at 31 or older, and it
+    is opportunity leaving rather than efficiency falling (correlation with age
+    -0.151 against -0.073). A trailing projection follows most of that down by
+    itself -- the trend in opportunities predicts its error at -0.010 for
+    backs, which is nothing -- but the conjunction does not fully price: age 28
+    or older on a heavy first-half workload missed a trailing projection by
+    -1.45 points in the second half against -0.49 for everyone else, n = 198.
+    One point against a weekly standard deviation of nine, so it is recorded
+    rather than applied.
 
     No projection is adjusted. This is a record, not a model.
     """
@@ -113,6 +129,12 @@ def snapshot(projections, trenches=None, coverage=None, *,
     # Points per $1,000: the units the builder actually compares.
     out["value"] = np.where(out["salary"] > 0,
                             out["projected"] / out["salary"] * 1000.0, np.nan)
+
+    out["age"] = pd.to_numeric(
+        out["player_id"].map(dict(ages)) if ages else np.nan, errors="coerce")
+    out["season_opportunities"] = pd.to_numeric(
+        out["player_id"].map(dict(season_opportunities))
+        if season_opportunities else np.nan, errors="coerce")
 
     out["run_lean"] = [band(v) for v in out["run_matchup"]]
     out["rosterable"] = out["projected"] >= float(rosterable)
