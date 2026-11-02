@@ -3912,3 +3912,98 @@ lift (RB 1.0/0.80/0.55) are the suspect quantity at RB in both directions.
 
 **To ship:** the demotion for QB, WR and TE, not RB, in `predict.py` after the
 promotion, with the harness re-run on the shipped code so `verify()` covers it.
+
+## Week 8 scored: the field was right, and so was the list we doubted (2026-11-02)
+
+2026 week 8, FanDuel main slate, 11 games. Nine builds, 85 lineups, 80 of them
+on the main slate and fully scorable. First week with ownership available
+before lock, so the first real test of both things it was supposed to buy.
+
+| | |
+|---|--:|
+| FanDuel's own FPPG would have built | 69.8 |
+| our 80 lineups, mean | **105.2** (sd 24.4) |
+| our best | 160.5 |
+| the best lineup the slate held | 266.7 |
+| beat FPPG | 74 of 80 (92%) |
+| cleared the 125 target | 17 of 80 |
+
+A 69.8 FPPG baseline is the lowest of the three weeks measured (116.3, 73.5,
+69.8), so 92% is flattering; against the pool it is an ordinary week. We took
+60% of what was there, in line with the 69% and 55% before it.
+
+### The leverage premise failed, cleanly
+
+Across the 65 main-slate players the board rated above 8 points and the field
+had a number for:
+
+**corr(ownership, actual − projected) = +0.130.** Below-median owned beat their
+projection by **−0.78**; above-median by **+2.03**. The chalk was chalk because
+it was good, and fading it was fading the better half of the board.
+
+Two builds 26 minutes apart make a near-controlled pair — same objective, same
+pool, same vintage, fade the only difference:
+
+| build | fade | mean actual | top five | best |
+|---|--:|--:|--:|--:|
+| 21 | 0.00 | 110.2 | 109.5 | 141.1 |
+| 22 | 0.05 | 105.4 | 114.9 | 142.1 |
+
+Which is noise at a lineup sd of 24. Nothing here says the fade works, and the
+one measurement with any power says the opposite. It stays a dial at 0.
+
+The confusing part, and the reason this is not simply "ownership is useless":
+the week's two best plays were both lowish-owned. Kirk Cousins at **0.7%**
+owned scored 28.2 against an 18.3 projection, in 30 of our lineups. Tony
+Pollard at 9.9% scored 30.2 against 15.4. So leverage pays in the tail while
+costing in the mean, which is exactly what a tournament trade looks like and
+exactly what one slate cannot separate from luck.
+
+### The scratch detector was wrong, both times, and expensively
+
+Logged on 2026-10-28 as the strongest new signal found: a well-projected player
+the field has not rostered is usually one the field knows is inactive. Week 8
+says otherwise.
+
+| | projected | listed | actual |
+|---|--:|--:|--:|
+| Cam Ward | 10.7 | no | **29.3** |
+| Braelon Allen | 10.3 | no | **25.3** |
+
+Both played, both were among the best scores on the slate, and both were in
+**zero** of our 80 lineups — not because anything excluded them, but because
+10.5 projected points does not make an optimal lineup. The flag was advisory
+and the advice ("check the news, usually he is out") was wrong twice.
+
+Three weeks of it:
+
+| week | unlisted & projected > 10 | played |
+|---|--:|--:|
+| 6 | 5 | 0 |
+| 7 | 4 | 2 |
+| 8 | 2 | **2** |
+| total | 11 | 4 |
+
+and the four who played went 20.4, 4.6, 29.3, 25.3 — mean 19.9. So week 6's 0
+of 5 was small-sample luck, the real rate is nearer 4 of 11, and the misses are
+the expensive direction: an unlisted player who plays is by construction
+uncontested. The flag is kept, the claim is not. It reads "the field has not
+priced this player, find out why" and nothing stronger.
+
+### The one rule that keeps holding
+
+| | week 6 | week 7 | week 8 |
+|---|--:|--:|--:|
+| ceiling build, top five | 139.9 | 149.7 | 116.8 / 116.0 |
+| mean build, top five | 125.1 | — | 95.9 |
+
+Third week running that the ceiling build's best five beats the mean build's,
+and week 8 is the widest margin yet (+21). Still the only lineup-level finding
+in this file with more than one week behind it, and still unexplained — the
+summed ceiling it ranks on is a quantity that cannot happen (see 2026-10-28).
+Worth trusting before it is worth understanding.
+
+Biggest misses, by points per lineup given up: Omar Cooper Jr. −3.0 on an 11.0
+projection in 30 lineups, Brissett 4.5 on 18.4 in 28, Javonte Williams 6.2 on
+17.7 in 30, Zay Flowers 0.0 on 15.4 in 22, Tre Tucker 0.0 on 11.0 in 30. Four
+of those five were on the leverage shortlist.
