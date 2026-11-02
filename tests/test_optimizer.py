@@ -1018,3 +1018,76 @@ class TestOwnershipExemption:
                                            max_usage_percentage=100, max_per_team=None,
                                            ownership_weight=0.1, ownership_exempt_rank=0)
         assert "QB0" not in set(built[0]["Nickname"])
+
+
+class TestMatchupBoost:
+    """A tiebreak between comparable backs, not a reason to climb the board."""
+
+    @staticmethod
+    def pool():
+        rows = []
+        for team, rating in (("A", 65.0), ("B", 45.0)):
+            for position, slot, n in (("QB", "QB", 1), ("RB", "RB/FLEX", 2),
+                                      ("WR", "WR/FLEX", 3), ("TE", "TE/FLEX", 1),
+                                      ("D", "DEF", 1)):
+                for i in range(n):
+                    # A-RB0 and B-RB0 are a near-tie: 12.0 against 12.8.
+                    points = 10.0 - i
+                    if position == "RB" and i == 0:
+                        points = 12.0 if team == "A" else 12.8
+                    rows.append({
+                        "Nickname": f"{team}-{position}{i}", "Position": position,
+                        "Roster Position": slot, "Salary": 5000,
+                        "FPPG": points, "fanduel_fantasy_points": points,
+                        "Team": team, "run_matchup": rating,
+                    })
+        return pd.DataFrame(rows)
+
+    def test_without_it_the_better_projection_wins(self):
+        built = optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None)
+        assert "B-RB0" in set(built[0]["Nickname"])
+
+    def test_a_small_boost_breaks_the_tie_toward_the_matchup(self):
+        built = optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None,
+                                           matchup_boost=1.5)
+        assert "A-RB0" in set(built[0]["Nickname"])
+
+    def test_it_cannot_reach_past_a_real_projection_gap(self):
+        # Chasing the matchup UP the board lost 4.06 points a week when tested,
+        # so the boost must not be able to do it.
+        pool = self.pool()
+        pool.loc[pool.Nickname == "B-RB0", "fanduel_fantasy_points"] = 20.0
+        built = optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None,
+                                           matchup_boost=1.5)
+        assert "B-RB0" in set(built[0]["Nickname"])
+
+    def test_it_only_touches_the_position_it_was_measured_on(self):
+        # Receivers were +2.38 on 2 good weeks of 5; quarterbacks and tight
+        # ends were negative.
+        pool = self.pool()
+        pool.loc[pool.Nickname == "A-WR0", "fanduel_fantasy_points"] = 9.5
+        pool.loc[pool.Nickname == "B-WR0", "fanduel_fantasy_points"] = 10.0
+        built = optimizer.optimize_lineups(pool, num_lineups=1, salary_cap=60000,
+                                           max_usage_percentage=100, max_per_team=None,
+                                           matchup_boost=1.5)
+        assert "B-WR0" in set(built[0]["Nickname"])
+
+    def test_it_needs_the_rating_column(self):
+        with pytest.raises(ValueError, match="run_matchup"):
+            optimizer.optimize_lineups(self.pool().drop(columns=["run_matchup"]),
+                                       num_lineups=1, max_usage_percentage=100,
+                                       max_per_team=None, matchup_boost=1.5)
+
+    def test_an_oversized_boost_is_called_out(self):
+        with pytest.warns(RuntimeWarning, match="chasing the matchup"):
+            optimizer.optimize_lineups(self.pool(), num_lineups=1, salary_cap=60000,
+                                       max_usage_percentage=100, max_per_team=None,
+                                       matchup_boost=5.0)
+
+    def test_it_is_off_by_default(self):
+        # It does not change built lineups at a safe size; see the docstring.
+        assert optimizer.contest_settings("cash", 50).get("matchup_boost", 0.0) == 0.0
+        assert optimizer.contest_settings("gpp", 100).get("matchup_boost", 0.0) == 0.0

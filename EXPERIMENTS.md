@@ -4344,3 +4344,74 @@ exactly.
 This is the first thing in this file built to be judged rather than fitted. If
 it is real the record will say so by about week 14; if it is the best of
 sixteen looks, it will say that instead, and that is the point.
+
+## A good matchup is a tiebreaker, not a reason to climb the board (2026-11-02)
+
+Asked directly: does a well-projected back in a good run matchup become
+someone to dial in? Three tests, and they do not all say the same thing.
+
+**The conjunction is real.** Flagged backs beat their projection in both
+halves of the projection range:
+
+| | n | projected | actual | miss |
+|---|--:|--:|--:|--:|
+| projected 8-11, neutral or worse | 58 | 10.22 | 10.60 | +0.38 |
+| projected 8-11, **lean up** | 9 | 9.48 | 16.90 | **+7.42** |
+| projected 11+, neutral or worse | 51 | 16.27 | 16.10 | −0.16 |
+| projected 11+, **lean up** | 16 | 15.77 | 19.57 | **+3.80** |
+
+**And chasing it up the board loses anyway.** Take the best flagged back each
+week instead of the best back:
+
+| | |
+|---|--:|
+| projection given up | **4.14** |
+| mean actual, best back by projection | 25.68 |
+| mean actual, best flagged back | 21.62 |
+| difference | **−4.06** |
+| weeks the flagged pick was better | 2 of 5 |
+
+The matchup is worth about 4-7 points of outperformance, and the projection
+gap you pay to reach it is 4.14 points on top of the top back ALSO beating his
+number. The two cancel, and then some.
+
+**But as a tiebreak it is strong.** Head-to-head pairs of backs inside a
+projection window, one flagged and one not:
+
+| window | pairs | flagged wins | mean margin | 95% CI |
+|---|--:|--:|--:|---|
+| ±1.0 | 59 | 64% | +6.73 | [+3.65, +9.89] |
+| ±1.5 | 90 | **70%** | +6.97 | [+4.76, +9.45] |
+| ±2.5 | 153 | 67% | +6.67 | [+4.67, +8.77] |
+
+Clear of zero at every window and stable across them. The pairs are not
+independent — 25 flagged player-weeks generate all 90 — so the interval is
+optimistic, but the win rate is a different statistic from the correlation and
+agrees with it.
+
+So: `matchup_boost`, capped by documentation at about 1.5 points, which can
+reorder near-ties and cannot promote a worse player past a better one.
+
+### And it does not reach the lineup
+
+| boost | wk 6 actual | wk 8 actual | flagged backs per lineup |
+|---|--:|--:|--:|
+| 0.0 | 123.7 | 93.7 | 0.9 / 0.0 |
+| 0.5 | 121.8 | 93.7 | 1.0 / 0.0 |
+| 1.0 | 121.3 | 93.7 | 1.3 / 0.0 |
+| 1.5 | 123.7 | 94.5 | 1.7 / 0.1 |
+| 3.0 | 114.9 | 107.5 | 2.6 / 1.6 |
+
+Nothing at a defensible size. The reason is worth keeping: the head-to-head
+evidence is about backs within 1.5 **projected** points, and the builder picks
+on points per dollar under a cap, so its near-ties sit in value space. A
+projection-space nudge mostly does not reach them — on week 8 it moved the
+flagged-back count from 0.0 to 0.1 a lineup.
+
+The 3.0 row is the only one that moved week 8, and it moved it a long way
+(+13.8). That is the chase regime the second test says loses, on one week, so
+it is noted and not believed.
+
+Default 0. The effect is real where it was measured, the implementation is
+honest about the size, and it has not been shown to improve a lineup. The
+prospective record is what settles it.

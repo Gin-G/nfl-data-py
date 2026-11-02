@@ -822,6 +822,8 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
                      salary_step=100, price_step=None, max_per_team=4,
                      stack_qb=0, rb_with_qb=True, ownership_weight=0.0,
                      ownership_exempt_rank=0, rb_vs_opposing_def=True,
+                     matchup_boost=0.0, matchup_column="run_matchup",
+                     matchup_threshold=58.0, matchup_positions=("RB",),
                      target=None, sims=None, candidates=None, diversify=None):
     """Build FanDuel lineups: the best one under the cap, then cheaper ones.
 
@@ -853,6 +855,39 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
             the best player on the slate.
         rb_vs_opposing_def: when False, no running back facing the lineup's
             own defense. See `best_lineup`.
+        matchup_boost: points added to a running back whose team is in a good
+            run matchup. **Deliberately small**, because the size is the whole
+            finding. Chasing the matchup UP the board loses: taking the best
+            flagged back instead of the best back costs 4.14 projected points
+            and returned 4.06 fewer actual ones, better in 2 weeks of 5. But
+            among backs within 1.5 projected points of each other -- the choice
+            actually being made -- the flagged one won 63 of 90 head-to-head
+            pairs by a mean 6.97 points, 95% CI [+4.76, +9.45], and held at
+            every window from 1.0 to 2.5 points.
+
+            So a boost under about 1.5 can only reorder near-ties, which is
+            where the evidence is, and cannot promote a worse player past a
+            better one, which is where it loses. Anything larger turns a
+            tiebreak into the chase that was measured to fail.
+
+            **It defaults to 0 because at a safe size it does not change built
+            lineups.** Weeks 6 and 8: at boosts of 0 to 1.5 the actual scores
+            were 123.7/121.8/121.3/123.7 and 93.7/93.7/93.7/94.5, and the
+            number of flagged backs in a lineup moved from 0.0 to 0.1 on week
+            8. The head-to-head evidence is about backs within 1.5 PROJECTED
+            points of each other; the builder picks on points per dollar under
+            a cap, so its near-ties are in value space and a projection-space
+            nudge mostly fails to reach them. The effect is real where it was
+            measured and does not transmit to the thing it was supposed to
+            improve. Kept opt-in so the finding can be acted on deliberately,
+            not because it has been shown to help.
+        matchup_column: the column carrying the matchup rating (0-100).
+        matchup_threshold: the rating at or above which the boost applies.
+            58 is the trench report's own "lean up" band edge, not a cut
+            fitted here.
+        matchup_positions: which positions it applies to. Running back only:
+            the same test gives +2.38 for receivers on 2 good weeks of 5,
+            -0.27 for quarterbacks and -0.93 for tight ends.
         target: a score to aim at (125, say). Given one, the builder solves
             `candidates` lineups on the linear objective and then re-ranks them
             by the chance of CLEARING the target, which needs `sims`.
@@ -938,6 +973,25 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
         df.loc[is_defense, "lineup_points"] = projected.fillna(df.loc[is_defense, "FPPG"])
     else:
         df.loc[is_defense, "lineup_points"] = df.loc[is_defense, "FPPG"]
+
+    if matchup_boost:
+        if matchup_column not in df.columns:
+            raise ValueError(
+                f"matchup_boost needs a {matchup_column!r} column; see "
+                "nfl_projections.signals and the /trenches/matchups report")
+        rating = pd.to_numeric(df[matchup_column], errors="coerce")
+        base = (df.get("Position", pd.Series("", index=df.index)).astype(str)
+                  .str.upper().str.replace("/FLEX", "", regex=False))
+        wanted_positions = {p.upper() for p in matchup_positions}
+        flagged = base.isin(wanted_positions) & (rating >= float(matchup_threshold))
+        if matchup_boost > 2.0:
+            warnings.warn(
+                f"matchup_boost={matchup_boost} is larger than the projection "
+                "gaps this was measured on. Above about 1.5 it stops breaking "
+                "ties and starts chasing the matchup up the board, which lost "
+                "4.06 points a week when it was tested.",
+                RuntimeWarning, stacklevel=2)
+        df["lineup_points"] = df["lineup_points"] + float(matchup_boost) * flagged
 
     # The field is charged for before the solve, so it is part of the exact
     # objective rather than a filter applied to lineups that were already
