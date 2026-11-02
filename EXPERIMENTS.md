@@ -4471,3 +4471,72 @@ share, rather than the matchup signal alone.
 So `matchup_swaps` ships off by default. `signals` now records salary and
 value alongside the projection, which is what makes the value-space question
 answerable on a real sample instead of on one week and one running back.
+
+## Correction: it was not the split, and dollars per opportunity does not beat the board (2026-11-02)
+
+The entry above explained the failed matchup swap as a move "from a bellcow to
+a split backfield" — the trench report rating a team while a lineup slot holds
+a player. It read well and it is **wrong**. The volume says so plainly:
+
+| week 6 | team | salary | expected opp/game | projected | actual | $/opp |
+|---|---|--:|--:|--:|--:|--:|
+| Chuba Hubbard | CAR | 6,800 | 18.0 | 14.3 | 21.6 | 378 |
+| D'Andre Swift | CHI | 6,600 | 18.8 | 13.8 | 21.0 | 352 |
+| **Kyren Williams** | LAR | 8,100 | **22.2** | 16.7 | **8.2** | 364 |
+
+The swap moved **up** in opportunity, not down. Kyren was the Rams' lead back
+by trailing volume — 22.2 a game against Corum's 9.8, a 69/31 split — and
+carried a similar price per opportunity to the men he replaced. He simply had a
+bad game. The swap lost to efficiency variance, which is the one thing nothing
+in this repo has ever been able to forecast, and I attributed it to a structural
+story the data does not support.
+
+### And the proposal it prompted tests as a null
+
+"Load up on players with the most opportunities; look at dollars per
+opportunity." The premise is right and already on file: opportunity repeats at
+0.974 across odd and even weeks while touchdowns per opportunity manage 0.178.
+But the October entry could not test the price half, because no historical
+FanDuel salaries existed anywhere. Weeks 6 and 8 now have stored slates, so for
+the first time there is a price to compare against. 91 rosterable skill
+player-weeks:
+
+| selection metric | r with actual | spearman |
+|---|--:|--:|
+| **projected points** | **0.315** | **0.297** |
+| salary | 0.294 | 0.330 |
+| expected opportunities | 0.243 | 0.192 |
+| projected points / $1k | 0.234 | 0.117 |
+| opportunities / $1k | 0.164 | 0.113 |
+
+The board's projection is the better selector, raw and per dollar. And against
+the board's own error, volume at a price is nothing: expected opportunities
++0.015, opportunities per $1k +0.015, dollars per opportunity +0.029. Which is
+the October result, now confirmed on the half of the question that could not be
+asked then.
+
+### Why volume cannot do the job it is being asked to do
+
+The twelve highest-volume backs across the two weeks averaged 23.6 opportunities
+a game, were projected 15.6, and scored 15.9 — with a standard deviation of
+**8.9** and a range of **4.5 to 29.9**:
+
+| | expected opp/game | projected | actual |
+|---|--:|--:|--:|
+| Gibbs (wk 8) | 29.0 | 22.4 | 26.8 |
+| Walker (wk 6) | 26.5 | 20.6 | 29.9 |
+| Henry (wk 6) | 24.2 | 17.6 | **4.5** |
+| Bijan (wk 6) | 24.0 | 18.3 | **6.3** |
+| Kyren (wk 6) | 22.2 | 16.7 | **8.2** |
+
+Walker, Bijan and Kyren had near-identical volume and scored 29.9, 6.3 and 8.2.
+Volume buys more chances at a touchdown, exactly as argued — and a touchdown
+per opportunity is a coin flip, so more chances does not narrow the outcome
+enough to beat a projection that already counts the chances. The board's mean
+is the right summary of "volume times whatever efficiency we can forecast", and
+re-ranking on one of its two inputs discards the other.
+
+Both samples here are small — 91 rosterable player-weeks, 2 slates — and the
+only reason the price question is answerable at all is the two stored slates.
+`signals` now records salary and value every week, so this gets re-asked on a
+real sample rather than re-argued.

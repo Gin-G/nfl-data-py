@@ -848,13 +848,17 @@ def matchup_swaps(lineup, pool, cap, *, column="run_matchup", threshold=58.0,
     and who returned 12.4 against a 16.0 projection. The effective sample is
     one player, not four swaps.
 
-    But that one case is the shape of the problem. The trench report rates a
-    TEAM's run blocking; whether any individual back banks it depends on how
-    the carries are split, which the signal knows nothing about. Los Angeles
-    was flagged and the carries went two ways. A matchup signal conditioned on
-    workload share is the version worth testing, and `signals` now records
-    salary and value so the question can be asked on a real sample rather than
-    on one week and one running back.
+    It is tempting to explain that as a split backfield -- the trench report
+    rating a team while a lineup slot holds a player -- and the volume says
+    otherwise. Kyren Williams was the Rams' lead back by trailing opportunity,
+    22.2 a game against Corum's 9.8, and the swap moved UP in volume from
+    Hubbard's 18.0 and Swift's 18.8 at a similar price per opportunity. He had
+    a bad game. The swap lost to efficiency variance, which is the one thing
+    nothing here forecasts.
+
+    So there is no structural fix to reach for, and no reason to believe this
+    helps. `signals` records salary and value every week so the question gets
+    a real sample instead of one week and one running back.
     """
     frame = pool if "_slots" in pool.columns else add_eligibility(pool.copy())
     rating = pd.to_numeric(frame[column], errors="coerce")
