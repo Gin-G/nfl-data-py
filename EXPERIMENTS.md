@@ -4007,3 +4007,87 @@ Biggest misses, by points per lineup given up: Omar Cooper Jr. −3.0 on an 11.0
 projection in 30 lineups, Brissett 4.5 on 18.4 in 28, Javonte Williams 6.2 on
 17.7 in 30, Zay Flowers 0.0 on 15.4 in 22, Tre Tucker 0.0 on 11.0 in 30. Four
 of those five were on the leverage shortlist.
+
+## The 147 the board agreed with and the optimizer would not buy (2026-11-02)
+
+The week 8 lineup actually entered, in a 50/50, scored **147.0** at $59,600:
+Prescott 19.8, Tuten 31.9, Jeanty 8.8, Ja'Kobi Lane 1.8, Jefferson 11.8, Chase
+28.6, Hockenson 13.8, Stevenson 10.5, Jacksonville 20.0.
+
+It beat **76 of our 80** main-slate lineups. Four of ours beat it. And **eight
+of its nine players appeared in none of our eighty lineups** — only Hockenson
+overlapped, in 7.
+
+That is not the board disagreeing. On our own board those players ranked:
+
+| | our projection | our rank | actual |
+|---|--:|---|--:|
+| Prescott | 18.3 | #8 of 75 QB | 19.8 |
+| Tuten | 14.3 | #10 of 119 RB | 31.9 |
+| Chase | 12.7 | #6 of 205 WR | 28.6 |
+| Hockenson | 8.0 | #7 of 131 TE | 13.8 |
+| **Jacksonville DEF** | 7.7 | **#3 of 22** | **20.0** |
+| Jefferson | 9.6 | #17 WR | 11.8 |
+| Stevenson | 10.3 | #18 RB | 10.5 |
+| Jeanty | 11.2 | #16 RB | 8.8 |
+| Ja'Kobi Lane | 4.2 | #47 WR | 1.8 |
+
+Eight of nine are top-decile on our board. What excluded them was **points per
+dollar** — Chase 1.46, Jefferson 1.21, Jacksonville 1.64 — against cheaper
+players at 1.8–2.7. The board ranked the week correctly and the value filter
+overrode it. Worth a dedicated test: an objective that pays up for the board's
+top-ranked players instead of its most efficient ones.
+
+### Pairing a running back with his own defence: right, and for one reason
+
+The stated theory was "if the defence plays well the RB should see more work."
+3,982 team-games, 2019-2026, lead scorer per team per game:
+
+| pair | correlation |
+|---|--:|
+| **RB carries vs own DST** | **+0.177** |
+| lead RB points vs own DST | +0.087 |
+| QB vs own DST | −0.074 |
+| lead WR vs own DST | −0.056 |
+| **lead RB vs the OPPOSING DST** | **−0.339** |
+
+Running back is the only position that pairs positively with its own defence,
+exactly as claimed, and carries more than points — the mechanism named was the
+right one.
+
+| own DST | n | RB points | RB carries | margin |
+|---|--:|--:|--:|--:|
+| worst 25% | 1037 | 13.68 | 12.36 | −12.28 |
+| best 25% | 933 | 15.73 | 15.65 | +13.40 |
+
+**But partial out the scoring margin and it is gone**: RB points vs own DST
+falls to −0.240 and carries to −0.036. The whole link is "my team is winning."
+That does not make it useless — nobody knows the margin before kickoff, so
+RB + own DEF is a cheap way to express a bet on the game going one way, which
+is precisely how the Jacksonville side of this lineup was reasoned. It is a
+correlated bet, not an independent edge, and should be sized like one.
+
+The bigger number is the mirror image, and it is not a stack rule anyone states:
+
+| opposing DST | n | RB points | RB carries |
+|---|--:|--:|--:|
+| worst 25% | 1037 | **18.79** | 15.84 |
+| best 25% | 933 | **11.22** | 11.96 |
+
+A 7.6-point swing on the defence a back is playing against, against 2.05 for
+the defence he shares a sideline with. The `max_per_team` cap cannot see it,
+because an RB and the defence facing him are on different teams.
+
+### What this says about our simulator
+
+`pool_sims` draws defences independently, so it models
+
+- RB ↔ own DEF at **−0.006** where reality is +0.087
+- RB ↔ opposing DEF at **0** where reality is **−0.339**
+
+So P(≥target) understates the spread of exactly this lineup shape: the pair's
+SD should be 13.11 rather than the 12.63 we simulate. Small for one pair, and
+the opposing-DEF case is not small at all. Wiring the defence into the team
+environment draw — and into the opponent's, with the sign flipped — is the fix,
+and it is the first thing found that would make the target objective rank
+differently from the mean rather than identically (see 2026-10-28).
