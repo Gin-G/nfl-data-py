@@ -4091,3 +4091,69 @@ the opposing-DEF case is not small at all. Wiring the defence into the team
 environment draw — and into the opponent's, with the sign flipped — is the fix,
 and it is the first thing found that would make the target objective rank
 differently from the mean rather than identically (see 2026-10-28).
+
+## Correction: the ownership page is a vintage, and I scored the flag against the wrong one (2026-11-02)
+
+The entry above retracted the unlisted-player signal on the strength of Cam
+Ward (29.3) and Braelon Allen (25.3) — two big scores I had flagged on the
+Friday as players the field had not rostered. The retraction was wrong, and the
+reason is the same class of mistake as 2026-10-26's projection vintages.
+
+**The roster-percentage page is republished.** Week 8's read "Last updated Fri"
+when pulled on 2026-10-30 with 169 players, and "Sun, Nov 1 at 4:24 PM GMT" —
+11:24 ET, minutes before lock — with 158. Between those two reads:
+
+| | Friday | at lock | actual |
+|---|---|--:|--:|
+| Braelon Allen | unlisted | **30.1%** | 25.3 |
+| Cam Ward | unlisted | 1.5% | 29.3 |
+| Breece Hall | listed | **removed** | did not play |
+
+Breece Hall was ruled out, and the field moved onto his backup. By kickoff Allen
+was the third-most-rostered back on the slate. He was never an unlisted player
+at the moment that matters; he was an unlisted player three days early.
+
+So the flag did not mispredict. It was handed a snapshot taken before the
+weekend's news and judged against outcomes from after it. Scored on the list as
+it stood **at lock**, week 8's unlisted-and-projected-above-10 were:
+
+| | projected | actual |
+|---|--:|--:|
+| Breece Hall | 12.9 | did not play |
+| Daniel Jones | 11.2 | 8.5 |
+| Tre Tucker | 10.9 | 0.0 |
+
+Three weeks, all judged at lock:
+
+| week | unlisted & projected > 10 | played |
+|---|--:|--:|
+| 6 | 5 | 0 |
+| 7 | 4 | 2 |
+| 8 | 3 | 2 |
+| total | 12 | 4 |
+
+and the four who played went 20.4, 4.6, 8.5, 0.0 — **mean 8.4** against
+projections of 11 to 18, not the 19.9 the previous entry reported. That figure
+was inflated by Ward and Allen, who do not belong in the sample. Eight of
+twelve did not play at all. The original reading stands: a well-projected
+player the field has not rostered *at lock* is usually one it knows something
+about, and the exception so far is Cousins.
+
+The leverage result is unaffected — it was computed from the at-lock list
+throughout, and corr(ownership, actual − projected) = +0.130 either way, with
+below-median-owned at −0.78 and above-median at +2.03. Fading the field still
+lost.
+
+### What to actually change
+
+**Pull ownership close to lock, and record when it was pulled.** We stamp
+`projection_computed_at` on every build precisely so a stale board cannot hide,
+and then read the field from a page with no vintage at all. A Friday pull is
+the field's guess before the inactive reports; it is not wrong, it is early,
+and nothing in the build says which it was. `_attach_ownership` should store
+the page's own "Last updated" and surface it beside the board's.
+
+Two of the week's best scores, Tyler Allgeier (36.6, the top back on the slate)
+and Emmett Johnson (25.8), were unlisted even on the final page — so the tail
+of genuinely unrostered players who go off is real. It is just not the same set
+as the Friday tail.
