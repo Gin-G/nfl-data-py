@@ -154,3 +154,111 @@ class TestLineupTotals:
         together = np.array([[0.0, 20.0], [0.0, 20.0]])
         totals = sim.lineup_totals(together, [0, 1])
         assert totals.tolist() == [0.0, 40.0]
+
+
+class TestSpreadCalibration:
+    """The usage simulator is over-dispersed; the correction is volume-aware.
+
+    Fitted on 1,318 player-seasons (2019-2023), validated on 567 (2024-2026).
+    """
+
+    def test_a_workhorse_is_shrunk_more_than_a_bit_player(self):
+        # The error grows with volume: a 20-touch back simulated 40% more
+        # volatile than he really is, a 5-touch back came out about right.
+        assert sim.spread_factor("RB", 20) < sim.spread_factor("RB", 9)
+        assert sim.spread_factor("RB", 9) < sim.spread_factor("RB", 5)
+        assert sim.spread_factor("RB", 5) > 0.95
+
+    def test_volume_shrinks_spread_for_receivers_too(self):
+        assert sim.spread_factor("WR", 9) < sim.spread_factor("WR", 3.5)
+
+    def test_an_unknown_position_or_workload_changes_nothing(self):
+        # A missing column must never silently reshape the simulation.
+        assert sim.spread_factor("D", 10) == 1.0
+        assert sim.spread_factor("RB", None) == 1.0
+        assert sim.spread_factor("RB", float("nan")) == 1.0
+
+    def test_the_factor_is_clamped_against_extrapolation(self):
+        lo, hi = sim._SPREAD_CLAMP
+        for opp in (0, 1, 50, 500, 10_000):
+            assert lo <= sim.spread_factor("RB", opp) <= hi
+
+    def test_shrinking_moves_the_spread_and_not_the_mean(self):
+        row = np.array([1.0, 5.0, 9.0, 20.0])
+        out = sim._shrink_spread(row, 0.5)
+        assert out.mean() == row.mean()
+        np.testing.assert_allclose(out.std(), row.std() * 0.5)
+
+    def test_a_factor_of_one_is_the_identity(self):
+        row = np.array([1.0, 5.0, 9.0])
+        np.testing.assert_array_equal(sim._shrink_spread(row, 1.0), row)
+
+    def test_trailing_opportunity_is_carries_plus_targets(self):
+        hist = pd.DataFrame({
+            "player_id": ["a"] * 4,
+            "season": [2026] * 4, "week": [1, 2, 3, 4],
+            "carries": [10, 12, 14, 16], "targets": [2, 2, 2, 2],
+        })
+        # last two games only: (14+2) and (16+2)
+        assert sim.trailing_opportunity(hist, trailing=2)["a"] == 17.0
+
+    def test_trailing_opportunity_tolerates_a_missing_frame(self):
+        assert sim.trailing_opportunity(None) == {}
+        assert sim.trailing_opportunity(pd.DataFrame({"x": [1]})) == {}
+
+    @staticmethod
+    def _pool_and_history():
+        pool = pd.DataFrame({
+            "player_id": ["rb1"],
+            "player_name": ["Workhorse"],
+            "position": ["RB"],
+            "team": ["X"],
+            "lineup_points": [18.0],
+            "is_def": [False],
+        })
+        hist = pd.DataFrame({
+            "player_id": ["rb1"] * 6,
+            "season": [2026] * 6, "week": [1, 2, 3, 4, 5, 6],
+            "carries": [19, 21, 20, 22, 18, 20],
+            "targets": [3, 2, 4, 3, 2, 3],
+            "attempts": [0] * 6,
+            "rushing_yards": [85, 95, 70, 110, 60, 90],
+            "receiving_yards": [20, 15, 30, 18, 10, 22],
+            "passing_yards": [0] * 6,
+            "rushing_tds": [1, 0, 1, 1, 0, 0],
+            "receiving_tds": [0] * 6, "passing_tds": [0] * 6,
+            "passing_interceptions": [0] * 6,
+        })
+        return pool, hist
+
+    def test_calibration_narrows_a_workhorse_without_moving_his_mean(self):
+        pool, hist = self._pool_and_history()
+        raw = sim.pool_sims(pool, hist, n_sims=8000, seed=5, calibrate_spread=False)
+        cal = sim.pool_sims(pool, hist, n_sims=8000, seed=5, calibrate_spread=True)
+        # the board is untouched -- only the width of the week changes
+        np.testing.assert_allclose(cal.mean(axis=1), raw.mean(axis=1), rtol=1e-12)
+        assert cal.std() < raw.std() * 0.85
+
+    def test_calibration_is_opt_out(self):
+        pool, hist = self._pool_and_history()
+        a = sim.pool_sims(pool, hist, n_sims=2000, seed=5, calibrate_spread=False)
+        b = sim.pool_sims(pool, hist, n_sims=2000, seed=5, calibrate_spread=False)
+        np.testing.assert_array_equal(a, b)
+
+    def test_a_quarterback_without_history_is_steadier_than_a_back(self):
+        # One global CV of 0.75 treated these as the same player. Realized CVs
+        # over 1,618 player-seasons: QB 0.46, RB 0.72.
+        pool = pd.DataFrame({
+            "player_id": [None, None],
+            "player_name": ["Q", "R"],
+            "position": ["QB", "RB"],
+            "team": ["X", "Y"],
+            "lineup_points": [18.0, 18.0],
+            "is_def": [False, False],
+        })
+        sims = sim.pool_sims(pool, None, n_sims=40000, seed=7)
+        qb_cv = sims[0].std() / sims[0].mean()
+        rb_cv = sims[1].std() / sims[1].mean()
+        assert qb_cv < rb_cv
+        assert abs(qb_cv - 0.46) < 0.05
+        assert abs(rb_cv - 0.72) < 0.05

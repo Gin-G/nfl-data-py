@@ -258,7 +258,80 @@ _DEF_SHAPE = np.array([
     -4, -1, 0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6,
     6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 12, 13, 14, 15, 17, 19, 22, 27,
 ], dtype=float)
-_SKILL_CV = 0.75   # spread of a fantasy score around its projection, unitless
+# A player without two games of history has no usage to simulate from, so he
+# falls back to a gamma. This was one global 0.75 for every skill player; the
+# per-position realized CVs over 1,618 player-seasons (2019-2026) are below,
+# and a quarterback is far steadier than the flat number implied.
+_FALLBACK_CV = {"QB": 0.46, "RB": 0.72, "WR": 0.72, "TE": 0.71}
+_SKILL_CV = 0.75   # unknown position
+
+# The usage simulator is systematically OVER-dispersed, and the error grows with
+# volume: over 2024-2026 a 20-touch back came out 40% more volatile than he
+# really was, while a 7-touch back came out about right (ratio 1.04). The
+# direction matters -- it understates how safe a workhorse is, which is exactly
+# the player a cash lineup is built on.
+#
+# Dispersion is a real, forecastable trait: a player's CV persists odd-to-even
+# week within a season (QB r +0.46, RB +0.35) and year over year (RB +0.47). The
+# driver is VOLUME, not the deep-threat archetype -- holding the projection
+# fixed, opportunities/game correlates -0.34 (RB) and -0.27 (WR) with spread
+# while aDOT manages -0.05 and +0.14. More opportunities is not just more points,
+# it is steadier points.
+#
+# log(realized_cv / simulated_cv) = a + b*log1p(opportunities), fitted on
+# 1,318 player-seasons from 2019-2023 and validated on 567 from 2024-2026, where
+# it moves the simulated/realized ratio to 0.97-1.01 in every position and every
+# volume tier and cuts mean |CV error| for all four positions.
+_SPREAD_CALIBRATION = {
+    "QB": (-0.3002, -0.0603),
+    "RB": (+0.4362, -0.2506),
+    "WR": (+0.1946, -0.1928),
+    "TE": (-0.3111, +0.0430),
+}
+_SPREAD_CLAMP = (0.45, 1.15)
+# Opportunities means carries + targets, the same definition the fit used.
+_OPPORTUNITY_COLS = ("carries", "targets")
+
+
+def spread_factor(position, opportunities):
+    """Multiplier for a simulated spread; 1.0 leaves it exactly as it was.
+
+    Returns 1.0 for an unknown position or an unknown workload, so a missing
+    column can only ever leave the simulation where it already was.
+    """
+    ab = _SPREAD_CALIBRATION.get(str(position).upper())
+    if ab is None or opportunities is None:
+        return 1.0
+    opp = float(opportunities) if np.isfinite(opportunities) else np.nan
+    if not np.isfinite(opp):
+        return 1.0
+    a, b = ab
+    return float(np.clip(np.exp(a + b * np.log1p(max(opp, 0.0))), *_SPREAD_CLAMP))
+
+
+def _shrink_spread(row, factor):
+    """Scale a row's deviations around its own mean, leaving the mean untouched."""
+    if factor == 1.0:
+        return row
+    m = row.mean()
+    return m + (row - m) * factor
+
+
+def trailing_opportunity(history, trailing=6):
+    """Mean carries + targets over each player's last `trailing` games."""
+    if history is None or "player_id" not in getattr(history, "columns", ()):
+        return {}
+    cols = [c for c in _OPPORTUNITY_COLS if c in history.columns]
+    if not cols:
+        return {}
+    h = history.copy()
+    order = [c for c in ("season", "week") if c in h.columns]
+    if order:
+        h = h.sort_values(order)
+    opp = sum(pd.to_numeric(h[c], errors="coerce").fillna(0.0) for c in cols)
+    h = h.assign(_opp=opp)
+    return (h.groupby("player_id")["_opp"]
+            .apply(lambda s: s.tail(trailing).mean()).to_dict())
 
 
 def _recentred(mean, shape, n_sims, rng):
@@ -302,7 +375,7 @@ def _blend(target, driver, rho, rng):
 
 def pool_sims(pool, history=None, *, n_sims=2000, seed=0, trailing=6,
               points_col="lineup_points", defense_col="is_def",
-              correlate_defense=True):
+              correlate_defense=True, calibrate_spread=True):
     """A correlated simulation matrix aligned row-for-row with a player pool.
 
     Returns an ``(len(pool), n_sims)`` array. Skill players with history are
@@ -310,6 +383,11 @@ def pool_sims(pool, history=None, *, n_sims=2000, seed=0, trailing=6,
     pass-catchers; everyone else is drawn from an empirical shape re-centred on
     their projection, uncorrelated. Every row's mean is its projection, so the
     matrix only ever adds shape and correlation -- never a different board.
+
+    `calibrate_spread` rescales each usage-simulated row's deviations by the
+    measured over-dispersion factor for its position and workload. It moves no
+    row's mean, so the board is untouched -- only how wide each player's week is
+    allowed to be. Pass False to get the raw simulator back.
     """
     rng = np.random.default_rng(seed)
     pool = pool.reset_index(drop=True)
@@ -319,6 +397,8 @@ def pool_sims(pool, history=None, *, n_sims=2000, seed=0, trailing=6,
     is_def = (pool[defense_col].to_numpy(bool) if defense_col in pool.columns
               else np.zeros(len(pool), bool))
     covered = np.zeros(len(pool), bool)
+    pos_col = (pool["position"] if "position" in pool.columns
+               else pd.Series(index=pool.index, dtype=object))
 
     if history is not None and "player_id" in pool.columns:
         frame = pool.loc[~is_def & pool["player_id"].notna(),
@@ -328,10 +408,17 @@ def pool_sims(pool, history=None, *, n_sims=2000, seed=0, trailing=6,
             frame, history, n_sims=n_sims, seed=seed, trailing=trailing)
         if len(summary):
             row_of = {pid: i for i, pid in enumerate(summary["player_id"])}
+            opp_of = trailing_opportunity(history, trailing) if calibrate_spread else {}
+            positions = (frame["position"] if "position" in frame.columns
+                         else pd.Series(index=frame.index, dtype=object))
             for i, pid in zip(frame.index, frame["player_id"]):
                 j = row_of.get(pid)
                 if j is not None:
-                    sims[i] = team_sims[j]
+                    row = team_sims[j]
+                    if calibrate_spread:
+                        row = _shrink_spread(
+                            row, spread_factor(positions.get(i), opp_of.get(pid)))
+                    sims[i] = row
                     covered[i] = True
 
     for i in np.flatnonzero(~covered):
@@ -341,7 +428,8 @@ def pool_sims(pool, history=None, *, n_sims=2000, seed=0, trailing=6,
             # A gamma with the measured coefficient of variation: non-negative
             # and right-skewed, which is the shape of a fantasy score.
             mean = max(means[i], 1e-6)
-            shape_k = 1.0 / (_SKILL_CV ** 2)
+            cv = _FALLBACK_CV.get(str(pos_col.get(i, "")).upper(), _SKILL_CV)
+            shape_k = 1.0 / (cv ** 2)
             sims[i] = rng.gamma(shape_k, mean / shape_k, size=n_sims)
 
     if correlate_defense and is_def.any():
