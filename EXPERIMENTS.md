@@ -4614,3 +4614,395 @@ is the correct summary of everything in this file. Walker, Bijan and Kyren took
 near-identical volume in week 6 to 29.9, 6.3 and 8.2 points. Nothing measured
 here separates those three beforehand, and the honest position is that the
 separation mostly does not exist rather than that it is waiting in a feature.
+
+---
+
+## Boom/bust is real, it is volume, and it was mis-simulated
+
+Prompted by: "we don't really take into account boom or bust players either.
+Tre Tucker is a good example, Jameson Williams ... their projections do get
+skewed because they can have those big weeks which average out with the bust
+weeks."
+
+Correct on every count except the mechanism. 32,916 player-weeks, 2019–2026.
+
+### Dispersion is a real, forecastable trait
+
+A player's coefficient of variation persists odd-week to even-week inside a
+season, and year over year:
+
+| position | n | r (odd vs even, same season) | n | r (year over year) |
+|---|--:|--:|--:|--:|
+| QB | 217 | **+0.456** | 132 | +0.199 |
+| RB | 474 | +0.348 | 272 | **+0.468** |
+| WR | 668 | +0.178 | 381 | +0.242 |
+| TE | 259 | +0.067 | 146 | +0.125 |
+
+(Pooled "all positions" numbers are inflated by the QB/skill CV gap — the
+within-position rows are the honest ones. TE is noise.)
+
+### The driver is volume, not the deep-threat archetype
+
+Holding the projection fixed, partial correlation of a player's SD with:
+
+| position | n | opportunities/game | aDOT |
+|---|--:|--:|--:|
+| RB | 477 | **−0.342** | −0.048 |
+| WR | 674 | **−0.270** | +0.141 |
+| TE | 265 | −0.128 | +0.072 |
+
+aDOT is close to nothing. **More opportunities is not just more points, it is
+steadier points** — the same thesis as the opportunity work above, in a second
+dimension. And the skew claim is exactly right, graded by volume:
+
+| | median/mean | CV | p90/mean |
+|---|--:|--:|--:|
+| RB low volume | **0.752** | 0.872 | 2.02 |
+| RB high volume | 0.923 | 0.551 | 1.66 |
+| WR low volume | **0.787** | 0.820 | 1.95 |
+| WR high volume | 0.878 | 0.620 | 1.76 |
+
+A low-volume back's *typical* week is 75% of his projection. A workhorse's is
+92%. A gamma with the matching CV reproduces both the median/mean and the
+p90/mean to within ~0.02, so the existing machinery was right and only the
+width was wrong.
+
+The named players split, and the sample is 7 games each, so this is
+illustrative only: Tucker CV 0.73 but **median/mean 0.49** — the archetype
+exactly. Jameson Williams CV **0.55**, median/mean 1.16 — steadier in 2026 than
+Chase (0.62) or Higgins (0.63). He has the reputation without the profile.
+
+### The simulator was over-dispersed, worst where it hurts
+
+`project_distributions` already gave players different shapes — the flat
+`_SKILL_CV` was only the no-history fallback — and it tracked the volume
+direction. But it was systematically too wide, and the error grew with volume:
+
+| | sim CV | real CV | ratio |
+|---|--:|--:|--:|
+| RB low volume | 0.955 | 0.916 | 1.04 |
+| RB high volume | 0.774 | 0.550 | **1.41** |
+| WR high volume | 0.763 | 0.629 | 1.21 |
+| QB | 0.647 | 0.492 | 1.32 |
+
+So the system understated how safe a workhorse is — precisely the player a cash
+lineup is built on. Fitted `log(real_cv/sim_cv) = a + b·log1p(opportunities)`
+on 1,318 player-seasons (2019–2023), validated on 567 (2024–2026): mean |CV
+error| falls for all four positions (RB 0.199→0.130, QB 0.197→0.111) and the
+ratio lands at 0.96–1.01 in every position and volume tier. **Kept**, as
+`simulate.spread_factor` + `calibrate_spread=True`. It rescales deviations
+around each row's own mean, so no row's mean moves (verified to 3.6e-15) and
+the board is untouched.
+
+`_SKILL_CV`'s one global 0.75 also became per-position (QB 0.46, RB 0.72,
+WR 0.72, TE 0.71) for the no-history fallback.
+
+### Negative result: it does not change which lineup to build
+
+The hypothesis was that a flat CV is *why* `p_target` ranked identically to
+`mean` (#earlier, Spearman 0.9986). **Wrong.** With calibrated per-player
+spread, Spearman(mean, P(125)) is 0.9959 over 4,000 lineups, and among the top
+decile by projection the max-mean lineup *is* the max-P(125) lineup, giving up
+0.00 projected points. Nine players still average out. That is now the fifth
+independent confirmation, and the strongest, because the obvious confound is
+gone.
+
+### What it does change: the target curve
+
+Lineup SD **26.81 → 20.29**, a 24% narrowing. Probabilities pivot around the
+target instead of regressing to a coin flip:
+
+| projected | P(125) raw | P(125) calibrated |
+|---|--:|--:|
+| 110 | 0.275 | 0.224 |
+| 125 | 0.458 | 0.457 |
+| 140 | 0.639 | **0.705** |
+
+| clear 125 at | raw needs | calibrated needs |
+|---|--:|--:|
+| 50% | 127.6 | 126.7 |
+| 60% | 135.7 | 132.7 |
+| 70% | 147.2 | **138.4** |
+| 80% | — | 147.2 |
+
+The 125 goal is less of a coin flip than the earlier backtest implied; we were
+24% too pessimistic about lineup variance. These figures are from a synthetic
+board (season mean as projection) over random lineups — the *spread* is the
+validated part; re-derive the curve on real slates before quoting it.
+
+### Negative result: matchup does not rescue the volatile player
+
+The companion hypothesis — a plus matchup is where you find the edge on a
+boom/bust guy — fails. 18,359 player-weeks, leakage-safe, opponent's trailing
+points allowed to the position, league-relative:
+
+| position | volume tier | n | r(soft opp, residual) | r(soft opp, boom) |
+|---|---|--:|--:|--:|
+| RB | low | 2,050 | +0.069 | +0.047 |
+| RB | high | 2,037 | **+0.107** | **+0.092** |
+| WR | low | 3,133 | +0.020 | +0.015 |
+| WR | high | 2,899 | +0.036 | +0.033 |
+
+WR is null for a fifth time. RB carries real signal but it is **strongest on
+the high-volume backs, weakest on the volatile ones** — the opposite of the
+hypothesis. For low-volume players across all positions, going from the
+toughest opponent quintile to the softest moves boom rate 24.6% → 29.1% and the
+mean +0.66 points, while bust rate does not move at all (30.2% → 30.5%). A
+soft matchup buys a little more upside and buys nothing on the downside, which
+makes it a tiebreak, exactly like the trench finding.
+
+---
+
+## Wind is the one unpriced situational factor worth buying data for
+
+Prompted by: "is the read on this weeks situation correct, is the opposing
+defense really good vs the run ... or weather with Bijan Robinson and the game
+with TB."
+
+13,304 outdoor player-weeks, 2019–2026, against a trailing baseline. Wind is a
+**threshold, not a slope** — which is exactly why it reads as nothing to a
+linear fit and as a lot to a band:
+
+| mph | 0–5 | 5–10 | 10–15 | **15+** | r(wind, error) |
+|---|--:|--:|--:|--:|--:|
+| QB | +0.23 | +0.31 | −0.37 | **−2.14** | −0.087 |
+| WR | −0.10 | −0.16 | −0.43 | **−1.37** | −0.051 |
+| TE | +0.33 | +0.50 | +0.15 | −0.36 | −0.065 |
+| RB | +0.28 | +0.25 | 0.00 | **+0.01** | −0.006 |
+
+The backs are completely untouched, which is the sensible shape — a team in the
+wind runs more, so the volume moves toward them. A QB plus three receivers in a
+15+ mph game is about six points of overstatement, which is larger than
+anything else measured in this file.
+
+Cold is weaker and probably confounded with wind and late season: QB −1.06 at
+32–50°F (n=635), freezing −0.37 (n=114). Not separated out.
+
+Roof is worth a third of a point (dome/closed vs outdoors: QB +0.10/+1.21 vs
+−0.23, WR +0.18/+0.30 vs −0.35) and is complete and known in advance.
+
+### But we cannot get the data
+
+nflverse populates `temp`/`wind` only for games it has backfilled — **45 of 272
+in 2026, none past week 4** — and never ahead of kickoff. So the measured
+effect is real and unpriced and we have no feed for it. `explain.wind_adjustment`
+carries the measured penalties and returns 0.0 without a reading, so it is
+inert until someone supplies a forecast. **This is the one place where buying a
+weather source has a measured payoff.** `roof` is usable today and is reported.
+
+## A vetting layer, explicitly outside the objective
+
+`explain.py`: per-player provenance for a built lineup — where the projection
+sits against trailing form, how many opportunities it assumes and what share of
+the team's, the predicted volatility, the **typical week** (the median behind
+the mean, which is 75–79% of the projection for a low-volume player and 88–92%
+for a workhorse), the upside, the opponent front's run band, roof/wind, and a
+short `why` string.
+
+Context only, never an input to the objective — the same boundary `opportunity`
+observes, and for the same measured reason: the opponent run grade is a
+tiebreak between comparable backs (r +0.166), coverage is null four ways, and a
+soft opponent moves a low-volume player's boom rate 24.6% → 29.1% while moving
+his bust rate not at all. Letting any of that move the board would be fitting
+noise. Wind is the exception on the evidence and is still inert for want of a
+feed.
+
+---
+
+## Backtest: one cash lineup a week against the 125 target
+
+Leakage-safe, reproducing production's path: the model is trained on 2026 games
+strictly before the target week (5 seeds, 60 epochs), projections come off each
+player's latest row BEFORE the week, defences from `defense.project`, and the
+build is the shipped cash preset at `num_lineups=1`.
+
+Only two weeks are testable. Week 5's saved file is a showdown slate (TB@DAL,
+51 rows, `MVP 1.5x Salary`), week 7's was never saved, and week 8's lived only
+in the production database.
+
+| week | projected | actual | cleared 125 |
+|---|--:|--:|---|
+| 4 | 137.3 | **143.3** | yes |
+| 6 | 124.7 | 103.4 | no |
+
+**1 of 2**, mean actual 123.4. Small, but the pattern is the one the calibrated
+target curve predicts rather than a contradiction of it: the week that
+projected 137 cleared and the week that projected 125 did not, and the curve
+says 125 projected is a coin flip while ~138 is the 70% mark.
+
+### Scoring bug found and fixed
+
+The first run scored week 4 at 8.0. nflverse `player_name` is the abbreviated
+form (`A.Rodgers`) and only the defence matched; the join needs
+`player_display_name`. The lineups themselves were unaffected.
+
+### What the vetting layer says about the week that missed
+
+Running `explain.vet` over the same two lineups after the fact, with the
+opportunity context, the trench grades and the schedule attached:
+
+| week 6 pick | opp/game | opponent front | actual |
+|---|--:|---|--:|
+| Kenneth Walker III | 26.5 | soft (35.6) | 29.9 |
+| Jaylen Warren | 19.2 | **stout (60.6)** | 8.8 |
+| Chuba Hubbard | 18.0 | **stout (56.7)** | 21.6 |
+| Denzel Boston (WR) | **5.8** | — | 2.0 |
+| Juwan Johnson (TE) | **6.4** | — | 0.0 |
+
+Two of the three backs were run into stout fronts, and both of the
+sub-7-opportunity pass catchers returned nothing. In week 4, which cleared,
+Bijan Robinson had 27.3 opportunities against a very soft front (20.4) indoors
+and went for 30.2.
+
+That is one week each way and proves nothing on its own. It is recorded as the
+first prospective test of whether the vetting columns would have changed a
+submission, not as evidence that they do. The run band is reported for backs
+only — the receiving equivalent is coverage, which is measured null four ways.
+
+---
+
+## Fantasy points allowed, adjusted for who the defence has faced
+
+Prompted by: "If a team lets up a lot of points to the TE and they have faced
+lower ranking TEs then that is a team to target, where a team that allows a lot
+of points to TE because they've faced 4 of the best TEs than that's not
+necessarily an advantage."
+
+Correct, and the FPA table that shipped (NFL-API `app/api/fpa.py`, ported from
+NickKnows) cannot tell those two cases apart: it sums opposing PPR points per
+(defence, week, position) and averages the weeks, with no schedule adjustment
+and in PPR rather than FanDuel scoring.
+
+`fpa.py` measures every opposing player against **his own entering baseline**
+instead, so a hard schedule nets out. 21,998 player-weeks with a baseline,
+2019–2026, leakage-safe throughout.
+
+### The two rankings disagree, and the adjusted one is better
+
+| | Spearman(raw, adjusted) | r(raw, next delta) | r(adjusted, next delta) |
+|---|--:|--:|--:|
+| QB | 0.758 | 0.068 | **0.094** |
+| RB | 0.755 | **0.089** | 0.082 |
+| WR | 0.602 | 0.026 | **0.051** |
+| TE | 0.755 | 0.037 | **0.049** |
+
+Roughly double the signal for QB, WR and TE; RB is a wash, which fits — the
+backs already have the trench report. Restricted to ≥4 prior weeks the adjusted
+numbers rise to QB 0.102, RB 0.115, WR 0.075, TE 0.049.
+
+**These are still small.** 0.05–0.10 is a tiebreak between comparable players
+and a sanity check on a build, not a signal to chase, and it earns the same
+standing as the trench and coverage work: context, never an input to the
+objective.
+
+### What it changes in practice (2026, entering week 9)
+
+| | allowed | faced | adjusted | grade | |
+|---|--:|--:|--:|--:|---|
+| PHI vs WR | 29.7 | **32.4** | −1.25 | 28.8 | raw calls them soft; they are very tough |
+| IND vs WR | 16.3 | 24.3 | −1.37 | 26.6 | very tough |
+| LV vs WR | **36.2** | 20.3 | +1.92 | 84.0 | genuinely very soft |
+| CIN vs TE | 10.8 | **7.3** | +1.47 | 76.0 | very soft |
+| MIA vs TE | **16.2** | 12.4 | +1.19 | 71.2 | soft, but less than raw implies |
+
+### Outliers are clipped, and the median is the wrong fix
+
+Prompted by: "Atlanta will have skewed numbers there ... TB didn't complete a
+pass and still won. It was really rainy and they ran."
+
+Exactly right, and the data is stark — 2026 week 8, Tampa Bay at Atlanta:
+
+| position | players | points | pass yds | rush yds |
+|---|--:|--:|--:|--:|
+| QB | 1 | 1.4 | **0** | 14 |
+| RB | 2 | 41.0 | 0 | **310** |
+
+WR 0.0 and TE 0.0. That one game moves Atlanta's season WR number from 28.9 to
+25.3 and their ranking with it, on weather and game script rather than coverage.
+
+**That last sentence is wrong, and the correction is below** ("three corrections
+the live run forced"). nflverse recorded no Tampa Bay receiver or tight end at
+all for that game, so there is no 0.0 to average in and Atlanta's WR number is
+untouched by it. The 28.9 → 25.3 figure came from a prototype that scored an
+absent position as zero.
+
+But taking the median over-corrects. Four estimators against next week's delta
+(≥4 prior weeks):
+
+| | mean | median | trimmed | winsorised |
+|---|--:|--:|--:|--:|
+| QB | **0.102** | 0.093 | 0.100 | 0.098 |
+| RB | 0.110 | 0.105 | 0.111 | **0.115** |
+| WR | 0.072 | 0.055 | 0.068 | **0.075** |
+| TE | 0.049 | **0.060** | 0.044 | 0.043 |
+
+The median is the **worst** of the four for receivers — a defence that genuinely
+gets gashed carries real information, and dropping the tail throws it away.
+Winsorising at ±12 points keeps the direction and caps the magnitude, and it is
+best or near-best for RB and WR. Shipped as `WINSOR = 12.0`.
+
+`ratings` also reports `worst_week` / `worst_week_swing`: drop each week in turn
+and keep the biggest move, flagged past ±1.0. On the shipped module Atlanta's WR
+row flags week 5 (+1.95) rather than week 8, for the reason above — and their RB
+row grades **very soft** (76.2; 30.4 allowed against 20.6 faced), which is the
+real Atlanta story the Tampa Bay game was hiding.
+
+### Honest note on the week 6 lineup
+
+With both matchup sides attached, the vetting layer flags Juwan Johnson cleanly
+(tough vs TEs, grade 41, and 6.4 opportunities a game — he scored 0.0) and both
+backs run into stout fronts. But **all three receivers in that lineup graded
+"very soft" and all three busted** (2.0, 9.7, 7.9). That is what an r of 0.07
+looks like from the inside, and it is the reason this is a tiebreak and not a
+lean.
+
+### Shipped to the endpoint, and three corrections the live run forced
+
+`/fpa/` on NFL-API served the raw PPR table; it now serves both halves. The
+legacy `qb`/`rb`/`wr`/`te` keys are untouched, because they are the historical
+series and the NickKnows chart is built on them, and each row gains
+`{pos}_allowed`, `{pos}_faced`, `{pos}_adjusted`, `{pos}_grade`, `{pos}_band`,
+`{pos}_weeks` and `{pos}_outlier_week`. `through_week` gives the ratings as they
+stood entering a week. Early in a season the adjusted half is legitimately empty
+— no player has three prior games yet — so the response carries `adjusted: false`
+and a sentence saying why, rather than failing and taking the chart down with it.
+
+Shipping it turned up a **bug in `fpa._points`**: `weekly.get("rushing_fumbles_lost", 0)`
+hands back a bare int when the column is absent, and an int has no `.fillna`, so
+any frame omitting it raised `AttributeError` instead of scoring. The research
+frames all carried a precomputed `fd`, which is why no test had reached it.
+Fixed with a `_num` helper and four regression tests.
+
+Then the endpoint was run over the real 2026 season (1,968 player-weeks, weeks
+1-8, through a throwaway SQLite copy of `player_stats` and `schedules`). Three
+numbers reported earlier came from the research prototype `fpa_adj.py`, which
+has its own grouping, and the shipped module disagrees slightly:
+
+| | prototype | shipped module |
+|---|---|---|
+| PHI vs WR | raw rank 1 → adj 24, grade 28.8 | raw rank 2 → adj 31, grade 30.3 |
+| LV vs WR | grade 84.0 | grade 73.7 (still very soft, adj rank 4) |
+| ATL vs RB | grade 74.6 | grade 76.2 |
+
+The direction and the conclusions are the same; the module's numbers are the
+ones that ship.
+
+**The Atlanta worry is smaller than it looked, for a reason worth recording.**
+nflverse has exactly three Tampa Bay rows for that week — Mayfield 1.4, Gainwell
+17.0, Irving 24.0. No receiver or tight end recorded a line at all, because
+there were no completions to record. So the WR 0.0 and TE 0.0 never enter the
+rating: there is no player-week to average, and the feared distortion is
+self-limiting. What week 8 does do is show up on the RB side, where Gainwell's
++12.29 gap is the one row the ±12 winsor actually bites on.
+
+And Atlanta's "very tough vs QBs" (grade 23.8, 11.1 allowed against 21.1 faced)
+is **not** the Tampa Bay game. Their three rated quarterback weeks are −11.19,
+−8.31 and −10.54; drop week 8 and the other two still average −9.75. The
+leave-one-out check says as much on its own by flagging week 7, the mildest of
+the three, rather than week 8. The same check now puts Atlanta's biggest WR
+swing at week 5 (+1.95), not week 8.
+
+The thing to keep in view is sample size, not outliers: entering week 9 Atlanta
+has three rated QB weeks and four WR weeks, because weeks 1-3 cannot produce a
+baseline. A grade resting on three weeks is a tiebreak, which is all it was ever
+claimed to be.
