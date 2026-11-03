@@ -17,6 +17,8 @@ one exception is wind, which is large, position-specific and NOT in the model
 -- see `wind_adjustment`, which stays off until someone supplies a reading.
 """
 
+import math
+
 import numpy as np
 import pandas as pd
 
@@ -78,14 +80,75 @@ def player_cv(position, projected, opportunities=np.nan):
     return float(np.clip(sd / proj, *_CV_CLAMP))
 
 
-def _gamma_ratio(cv, q):
-    """Quantile `q` of a gamma with mean 1 and the given CV, as a ratio."""
-    from scipy import stats
+def _gamma_p(k, x):
+    """Regularised lower incomplete gamma P(k, x) = gamma(k, x) / Gamma(k).
 
-    if not np.isfinite(cv) or cv <= 0:
+    Series below the transition point and the Lentz continued fraction above,
+    which is the standard split: each converges quickly on one side of x = k+1
+    and slowly on the other.
+    """
+    if x <= 0.0:
+        return 0.0
+    log_front = -x + k * math.log(x) - math.lgamma(k)
+    if x < k + 1.0:
+        term = total = 1.0 / k
+        for n in range(1, 500):
+            term *= x / (k + n)
+            total += term
+            if abs(term) < abs(total) * 1e-14:
+                break
+        return min(1.0, total * math.exp(log_front))
+    # continued fraction for Q(k, x), then P = 1 - Q
+    tiny = 1e-300
+    b = x + 1.0 - k
+    c = 1.0 / tiny
+    d = 1.0 / b
+    h = d
+    for i in range(1, 500):
+        an = -i * (i - k)
+        b += 2.0
+        d = an * d + b
+        if abs(d) < tiny:
+            d = tiny
+        c = b + an / c
+        if abs(c) < tiny:
+            c = tiny
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < 1e-14:
+            break
+    return 1.0 - math.exp(log_front) * h
+
+
+def _gamma_ratio(cv, q):
+    """Quantile `q` of a gamma with mean 1 and the given CV, as a ratio.
+
+    Inverted by bisection on `_gamma_p` rather than with `scipy.stats`. This
+    file is imported by the API image, which installs the package without its
+    heavy dependencies, and by CI, which keeps its environment light -- so a
+    scipy import here is a module that fails to load in two of the three places
+    it runs. `evaluate.py` carries its own rank correlation for the same
+    reason. The shape stays in [0.59, 16] because `_CV_CLAMP` bounds the CV,
+    which is a range bisection crosses to full double precision in ~60 steps.
+    """
+    if not np.isfinite(cv) or cv <= 0 or not 0.0 < q < 1.0:
         return np.nan
     k = 1.0 / cv ** 2
-    return float(stats.gamma.ppf(q, k, scale=1.0 / k))
+    lo, hi = 0.0, max(10.0, k * 10.0)
+    while _gamma_p(k, hi) < q:          # widen if the bracket misses
+        hi *= 2.0
+        if hi > 1e6:
+            return np.nan
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if hi - lo < 1e-12 * max(1.0, hi):
+            break
+        if _gamma_p(k, mid) < q:
+            lo = mid
+        else:
+            hi = mid
+    return float(0.5 * (lo + hi) / k)   # scale 1/k puts the mean at 1
 
 
 def typical_week(projected, position, opportunities=np.nan):

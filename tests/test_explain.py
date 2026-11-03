@@ -1,6 +1,7 @@
 """Unit tests for the player vetting layer (synthetic)."""
 import numpy as np
 import pandas as pd
+import pytest
 
 from nfl_projections import explain as ex
 
@@ -51,6 +52,42 @@ class TestTypicalWeek:
         assert (ex.typical_week(12, "RB", 12)
                 < ex.upside(12, "RB", 12, q=0.70)
                 < ex.upside(12, "RB", 12, q=0.95))
+
+    def test_it_does_not_need_scipy(self, monkeypatch):
+        """The whole point of hand-rolling the inverse gamma.
+
+        CI keeps its environment light and the API image installs this package
+        with --no-deps, so a scipy import here is a module that fails to load
+        in two of the three places it runs. It did: 21 tests in this file went
+        down with ModuleNotFoundError on the first push.
+        """
+        import builtins
+
+        real_import = builtins.__import__
+
+        def no_scipy(name, *args, **kwargs):
+            if name.split(".")[0] == "scipy":
+                raise ImportError("no scipy in this environment")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", no_scipy)
+        assert 0.70 < ex.typical_week(14, "RB", 6) / 14 < 0.85
+        assert ex.upside(12, "WR", 4) > 12
+
+    def test_the_quantiles_match_scipy_where_it_is_installed(self):
+        """Pins the hand-rolled inverse gamma to the reference implementation."""
+        stats = pytest.importorskip("scipy.stats")
+        for cv in (0.25, 0.46, 0.72, 1.30):
+            for q in (0.05, 0.5, 0.85, 0.99):
+                k = 1.0 / cv ** 2
+                reference = float(stats.gamma.ppf(q, k, scale=1.0 / k))
+                assert ex._gamma_ratio(cv, q) == pytest.approx(reference, abs=1e-9)
+
+    def test_a_degenerate_request_is_nan_not_a_crash(self):
+        assert np.isnan(ex._gamma_ratio(float("nan"), 0.5))
+        assert np.isnan(ex._gamma_ratio(0.0, 0.5))
+        assert np.isnan(ex._gamma_ratio(0.5, 0.0))
+        assert np.isnan(ex._gamma_ratio(0.5, 1.0))
 
 
 class TestWind:
