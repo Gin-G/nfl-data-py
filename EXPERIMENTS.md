@@ -4890,6 +4890,10 @@ Roughly double the signal for QB, WR and TE; RB is a wash, which fits — the
 backs already have the trench report. Restricted to ≥4 prior weeks the adjusted
 numbers rise to QB 0.102, RB 0.115, WR 0.075, TE 0.049.
 
+**This table is superseded — see "Three reports of the same defence" below.**
+It is in-sample over the whole pool, and the raw arm was scored on a different
+transform from the adjusted arm. Matched and held out, the two are a wash.
+
 **These are still small.** 0.05–0.10 is a tiebreak between comparable players
 and a sanity check on a build, not a signal to chase, and it earns the same
 standing as the trench and coverage work: context, never an input to the
@@ -5006,3 +5010,99 @@ The thing to keep in view is sample size, not outliers: entering week 9 Atlanta
 has three rated QB weeks and four WR weeks, because weeks 1-3 cannot produce a
 baseline. A grade resting on three weeks is a tiebreak, which is all it was ever
 claimed to be.
+
+## Three reports of the same defence: do trenches, coverage and FPA agree?
+
+The question, asked directly: the trench report, the coverage grades and the
+adjusted FPA table all claim to describe how hard a defence is to score on, from
+three unrelated sources — play-by-play line yards and stuff rate, PFR per-corner
+charting, and what opposing players did against their own baselines. They ought
+to correlate. Do they, and does the third add anything to the first two?
+
+### Season level: yes, and it is unit-specific where it should be
+
+256 team-seasons, 2019-2026. Spearman **within** each season so a league-wide
+drift cannot manufacture anything, everything flipped to the "tough" direction
+so positive means agreement. Partial columns hold the other two reports fixed.
+
+| | raw ρ | partial ρ | 95% CI |
+|---|--:|--:|---|
+| `run_stop` ↔ FPA-RB | +0.377 | **+0.341** | [+0.216, +0.447] |
+| `cover_grade` ↔ FPA-QB | +0.162 | **+0.249** | [+0.131, +0.369] |
+| `cover_grade` ↔ FPA-WR | +0.156 | +0.146 | [+0.016, +0.268] |
+| `cover_grade` ↔ FPA-TE | +0.137 | +0.117 | [−0.007, +0.250] |
+| `pass_rush` ↔ FPA-QB | +0.162 | +0.085 | [−0.035, +0.212] |
+| `pass_rush` ↔ FPA-WR | +0.075 | +0.018 | [−0.110, +0.140] |
+
+Three things fall out. The **run side is the real agreement** — +0.34 after the
+pass side is held fixed, and consistent in all eight seasons (+0.26 to +0.59,
+never near zero). **Coverage shows up in the quarterback rather than the
+receiver** (+0.249 against +0.146), which fits: a quarterback's line aggregates
+the whole passing game, which is what a team coverage grade measures, while a
+receiver's week depends on which corner he drew. And **pass rush explains
+nothing once coverage is held fixed** — the raw +0.162 against quarterbacks was
+coverage leaking through, the two correlating +0.247.
+
+The controls earned their place. `pass_rush` ↔ FPA-RB came back +0.299 raw and
+`cover_grade` ↔ FPA-RB +0.181, as strong as pairs that were predicted, because
+RB is the position most explained by a general "this defence is good" factor:
+17.4% of its rank variance, against 5.5% QB, 2.1% WR, 1.3% TE. Without the
+controls this would have read as three reports each confirming its own unit.
+
+They are nowhere near redundant, though. All three reports together explain
+20.7% of FPA-RB, 8.5% of FPA-QB, 2.7% of FPA-WR and 2.4% of FPA-TE.
+
+### Negative result: week to week, FPA adds nothing over the two reports
+
+20,701 player-weeks, every rating as it stood entering the week, outcome = the
+player's FanDuel points minus his own entering baseline. Fitted on 2019-2023,
+scored on 2024-2026, 95% bootstrap intervals.
+
+| | report alone | FPA alone | FPA given the reports | report given FPA |
+|---|--:|--:|--:|--:|
+| QB (coverage) | +0.075 [+0.013, +0.138] | +0.058 [−0.006, +0.122] | +0.024 [−0.043, +0.086] | +0.066 [+0.002, +0.129] |
+| RB (run front) | +0.052 [+0.006, +0.098] | +0.054 [+0.009, +0.099] | +0.022 [−0.027, +0.070] | +0.036 [−0.012, +0.085] |
+| WR (coverage) | +0.015 [−0.023, +0.053] | +0.009 [−0.028, +0.048] | +0.007 [−0.031, +0.045] | +0.014 [−0.023, +0.052] |
+| TE (coverage) | +0.042 [−0.018, +0.102] | +0.018 [−0.043, +0.079] | −0.008 [−0.069, +0.050] | +0.044 [−0.018, +0.105] |
+
+**No FPA increment survives its own interval at any position.** The reports hold
+up marginally better in the other direction. Nothing here is big enough to lean
+on; this is the sixth independent confirmation that a matchup read is a tiebreak.
+
+### Correction: the adjustment is a wash against raw FPA, not double
+
+An earlier section of this file claims the adjustment roughly doubles the
+signal. **It does not.** That comparison was in-sample over the whole pool, and
+worse, it scored a percentile rank against a clipped z-score grade. Matched —
+every arm a percentile rank within (season, week, position) — against the same
+outcome:
+
+| | train raw | train adj | **test raw** | **test adj** |
+|---|--:|--:|--:|--:|
+| QB | +0.073 | +0.064 | **+0.049** | **+0.061** |
+| RB | +0.084 | +0.085 | **+0.056** | **+0.043** |
+| WR | +0.021 | +0.030 | **−0.025** | **+0.010** |
+| TE | +0.045 | +0.052 | **+0.052** | **+0.020** |
+
+Adjusted is ahead for receivers in both eras and raw is ahead for tight ends out
+of sample; quarterbacks and backs swap places between the halves and every
+interval overlaps. A wash. The grading step is neutral — "the gap, ungraded"
+scores within 0.001 of the shipped grade everywhere.
+
+A first, unmatched pass suggested raw *beat* adjusted everywhere, and that was
+the scaling artifact, caught by rerunning on matched transforms before anything
+was changed in response to it.
+
+The hypothesis that raw carries game-environment information the adjustment
+throws away is **not supported**: the schedule term on its own predicts +0.036
+for backs in training, −0.050 for receivers out of sample and +0.070 for tight
+ends out of sample — signs that do not agree across positions or eras, which is
+what noise looks like.
+
+### What this changes
+
+Nothing in the code, and both numbers stay served. The adjustment is kept not
+because it is more accurate — it is not — but because it is the only one of the
+two that can be *read*: `allowed` next to `expected` answers "soft defence or
+hard schedule", and raw FPA cannot answer that at all. The claims in
+`nfl_projections/fpa.py` and `NFL-API/app/api/fpa.py` were rewritten to say so.

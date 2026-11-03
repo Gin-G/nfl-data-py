@@ -10,14 +10,27 @@ So every opposing player is measured against **his own baseline** instead: the
 mean FanDuel points he was running at entering that week. A defence's rating is
 the average amount the players it faced beat or missed their own level by, which
 makes a hard schedule net out on its own. Measured 2019-2026, the two rankings
-disagree a lot (Spearman 0.60 for receivers, ~0.76 elsewhere) and the adjusted
-one predicts next week's over/under-performance better for three positions of
-four: QB 0.102 vs 0.068, WR 0.072 vs 0.026, TE 0.049 vs 0.037, RB a wash.
+disagree a lot: Spearman 0.60 for receivers, ~0.76 elsewhere.
 
-Those correlations are small, and they are meant to be read that way. This is a
-tiebreak between comparable players and a sanity check on a build, not a signal
-to chase -- the same standing the trench and coverage work earned. Nothing here
-enters the optimizer's objective.
+**On whether that disagreement is an improvement, the honest answer is: it is a
+wash.** Fitted on 2019-2023 and scored on 2024-2026, with raw and adjusted put
+on the same percentile scale so the comparison is fair, neither wins
+consistently -- adjusted is ahead for receivers in both eras, raw is ahead for
+tight ends out of sample, and quarterbacks and backs swap places between the
+two halves with every interval overlapping. An earlier claim that the
+adjustment roughly doubled the signal came from comparing a percentile rank
+against a clipped z-score grade, and did not survive matching the transforms.
+What the adjustment reliably buys is interpretability -- `allowed` next to
+`expected` says whether a number is a soft defence or a hard schedule, which raw
+FPA cannot say at all -- and that is the reason to keep it. The schedule term it
+subtracts is not itself a consistent predictor in either direction.
+
+Week to week all of this is small, and meant to be read that way. Against a
+player's gap from his own baseline the correlations run 0.01-0.09, and once the
+trench and coverage grades are in hand the FPA grade adds nothing that survives
+its own interval. This is a tiebreak between comparable players and a sanity
+check on a build, not a signal to chase -- the same standing the trench and
+coverage work earned. Nothing here enters the optimizer's objective.
 
 **Outliers are clipped on purpose.** In week 8 of 2026, Tampa Bay completed no
 passes against Atlanta, ran for 310 yards and won. That week is instructive
