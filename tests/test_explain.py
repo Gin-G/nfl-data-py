@@ -56,10 +56,10 @@ class TestTypicalWeek:
     def test_it_does_not_need_scipy(self, monkeypatch):
         """The whole point of hand-rolling the inverse gamma.
 
-        CI keeps its environment light and the API image installs this package
-        with --no-deps, so a scipy import here is a module that fails to load
-        in two of the three places it runs. It did: 21 tests in this file went
-        down with ModuleNotFoundError on the first push.
+        CI keeps its environment light and does not install scipy: 21 tests in
+        this file went down with ModuleNotFoundError on the first push. The API
+        image has scipy from its own requirements, but this package is
+        installed there with --no-deps, so it cannot count on that.
         """
         import builtins
 

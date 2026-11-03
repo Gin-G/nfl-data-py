@@ -124,13 +124,15 @@ def _gamma_p(k, x):
 def _gamma_ratio(cv, q):
     """Quantile `q` of a gamma with mean 1 and the given CV, as a ratio.
 
-    Inverted by bisection on `_gamma_p` rather than with `scipy.stats`. This
-    file is imported by the API image, which installs the package without its
-    heavy dependencies, and by CI, which keeps its environment light -- so a
-    scipy import here is a module that fails to load in two of the three places
-    it runs. `evaluate.py` carries its own rank correlation for the same
-    reason. The shape stays in [0.59, 16] because `_CV_CLAMP` bounds the CV,
-    which is a range bisection crosses to full double precision in ~60 steps.
+    Inverted by bisection on `_gamma_p` rather than with `scipy.stats`, because
+    this package cannot assume scipy is importable. CI installs it light and
+    does not have it -- a scipy import here took 21 tests down. The API image
+    does happen to have scipy, but from its OWN requirements file: this package
+    is installed there with --no-deps, so nothing it declares for itself is
+    guaranteed to arrive. `evaluate.py` carries its own rank correlation for
+    the same reason. The shape stays in [0.59, 16] because `_CV_CLAMP` bounds
+    the CV, a range bisection crosses to full double precision well inside its
+    iteration budget.
     """
     if not np.isfinite(cv) or cv <= 0 or not 0.0 < q < 1.0:
         return np.nan
