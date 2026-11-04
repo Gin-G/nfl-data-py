@@ -17,6 +17,7 @@ import logging
 import os
 import time
 
+import pandas as pd
 import requests
 
 from .utils import to_pandas
@@ -166,14 +167,30 @@ def categorize_injury_impact(injuries_dict, roster_data, depth_charts):
 
 def build_overrides(injuries_dict, roster_data, depth_charts):
     """Turn a flat injuries dict into (overrides, backup_situations)."""
+    return build_overrides_detailed(injuries_dict, roster_data, depth_charts)[:2]
+
+
+def build_overrides_detailed(injuries_dict, roster_data, depth_charts):
+    """``(overrides, backup_situations, counts)``.
+
+    ``counts`` separates what each source contributed, which is the thing a
+    projection cannot be read back from afterwards: a board with 24 players
+    zeroed looks the same whether the weekly report named them or they were all
+    simply sitting on IR. See ``integrate_injuries_detailed``.
+    """
     ir_injuries = fetch_ir_players(roster_data)
     all_injuries = merge_injury_sources(injuries_dict, ir_injuries)
+    counts = {"report_players": len(injuries_dict), "ir_players": len(ir_injuries),
+              "out": 0, "backups_elevated": 0, "questionable": 0}
 
     if not all_injuries:
         print("No injuries found from any source")
-        return {}, {}
+        return {}, {}, counts
 
     impact = categorize_injury_impact(all_injuries, roster_data, depth_charts)
+    counts.update(out=len(impact["zero_out"]),
+                  backups_elevated=len(impact["boost_backup"]),
+                  questionable=len(impact["questionable"]))
 
     overrides = {}
     backup_situations = {}
@@ -199,7 +216,7 @@ def build_overrides(injuries_dict, roster_data, depth_charts):
     print(f"Injury impact: {len(impact['zero_out'])} OUT/doubtful, "
           f"{len(impact['boost_backup'])} backups elevated, "
           f"{len(impact['questionable'])} questionable")
-    return overrides, backup_situations
+    return overrides, backup_situations, counts
 
 
 # -- nflverse source (default) ----------------------------------------------
@@ -264,16 +281,50 @@ def parse_nflverse_injuries(injuries_df, week):
     return injuries
 
 
-def fetch_nflverse_injuries(season, week):
-    """Load and flatten the nflverse weekly injury report (no API key needed)."""
+def injury_report_coverage(injuries_df, week):
+    """What the weekly report HOLDS for a week, before anything is parsed out.
+
+    Deliberately separate from parsing. ``parse_nflverse_injuries`` filters to
+    the exact week and returns ``{}`` both for a week where every club filed a
+    clean report and for a week nobody has filed yet — and teams do not file
+    until Wednesday, so a Tuesday run reads an empty frame and projects as if
+    the league were healthy. Those two cases have to be told apart after the
+    fact, so what the feed covered is measured here and carried out with the
+    projection rather than inferred from the absence of overrides.
+    """
+    df = to_pandas(injuries_df)
+    empty = {"report_weeks": [], "report_latest_week": None,
+             "report_rows_for_week": 0, "report_available": False}
+    if df is None or len(df) == 0 or "week" not in df.columns:
+        return empty
+    weeks = pd.to_numeric(df["week"], errors="coerce").dropna().astype(int)
+    if weeks.empty:
+        return empty
+    rows = int((weeks == week).sum())
+    return {
+        "report_weeks": sorted({int(w) for w in weeks}),
+        "report_latest_week": int(weeks.max()),
+        "report_rows_for_week": rows,
+        "report_available": rows > 0,
+    }
+
+
+def _nflverse_injuries_with_coverage(season, week):
+    """``(injuries, coverage)`` from the nflverse weekly report."""
     import nflreadpy as nfl
 
     try:
         injuries_df = to_pandas(nfl.load_injuries(seasons=[season]))
     except Exception as e:  # network / availability issues
         logger.warning("Could not load nflverse injuries: %s", e)
-        return {}
-    return parse_nflverse_injuries(injuries_df, week)
+        return {}, dict(injury_report_coverage(None, week), report_error=str(e))
+    return (parse_nflverse_injuries(injuries_df, week),
+            injury_report_coverage(injuries_df, week))
+
+
+def fetch_nflverse_injuries(season, week):
+    """Load and flatten the nflverse weekly injury report (no API key needed)."""
+    return _nflverse_injuries_with_coverage(season, week)[0]
 
 
 # -- Sportradar source (optional fallback) ----------------------------------
@@ -378,15 +429,38 @@ def integrate_injuries(week, roster_data, depth_charts, season=2025, source="nfl
             "auto" tries nflverse and falls back to Sportradar if it finds
             nothing and a key is present.
     """
+    return integrate_injuries_detailed(week, roster_data, depth_charts,
+                                       season=season, source=source)[:2]
+
+
+def integrate_injuries_detailed(week, roster_data, depth_charts, season=2025,
+                                source="nflverse"):
+    """``(injury_overrides, backup_situations, provenance)``.
+
+    ``provenance`` is what the sources offered for *this* week — which weeks the
+    report covers, how many rows it filed for the week being projected, and how
+    many players each source accounted for. It is the record that makes a board
+    readable back: "nobody was marked out" and "nobody had yet been asked" are
+    the same empty dict without it.
+    """
+    coverage = {}
     if source in ("sportradar",):
         injuries = fetch_sportradar_injuries(season, week)
+        used = "sportradar"
     else:
-        injuries = fetch_nflverse_injuries(season, week)
+        injuries, coverage = _nflverse_injuries_with_coverage(season, week)
+        used = "nflverse"
         if not injuries and source == "auto":
             injuries = fetch_sportradar_injuries(season, week)
+            if injuries:
+                used = "sportradar"
 
     # IR/PUP from rosters is always folded in by build_overrides
-    return build_overrides(injuries, roster_data, depth_charts)
+    overrides, backups, counts = build_overrides_detailed(
+        injuries, roster_data, depth_charts)
+    provenance = {"source": used, "season": season, "week": week,
+                  **injury_report_coverage(None, week), **coverage, **counts}
+    return overrides, backups, provenance
 
 
 # Backward-compatible alias (older callers / --source sportradar)

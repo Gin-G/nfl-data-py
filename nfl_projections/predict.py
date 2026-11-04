@@ -16,7 +16,7 @@ import os
 import pandas as pd
 
 from . import config, features
-from .injuries import integrate_injuries
+from .injuries import integrate_injuries_detailed
 from .utils import normalize_player_name, to_pandas
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,18 @@ def current_depth_chart(depth_charts, as_of=None):
     if not keep.any():
         return depth_charts.iloc[0:0]
     return depth_charts[stamp == stamp[keep].max()].reset_index(drop=True)
+
+
+def depth_chart_stamp(depth_charts):
+    """ISO stamp of the depth-chart snapshot in force, or None for a frame
+    without one. Recorded with the projection: nflverse republishes the chart
+    roughly daily, so which snapshot a board read is the difference between
+    starting the quarterback who is playing and the one who is not."""
+    cols = getattr(depth_charts, "columns", [])
+    if depth_charts is None or "dt" not in cols or depth_charts.empty:
+        return None
+    stamp = pd.to_datetime(depth_charts["dt"], utc=True, errors="coerce").max()
+    return None if pd.isna(stamp) else stamp.isoformat()
 
 
 def week_start_date(season, week, schedule=None):
@@ -538,13 +550,27 @@ class Projector:
                   f"team-position slots in week {week}")
 
         if use_injuries:
-            overrides, backups = integrate_injuries(
+            overrides, backups, injury_provenance = integrate_injuries_detailed(
                 week=week, roster_data=self.rosters,
                 depth_charts=depth_charts, season=season, source=injury_source,
             )
         else:
             overrides, backups = {}, {}
+            injury_provenance = {"source": "disabled", "season": season, "week": week}
         self.injury_analyzer = InjuryStatusAnalyzer(overrides, backups)
+
+        # What this projection was allowed to see. The numbers themselves never
+        # say: a week with no injury report and a week where everyone is healthy
+        # produce the same board, and the snapshot a depth chart came from is
+        # gone the moment the next one is published. Recorded here so a board
+        # stays readable back weeks later instead of being re-litigated from
+        # memory.
+        self.provenance = {
+            "injuries": injury_provenance,
+            "depth_chart_as_of": depth_chart_stamp(depth_charts),
+            "depth_chart_rows": 0 if depth_charts is None else int(len(depth_charts)),
+            "roster_rows": int(len(self.rosters)),
+        }
 
         # History table with derived features for latest-game lookups
         print("Preparing player history features...")

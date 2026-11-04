@@ -5106,3 +5106,214 @@ because it is more accurate — it is not — but because it is the only one of 
 two that can be *read*: `allowed` next to `expected` answers "soft defence or
 hard schedule", and raw FPA cannot answer that at all. The claims in
 `nfl_projections/fpa.py` and `NFL-API/app/api/fpa.py` were rewritten to say so.
+
+## Which lineup objective actually won: the record said floor, the record was wrong
+
+The optimizer's performance endpoint ranks objectives by the mean of every
+lineup they produced, and on 2026-11-03 it reported a clean answer across four
+scored weeks: **best `floor`, worst `ceiling`, spread 12.0 points**, with
+`one_week_only: false`. Two things are wrong with that, and the second one
+survives fixing the first.
+
+### Floor appeared in one week
+
+`floor` was built in week 7 and nowhere else. Week 7 is also the week whose
+FPPG baseline came in at 73.52 — low enough that *every* objective beat it, at
+rates of 0.80 to 0.93. The flag that exists to stop exactly this reading,
+`one_week_only`, was computed as `len(scored) <= 1` over the **season's** scored
+weeks, not over the weeks belonging to the objectives being ranked. Four scored
+weeks made it `false` while the winner stood on one.
+
+Fixed in `NFL-API/app/api/optimizer.py`: `_perf_bucket` now carries the set of
+weeks in which that bucket actually scored a lineup, `_perf_add` adds a week
+only when the build contributed a *complete* lineup (an unscored build buys no
+week), `_perf_summary` exposes `weeks_scored` per row, and the verdict reports
+`best_weeks` / `worst_weeks` and sets `one_week_only` when either ranked end
+rests on a single week. Two tests cover it: a winner seen in one week of two is
+still a one-week verdict, and both ends on two weeks is not. The live record
+now flags itself.
+
+### The deeper confound: a build's mean measures its depth
+
+A build of 25 lineups reaches further down the pool than a build of 5 — lineup
+25 is by construction worse than lineup 1 — so pooling builds of unequal size
+measures how many lineups were asked for as much as which objective asked.
+Week 7 pooled 110 ceiling lineups against 30 mean lineups.
+
+Matching builds on (week, lineups requested), classic only:
+
+| week | n | ranking at that depth |
+|---|--:|---|
+| 6 | 12 | mean 107.67, ceiling 107.65 |
+| 7 | 5 | mean 110.72, ceiling 107.71 (x3), floor 92.86 |
+| 7 | 25 | floor 104.70, median 96.67, mean 93.48, ceiling 78.54 (x3) |
+| 8 | 5 | mean 114.78 (x2), ceiling 98.54 |
+| 8 | 15 | mean 102.09, ceiling 100.71 |
+
+Head-to-head at matched depth, positive meaning the first is ahead:
+
+| pair | cells | gaps | mean |
+|---|--:|---|--:|
+| ceiling vs mean | 5 | −0.02, −3.01, −14.94, −16.24, −1.38 | **−7.12** |
+| ceiling vs floor | 2 | +14.85, −26.15 | −5.65 |
+| floor vs mean | 2 | −17.86, +11.22 | −3.32 |
+| ceiling vs median | 1 | −18.13 | −18.13 |
+| floor vs median | 1 | +8.02 | +8.02 |
+| mean vs median | 1 | −3.19 | −3.19 |
+
+**`ceiling` is behind `mean` in 5 of 5 matched cells across three weeks**, by
+7.12 points on average. That is the only comparison here with a consistent
+sign, and it is the opposite of how the board is mostly being built: 14 of 25
+builds and 182 of 344 scored lineups are ceiling.
+
+`floor`'s two cells disagree (+14.85 and −26.15); it won week 7 at n=25 and was
+last at n=5 in the same week. The endpoint's "floor is best" has no support
+once depth is matched, and neither does any verdict about median on one cell.
+
+### What stops this being established
+
+The spread between same-objective, same-depth builds is larger than the gap
+being measured. Week 7's four ceiling builds at n=25 scored 95.44, 71.98 and
+68.21 — a 27-point range at identical settings-as-exposed, which means
+something not in the payload (pool composition at build time, since
+`ownership_weight` and `stack_qb` are null for every week-7 build) moves a
+build further than the objective does. Five cells with one sign is suggestive;
+it is not a result.
+
+Also found while matching: **builds 10 and 16 are the same numbers** (n=5, mean
+115.94, best 146.86). The optimizer is deterministic, so building twice on the
+same settings reproduces the lineups exactly — and the record counts both,
+weighting whichever objective happened to be rebuilt. Here it flatters ceiling.
+
+### What this changes
+
+The `one_week_only` fix ships. The depth confound is **not** fixed — the
+endpoint still pools builds of unequal size, and the table above had to be
+computed outside it. Until that is normalized (compare each build's top-k
+lineups, k the minimum across the builds being ranked, is the obvious
+candidate), `objective_verdict` should be read as "which objective was built
+most, and how deep", not as advice. No objective default was changed on the
+strength of this.
+
+## Did a day-stale roster table corrupt the week 9 board? No
+
+The `nfl-api-roster-sync` cron died in the 2026-11-03 cluster outage, so
+`current_roster` was holding its 2026-11-02T15:00 state when the week 9
+projections were computed that evening. Checked rather than assumed.
+
+Against nflverse's **season** roster, of the 326 projected players worth a
+roster slot (≥ 1.0 pt): **4 differ, all on status alone**, nobody changed
+teams, nobody is missing. The four are Kyle Monangai (RB CHI, 11.3), Rashid
+Shaheed (WR SEA, 4.4), Drew Lock (QB SEA, 3.1) and Case Keenum (QB CHI, 2.1),
+each `ACT -> INA` with description `A01`, which is a game-day designation and
+not roster standing. Monangai is corroborated: the week 8 injury report has him
+Out, DNP, thumb.
+
+Depth charts had moved more — three snapshots published after the sync
+(2026-11-02 17:01, 2026-11-03 07:02, 2026-11-03 14:59 UTC), 7,008 rows across
+all 32 teams, 1,778 of them at skill positions. Comparing the newest chart's
+rank-1 against the chart as it stood at sync time, **three starters changed**:
+
+| team | pos | was | now | the board's projection for the new starter |
+|---|---|---|---|--:|
+| BAL | QB | Lamar Jackson | Tyler Huntley | 8.3 |
+| HOU | RB | David Montgomery | Woody Marks | 8.8 |
+| ARI | QB | Jacoby Brissett | Gardner Minshew II | 1.1 |
+
+**The board already had all three right.** BAL QB reads Huntley 8.3, Fagnano
+2.1, Jackson 1.2; HOU RB reads Marks 8.8 ahead of Montgomery 5.5. The depth
+rank in `current_roster` is one input among several, and the usage history the
+role and share models read had already moved — which is the answer to whether
+a stale chart can quietly mis-rank a backfield: here it could not, because
+snaps and touches had already said the same thing. Consistent with the loader
+note that depth charts are not a top feature; snaps are.
+
+No action taken. The 08:00 sync and the Wednesday 21:00 projection run restore
+the table on their own.
+
+### The measurement trap, again
+
+The first pass at this used `load_rosters_weekly` and produced garbage: 20
+"inactive" players and 47 "missing" ones. That table stops at the last
+**completed** week (8), its `status` is game-day status for *that* week rather
+than a forward-looking one, and it carries no rows at all for a team on bye —
+so HOU, NO, NYG and SF appeared to have lost their entire rosters and anyone
+inactive in week 8 looked out for week 9. This is the same `week.max()` hazard
+already written up under the bye-week roster gap. Season rosters
+(`load_rosters`) are the right table for "who is on this team now".
+
+## The Tuesday projection run is structurally blind to injuries
+
+Noticed when the user said Tyler Huntley was hurt and the week 9 board had him
+as Baltimore's QB1 at 8.3 points.
+
+`injuries.parse_nflverse_injuries` filters the report to the exact week being
+projected (`df[df["week"] == week]`). nflverse's 2026 injury feed currently
+holds **weeks 5-8 and no week 9 rows at all** — NFL teams file their first
+report on Wednesday. So for a board built on Tuesday evening that filter
+returns an empty frame and the weekly report contributes *nothing*.
+
+What survives is `fetch_ir_players`, which reads IR/PUP/Reserve off the roster
+`status` — 24 players on the week 9 board carry `prediction_type:
+injured_out` from that path alone. Neither Baltimore quarterback is on IR, so
+neither was zeroed. Huntley's 8.3 is pure usage history: he has been taking the
+snaps, so the role and share models rank him first. Lamar Jackson, who the
+newest depth chart no longer lists as QB1, lands at 1.2 the same way.
+
+The cron is `0 21 * * 2,3` America/Denver. **The Tuesday run can never see an
+injury report; the Wednesday run always can.** That is not a bug in either
+piece — it is what the calendar allows — but it means the two runs of a week
+are not the same kind of object, and only the second one should be built from.
+The model cache does not get in the way: it is keyed on completed weeks, and
+the reuse path exists precisely so a second run in the same week can "project
+fresher injuries and depth charts against" the model already trained.
+
+Worth considering, not done: the projections response says nothing about which
+of the two it is. A flag reporting whether an injury report existed for the
+week being projected would let the board say so out loud instead of leaving it
+to be inferred. Carrying the prior week's OUT designations forward as a prior
+is the other option and is worse — it would have zeroed nobody useful here and
+would wrongly bury players who returned.
+
+### A correction to the roster-staleness note above
+
+That entry said the depth rank in `current_roster` is "one input among
+several" to the projections. It is not an input at all. All 24 `injured_out`
+players are absent from `current_roster`, which only happens because the
+in-season path reads rosters straight from nflverse — as the loader note
+records ("In-season projections were unaffected: they read nflverse directly,
+not this table"). The stale sync affects the `/rosters` endpoints and the site,
+not the board. The conclusion there stands; the reason given for it was wrong.
+
+### Shipped: the board now records what it could see
+
+Built 2026-11-03, after the entry above sat as "worth considering". A flag on
+the response was the smaller half of it; the problem with a flag is that it is
+only true while the response is fresh, and the question this week was asked
+about a board that had already been built.
+
+So the run is recorded instead, one row per projection run in a new
+`projection_runs` table, written by `compute_projections` at publish time:
+
+- **the injury sources**, separated — which weeks the nflverse feed held
+  (`report_weeks`, `report_latest_week`), how many rows it had filed for the
+  week being projected (`report_rows`, and the flag `report_available`), how
+  many designations parsed out of it, and how many players came off roster
+  `status` as IR/PUP/Reserve instead. That separation is the whole point: week
+  9 zeroed 24 players and **not one of them because anybody filed a report**,
+  which the board cannot say about itself.
+- **the depth chart snapshot in force** (`depth_chart_as_of`), which nflverse
+  overwrites roughly daily, so which chart a board read is otherwise gone.
+- the roster source and row count, the model version, whether the model was
+  reused from the cache, the training window, and what came out.
+
+Served as `GET /projections/runs` and as a `provenance` block on
+`GET /projections`, which also spells the conditions out in words — a run with
+no report filed says so, naming the IR count as the only injury signal it had.
+Vintages resolve on `as_of_week` rather than week, since an archived week 12
+row came from whichever run had that many weeks of football behind it.
+
+What this does not do: it changes no projection. A Tuesday board is still a
+Tuesday board; it now says that it is one. Measuring how much that costs needs
+Tuesday and Wednesday runs of the same week scored against each other, which
+these rows make possible and did not exist before.

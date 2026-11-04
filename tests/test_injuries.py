@@ -94,3 +94,84 @@ class TestBuildOverrides:
         parsed = injuries.parse_nflverse_injuries(reports, week=3)
         overrides, _ = injuries.build_overrides(parsed, self._rosters(), self._depth_charts())
         assert overrides["Star Back"]["player_id"] == "00-0035685"
+
+
+class TestInjuryReportCoverage:
+    """What the feed HELD, which the parsed output cannot say.
+
+    A week nobody has filed for and a week where every club filed a clean
+    report both parse to ``{}``. Clubs do not file until Wednesday, so a
+    Tuesday-night board reads an empty frame and projects a healthy league --
+    and nothing in the projection afterwards distinguishes that from a league
+    that really was healthy.
+    """
+
+    def _reports(self):
+        return pd.DataFrame({
+            "week": [5, 6, 7, 8, 8],
+            "full_name": ["a", "b", "c", "d", "e"],
+            "report_status": ["Out"] * 5,
+        })
+
+    def test_a_week_nobody_filed_for_is_not_available(self):
+        cov = injuries.injury_report_coverage(self._reports(), week=9)
+        assert cov["report_available"] is False
+        assert cov["report_rows_for_week"] == 0
+        assert cov["report_latest_week"] == 8      # ...but the feed is not empty
+        assert cov["report_weeks"] == [5, 6, 7, 8]
+
+    def test_a_filed_week_is_available(self):
+        cov = injuries.injury_report_coverage(self._reports(), week=8)
+        assert cov["report_available"] is True
+        assert cov["report_rows_for_week"] == 2
+
+    def test_no_feed_at_all(self):
+        cov = injuries.injury_report_coverage(None, week=9)
+        assert cov == {"report_weeks": [], "report_latest_week": None,
+                       "report_rows_for_week": 0, "report_available": False}
+
+    def test_a_frame_without_a_week_column(self):
+        cov = injuries.injury_report_coverage(
+            pd.DataFrame({"full_name": ["a"]}), week=9)
+        assert cov["report_available"] is False
+
+
+class TestBuildOverridesDetailed:
+    def test_counts_separate_the_report_from_the_ir_list(self):
+        rosters = pd.DataFrame({
+            "player_name": ["Star Back", "Backup Back", "IR Guy"],
+            "team": ["DAL", "DAL", "NYG"],
+            "position": ["RB", "RB", "TE"],
+            "status": ["ACT", "ACT", "IR"],
+        })
+        depth = pd.DataFrame({
+            "team": ["DAL", "DAL"], "pos_abb": ["RB", "RB"], "pos_rank": [1, 2],
+            "player_name": ["Star Back", "Backup Back"],
+        })
+        report = {"Star Back": {"status": "OUT", "injury_type": "Knee",
+                                "position": "RB", "team": "DAL", "player_id": "1"}}
+        overrides, backups, counts = injuries.build_overrides_detailed(
+            report, rosters, depth)
+        assert counts == {"report_players": 1, "ir_players": 1, "out": 2,
+                          "backups_elevated": 1, "questionable": 0}
+        # Two players out, but only one of them because anybody said so.
+        assert set(overrides) == {"Star Back", "IR Guy"}
+        assert set(backups) == {"Backup Back"}
+
+    def test_nothing_from_either_source_still_counts(self):
+        empty_roster = pd.DataFrame(
+            columns=["player_name", "team", "position", "status"])
+        overrides, backups, counts = injuries.build_overrides_detailed(
+            {}, empty_roster, pd.DataFrame(columns=["team", "pos_abb", "pos_rank",
+                                                    "player_name"]))
+        assert (overrides, backups) == ({}, {})
+        assert counts["report_players"] == 0 and counts["ir_players"] == 0
+
+    def test_the_two_tuple_wrapper_still_works(self):
+        """build_overrides is called from the projector and the CLI."""
+        rosters = pd.DataFrame({"player_name": ["IR Guy"], "team": ["NYG"],
+                                "position": ["TE"], "status": ["IR"]})
+        depth = pd.DataFrame(columns=["team", "pos_abb", "pos_rank", "player_name"])
+        result = injuries.build_overrides({}, rosters, depth)
+        assert len(result) == 2
+        assert set(result[0]) == {"IR Guy"}

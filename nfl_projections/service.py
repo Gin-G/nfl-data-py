@@ -68,6 +68,8 @@ class ProjectionService:
 
         self.dataset = dataset if dataset is not None else dataset_mod.load_dataset(data_path)
         self.blend_form = blend_form
+        # Set by project(): what the most recent projection could see.
+        self.last_provenance = None
 
         matchup = None
         if opponent:
@@ -125,6 +127,11 @@ class ProjectionService:
             season, week, use_injuries, injury_source, rosters, depth_charts, schedule,
             rookie_fallback=rookie_fallback,
         )
+        # What that projection could see (injury-report coverage, depth-chart
+        # snapshot, roster size). Left on the service rather than mixed into the
+        # frame: it describes the run, not any row of it, and a caller that
+        # persists the board wants to persist this beside it.
+        self.last_provenance = dict(projector.provenance, season=season, week=week)
         results = projector.run(
             positions=positions, players=players, save=save, output_dir=output_dir
         )
