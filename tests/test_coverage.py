@@ -162,3 +162,121 @@ def test_predict_does_not_import_coverage():
     src = pathlib.Path(__file__).parent.parent / "nfl_projections"
     for name in ("predict.py", "blend.py", "roles.py", "model.py"):
         assert "coverage" not in (src / name).read_text()
+
+
+class TestShellPlays:
+    """The defence is read off the game id, because participation names only
+    the offence."""
+
+    def _part(self):
+        return pd.DataFrame([
+            {"nflverse_game_id": "2025_09_BAL_JAX", "possession_team": "BAL",
+             "defense_coverage_type": "COVER_3",
+             "defense_man_zone_type": "ZONE_COVERAGE"},
+            {"nflverse_game_id": "2025_09_BAL_JAX", "possession_team": "JAX",
+             "defense_coverage_type": "COVER_1",
+             "defense_man_zone_type": "MAN_COVERAGE"},
+            {"nflverse_game_id": "2025_09_BAL_JAX", "possession_team": "JAX",
+             "defense_coverage_type": None, "defense_man_zone_type": ""},
+        ])
+
+    def test_the_defence_is_whoever_is_not_in_possession(self):
+        sp = coverage.shell_plays(self._part())
+        assert sp.defense.tolist() == ["JAX", "BAL", "BAL"]
+        assert sp.season.tolist() == [2025, 2025, 2025]
+        assert sp.week.tolist() == [9, 9, 9]
+
+    def test_a_blank_man_zone_becomes_null_not_a_category(self):
+        """Roughly half of charted plays carry an empty man/zone string, which
+        would otherwise be counted as its own coverage."""
+        sp = coverage.shell_plays(self._part())
+        assert sp.man_zone.tolist()[:2] == ["ZONE_COVERAGE", "MAN_COVERAGE"]
+        assert pd.isna(sp.man_zone.iloc[2])
+
+    def test_empty_and_malformed_input(self):
+        assert coverage.shell_plays(pd.DataFrame()).empty
+        assert coverage.shell_plays(None).empty
+        assert coverage.shell_plays(
+            pd.DataFrame({"nflverse_game_id": ["nope"],
+                          "possession_team": ["BAL"]})).empty
+
+
+def _shells(season, weeks, defense, shell, man_zone, n):
+    """`n` identical charted plays, one row each."""
+    return pd.DataFrame([{"season": season, "week": w, "defense": defense,
+                          "shell": shell, "man_zone": man_zone}
+                         for w in weeks for _ in range(n)])
+
+
+class TestShellMix:
+    def test_shares_are_percentages_that_add_to_a_hundred(self):
+        sp = pd.concat([
+            _shells(2025, [1, 2], "BAL", "COVER_3", "ZONE_COVERAGE", 30),
+            _shells(2025, [1, 2], "BAL", "COVER_1", "MAN_COVERAGE", 10),
+        ])
+        mix = coverage.shell_mix(sp, 2025, week=3)
+        row = mix.iloc[0]
+        assert row.defense == "BAL"
+        assert row.cover_3 == 75.0 and row.cover_1 == 25.0
+        cols = [s.lower() for s in coverage.SHELLS] + ["other"]
+        assert round(sum(row[c] for c in cols), 1) == 100.0
+
+    def test_man_rate_counts_only_charted_man_zone_plays(self):
+        sp = pd.concat([
+            _shells(2025, [1], "BAL", "COVER_1", "MAN_COVERAGE", 30),
+            _shells(2025, [1], "BAL", "COVER_3", "ZONE_COVERAGE", 30),
+            _shells(2025, [1], "BAL", "COVER_2", None, 60),
+        ])
+        row = coverage.shell_mix(sp, 2025, week=2).iloc[0]
+        assert row.man_rate == 50.0 and row.zone_rate == 50.0
+
+    def test_the_graded_week_never_contributes(self):
+        """Leakage-safe the same way corner_grades is."""
+        sp = pd.concat([
+            _shells(2025, [1], "BAL", "COVER_3", "ZONE_COVERAGE", 80),
+            _shells(2025, [9], "BAL", "COVER_1", "MAN_COVERAGE", 80),
+        ])
+        row = coverage.shell_mix(sp, 2025, week=9).iloc[0]
+        assert row.cover_3 == 100.0 and row.cover_1 == 0.0
+
+    def test_a_thin_defence_is_left_out(self):
+        sp = _shells(2025, [1], "BAL", "COVER_3", "ZONE_COVERAGE", 10)
+        assert coverage.shell_mix(sp, 2025, week=2).empty
+
+    def test_the_prior_season_carries_part_of_the_load(self):
+        sp = pd.concat([
+            _shells(2025, [1], "BAL", "COVER_3", "ZONE_COVERAGE", 100),
+            _shells(2024, [1], "BAL", "COVER_1", "MAN_COVERAGE", 100),
+        ])
+        row = coverage.shell_mix(sp, 2025, week=2,
+                                 prior_weight=0.5).iloc[0]
+        # 100 current + 50 weighted prior
+        assert row.cover_3 == 66.7 and row.cover_1 == 33.3
+        assert row.plays == 100.0 and row.plays_prior == 50.0
+        assert row.shell_seasons == "2025,2024"
+        assert row.current_season_plays
+
+
+class TestShellMixSaysWhenItIsStale:
+    """nflverse publishes no participation after SHELL_LAST_SEASON, so a
+    current-season mix cannot be built at all. A row made entirely of last
+    season's scheme has to admit it rather than read as this week's tendency.
+    """
+
+    def test_a_season_with_no_charting_falls_back_and_flags_it(self):
+        sp = _shells(2025, [1, 2], "BAL", "COVER_3", "ZONE_COVERAGE", 100)
+        mix = coverage.shell_mix(sp, 2026, week=9)
+        row = mix.iloc[0]
+        assert not row.current_season_plays
+        assert row.plays == 0.0 and row.plays_prior > 0
+        assert row.shell_seasons == "2025"
+        # The distribution is still usable, just not current.
+        assert row.cover_3 == 100.0
+
+    def test_nothing_at_all_is_an_empty_frame(self):
+        sp = _shells(2024, [1], "BAL", "COVER_3", "ZONE_COVERAGE", 100)
+        assert coverage.shell_mix(sp, 2026, week=9).empty
+        assert coverage.shell_mix(pd.DataFrame(), 2026, week=9).empty
+
+    def test_the_cutoff_is_named_so_a_caller_can_check_it(self):
+        assert coverage.SHELL_LAST_SEASON == 2025

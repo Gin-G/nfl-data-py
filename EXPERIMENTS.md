@@ -5317,3 +5317,171 @@ What this does not do: it changes no projection. A Tuesday board is still a
 Tuesday board; it now says that it is one. Measuring how much that costs needs
 Tuesday and Wednesday runs of the same week scored against each other, which
 these rows make possible and did not exist before.
+
+**First production reading (2026-11-05).** The Tuesday-night cron recorded run
+1 for week 9 and it confirms the finding on live data:
+
+| field | value |
+|---|--:|
+| `report_available` | true |
+| `report_rows` (week 9) | 28 |
+| `report_players` parsed | 18 |
+| `questionable` | 18 |
+| `ir_players` | 106 |
+| `players_zeroed` | **106** |
+
+`players_zeroed` equals `ir_players` exactly, so **every zeroing came from
+roster status and not one from the injury report**, even though the report was
+no longer empty — 28 rows had appeared for week 9 by Tuesday night. All 18
+players it named parsed to QUESTIONABLE, which benches nobody. This is the
+early-week `practice_status`-only shape, measured in production rather than
+argued from the feed. Note also that 28 rows is against week 8's 320: the
+Tuesday report is not a thin version of the Friday one, it is a different
+document. The Wednesday run will overwrite this with its own row rather than
+amend it, so the pair is now observable.
+
+## FantasyGuru snapshots: storage, a shell mix, and a gate (2026-11-04)
+
+The owner subscribes to FantasyGuru and has started exporting its weekly
+"smash" matchup tables by hand, to read against `/coverage` and `/trenches`.
+**No scraping and no automated pulls** — their terms are personal use only, so
+the only route in is a human exporting a CSV. `nfl_projections/external.py`
+has no network import at all and a test that fails if one is ever added; the
+API accepts an upload and nothing else.
+
+Built: storage plus upload (`/external/upload`, `/external/snapshots`,
+`/external/team-lines`, `/external/wr-matchups`), two comparison endpoints
+(`/external/compare/trenches`, `/external/compare/coverage`), a coverage-shell
+mix in `coverage.py` exposed on `/coverage/shells` and beside each secondary,
+and the grading harness `scripts/grade_external.py`. Nothing feeds
+`/projections`: the harness is the gate and it refuses to open yet, for
+reasons below that are worse than "not enough weeks".
+
+### Their line ratings are a run-game measure, reproduced
+
+Reproduced the sharp-edge session's comparison from the week 9 export against
+`/trenches` ratings, re-run 2026-11-05 through the endpoint itself rather than
+a standalone script (n=32 teams with both):
+
+| their rating | against ours | Spearman | their session |
+|---|---|--:|--:|
+| O-line | run_block | **0.624** | 0.66 |
+| O-line | pass_block | 0.419 | 0.42 |
+| D-front | run_stop | **0.731** | 0.73 |
+| D-front | pass_rush | 0.286 | 0.22 |
+| O-line | their own D-front | 0.598 | 0.6 |
+
+Confirms the read: taken as a run-game measure they largely agree with us,
+taken as pass protection they do not, and their own two sides correlating 0.60
+is what overall team strength leaking into both would look like. Biggest
+disagreements on O-line rank: TEN (their 29 / our 12), CIN (18/4), DET (3/16),
+NYJ (8/21), CAR (17/5).
+
+Two figures moved from the first pass (pass_block 0.413 → 0.419, self 0.573 →
+0.598, n 31 → 32) because that pass was a script reading nflverse directly and
+this one is the deployed path. The script was the thing worth distrusting: the
+endpoint had never actually run. `trenches._grades` returns one DataFrame
+while `coverage._grades` returns two, the comparison unpacked the first as a
+pair, and the `ValueError` fell into a broad `except Exception` that reported
+`no_ratings` — indistinguishable from a week with no ratings yet. The suite
+was green because the only test for that route exercised the no-upload guard,
+which returns before `_grades` is reached. Both routes now carry a `reason`
+separating "nothing rated yet" from "the lookup broke", and the comparison
+path has tests that drive it with real-shaped grades. A soft failure that
+cannot say which failure it was is a silent one.
+
+Their per-game line table is **entirely derived** — each ADV column is one
+side's O-line minus the other's D-front, verified to 0.02 across all 30 sides
+of week 9 — so the upload endpoint checks it and stores nothing, which is one
+fewer thing to keep in sync. Two of the three exports are canonical.
+
+### The coverage-shell mix: nflverse stopped charting it after 2025
+
+`defense_coverage_type` and `defense_man_zone_type` live in nflverse's
+**participation** release. nflreadpy refuses a later season outright ("Season
+must be between 2016 and 2025"), and nothing else carries the fields: not
+`load_pbp`, not `load_ftn_charting` (pressure and box counts, no coverage), not
+`load_nextgen_stats`. Checked 2026-11-04.
+
+So the mix is built and shipped — 32 defences, ~38 charted plays a team-week,
+windowed and prior-weighted exactly like `corner_grades` — but **for 2026 it is
+a scheme tendency last measured in 2025**, not this week's. Every row carries
+`shell_seasons`, `plays`, `plays_prior` and `current_season_plays` so that is
+visible in the data rather than in a footnote. It is still worth showing:
+scheme travels with a coordinator. A defence with a new one is described by
+its predecessor.
+
+### FG's shell percentage does not measure what nflverse measures
+
+This is the one part of their coverage table that can be checked against
+charting, and the check fails. For the 21 of 25 pairings whose shell maps onto
+nflverse's vocabulary (Match has no equivalent and shadow carries no shell):
+
+| | FG's stated share | nflverse 2025, same defence |
+|---|--:|--:|
+| mean | **49.0%** | **23.3%** |
+| Spearman | | **0.282** |
+
+Roughly a factor of two, uniformly, across 21 defences. FG routinely states
+50–65% for a single shell where no defence in nflverse's charting exceeds
+40.3%. A systematic 2x gap is far too clean for year-over-year scheme drift,
+so their percentage is on a **different denominator** — per-corner snaps, or
+zone plays only, or some narrower play set. Whatever it is, it is not a
+team-level shell share and the two numbers cannot be compared.
+
+That matters for how much of this table is new. The advantage score is another
+estimate of a matchup our own residual tests closed three times over. The
+shell percentage turns out to be uncheckable against the only charting that
+exists. **What is left is the assignment** — which corner a receiver draws, and
+whether he travels — which nflverse genuinely does not publish.
+
+### And the assignment accrues at one row a week
+
+The export is 25 pairings a week, of which **one** is a shadow assignment.
+
+| weeks | pairings | shadow rows | slope CI vs the n=16,380 WR test |
+|--:|--:|--:|--:|
+| 4 | 100 | 4 | 12.8x wider |
+| 6 | 150 | 6 | 10.4x wider |
+| 20 | 500 | 20 | 5.7x wider |
+| 40 | 1,000 | 40 | 4.0x wider |
+
+"Per-corner coverage grades" called WR null at n=16,380 with a slope interval
+of about ±0.11. At n=100 the same precision is 12.8x worse, so a four-week
+harness **cannot separate "no effect" from an effect three times larger than
+anything we have ever measured.** The harness therefore reports
+`inconclusive` rather than a null, carries its own power arithmetic on every
+target, and keeps the gate shut even when a fit does pay — a signal that pays
+only at 12x-too-wide intervals is the shape of a signal that does not pay.
+
+Shadow coverage is reported separately and never folded into that aggregate,
+because four observations averaged into a hundred would read as adequately
+powered. At ~1 a week, 100 shadow rows is **96 more weeks**. The honest
+statement is that the only genuinely new column here needs seasons, and the
+4–6 week plan will not test it.
+
+One method substitution, stated because it weakens the result: the original
+fits leave-one-season-out and there is one season of snapshots, so a week
+plays the part of a season. Weeks of one season share a model vintage and a
+roster in a way seasons do not, so a pass here would be weaker evidence than a
+pass there.
+
+### Operational notes
+
+Both teams and players map cleanly. FG's full names are city-style ("LA
+Chargers", "NY Jets") and two of its abbreviations disagree with nflverse (JAC,
+LVR); 32 of 32 teams and all 30 matchup sides resolve, and "LA" is deliberately
+refused as ambiguous rather than guessed. Player ids resolve 25/25 both sides
+against the season roster — which is the right scope, because normalising a
+name strips suffixes and "Marvin Harrison Jr" otherwise collides with his
+father while "Mike Evans" collides with a 1992 defensive tackle. Two active
+players named Justin Jefferson (WR and LB) need the team to separate them, and
+one name ("Jacob Parish" for nflverse's "Jacob Parrish") resolves through a
+team-scoped fuzzy match that is recorded as `team_fuzzy` rather than passed off
+as exact.
+
+**The duplicate-header trap.** The WR export has two columns both headed
+`Team` — the corner's and the receiver's. `csv.DictReader` keeps the last and
+silently drops the corner's team; `pandas.read_csv` renames it `Team.1`. Both
+produce a plausible-looking frame, so the parser reads that file by position
+and a test pins the failure mode.

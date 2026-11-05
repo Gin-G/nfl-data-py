@@ -293,8 +293,17 @@ def band(rating: float) -> str:
 
 
 def report(season: int, week: int | None = None, *, seasons=None,
-           charting: pd.DataFrame | None = None, schedule=None):
-    """The whole report in one call: corners, secondaries, and the week's games."""
+           charting: pd.DataFrame | None = None, schedule=None,
+           shells: pd.DataFrame | None = None, with_shells: bool = True):
+    """The whole report in one call: corners, secondaries, the week's games, and
+    each defence's coverage-shell mix.
+
+    `shells` is the one part that may be stale rather than current — nflverse
+    publishes no charting after SHELL_LAST_SEASON — so it is a separate key
+    with its own seasons on every row, never merged into the corner grades as
+    if it were measured the same week. Pass `with_shells=False` to skip the
+    download.
+    """
     seasons = seasons or [season - 1, season]
     charting = load_charting(seasons) if charting is None else charting
     cw = corner_weeks(charting)
@@ -308,4 +317,177 @@ def report(season: int, week: int | None = None, *, seasons=None,
             from .utils import to_pandas
             schedule = to_pandas(nfl.load_schedules(seasons=[season]))
         mu = matchups_for_week(tc, schedule, season, week)
-    return {"corners": cg, "teams": tc, "matchups": mu}
+    sm = pd.DataFrame()
+    if with_shells:
+        sp = shell_plays(load_shells(seasons) if shells is None else shells)
+        sm = shell_mix(sp, season, week)
+    return {"corners": cg, "teams": tc, "matchups": mu, "shells": sm}
+
+
+# ---------------------------------------------------------------------------
+# Coverage shells: what a defence actually plays
+# ---------------------------------------------------------------------------
+#
+# The assignment is what this module says it cannot see (see the module
+# docstring). The SHELL is the other half of that gap and nflverse does chart
+# it — in the participation release, from the NFL's own charting:
+# `defense_coverage_type` (COVER_0..COVER_4, COVER_6, COVER_9, 2_MAN, COMBO)
+# and `defense_man_zone_type`.
+#
+# **It stops at 2025.** nflreadpy refuses a later season outright ("Season must
+# be between 2016 and 2025"), and nothing else in nflverse carries the fields:
+# not `load_pbp`, not `load_ftn_charting` (pressure and box counts, no
+# coverage), not `load_nextgen_stats`. Checked 2026-11-04. So a CURRENT-season
+# shell mix cannot be built from nflverse at all, and what this offers for 2026
+# is a scheme tendency last measured in 2025. Scheme is a coaching trait and
+# travels with a coordinator, which makes a stale mix worth showing — but a
+# defence with a new coordinator is described by its predecessor, so every row
+# carries the seasons behind it and the plays from each.
+
+# The last season nflverse publishes participation (and therefore shells) for.
+SHELL_LAST_SEASON = 2025
+# Charted plays a defence needs before its mix is worth reporting. The median
+# team-week carries ~38 charted plays, so this is about two games' worth.
+MIN_SHELL_PLAYS = 60
+# The shells worth their own column, in nflverse's own spelling. COMBO and
+# BLOWN are charted too and are left in `other`: a few dozen plays a season,
+# and "the chart could not tell" is not a tendency.
+SHELLS = ("COVER_0", "COVER_1", "COVER_2", "COVER_3", "COVER_4", "COVER_6",
+          "COVER_9", "2_MAN")
+
+
+def load_shells(seasons) -> pd.DataFrame:
+    """Per-play coverage-shell charting for the given seasons.
+
+    Returns an empty frame rather than raising for a season nflverse has no
+    participation for, which from 2026 is every season — see the note above.
+    """
+    import nflreadpy as nfl
+
+    from .utils import to_pandas
+
+    frames = []
+    for season in sorted({int(s) for s in seasons}):
+        if season > SHELL_LAST_SEASON:
+            logger.warning(
+                "nflverse publishes no coverage charting for %d (participation "
+                "ends %d), so no shell mix can be built for it",
+                season, SHELL_LAST_SEASON)
+            continue
+        try:
+            frames.append(to_pandas(nfl.load_participation(seasons=[season])))
+        except Exception as exc:
+            logger.warning("participation %d unavailable: %s: %s", season,
+                           type(exc).__name__, exc)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def shell_plays(part: pd.DataFrame) -> pd.DataFrame:
+    """One row per charted play, from the DEFENCE's side.
+
+    Participation names only the offence (`possession_team`), so the defence is
+    read off the game id — "2025_09_BAL_JAX" is season, week, away, home — and
+    is whichever of the two is not in possession. Doing it from the id rather
+    than a schedule join keeps this function offline and testable.
+    """
+    if part is None or part.empty or "nflverse_game_id" not in part.columns:
+        return pd.DataFrame()
+    d = part.copy()
+    ids = d.nflverse_game_id.astype(str).str.split("_", expand=True)
+    if ids.shape[1] < 4:
+        return pd.DataFrame()
+    d["season"] = pd.to_numeric(ids[0], errors="coerce")
+    d["week"] = pd.to_numeric(ids[1], errors="coerce")
+    away, home = ids[2], ids[3]
+    d["defense"] = home.where(d.possession_team != home, away)
+    d["shell"] = d.get("defense_coverage_type")
+    mz = d.get("defense_man_zone_type")
+    d["man_zone"] = mz.where(mz.isin(["MAN_COVERAGE", "ZONE_COVERAGE"])) \
+        if mz is not None else None
+    d = d[d.season.notna() & d.week.notna() & d.defense.notna()]
+    keep = d[["season", "week", "defense", "shell", "man_zone"]].copy()
+    keep["season"] = keep.season.astype(int)
+    keep["week"] = keep.week.astype(int)
+    return keep.reset_index(drop=True)
+
+
+def shell_mix(sp: pd.DataFrame, season: int, week: int | None = None, *,
+              prior_weight: float = PRIOR_WEIGHT,
+              min_plays: int = MIN_SHELL_PLAYS) -> pd.DataFrame:
+    """A defence's coverage-shell distribution, one row per defence.
+
+    Windowed exactly like `corner_grades`: only weeks strictly before `week`
+    count, and the previous season carries `prior_weight` of the load so an
+    early-season mix is not built on two games. A share is a percentage of
+    charted plays, so the shell columns sum to 100 with `other`.
+
+    `shell_seasons`, `plays` and `plays_prior` are on every row because the mix
+    may be entirely historical: for 2026 nflverse has no charting at all, and a
+    row that is 100% last season's scheme has to say so rather than look like
+    this week's tendency.
+    """
+    if sp is None or sp.empty:
+        return pd.DataFrame()
+    cur = sp[sp.season == int(season)]
+    if week is not None:
+        cur = cur[cur.week < int(week)]
+    prev = sp[sp.season == int(season) - 1]
+    if cur.empty and prev.empty:
+        return pd.DataFrame()
+
+    def counts(frame, weight):
+        """Weighted play counts per (defence, shell) and per man/zone."""
+        if frame.empty:
+            return {}, {}, {}
+        shells = frame[frame.shell.notna()]
+        by_shell = {}
+        for (team, shell), n in shells.groupby(["defense", "shell"]).size().items():
+            by_shell[(team, shell)] = by_shell.get((team, shell), 0.0) + n * weight
+        mz = frame[frame.man_zone.notna()]
+        man = (mz.man_zone == "MAN_COVERAGE").groupby(mz.defense).sum() * weight
+        tot = mz.groupby("defense").size() * weight
+        return by_shell, man.to_dict(), tot.to_dict()
+
+    cs, cman, ctot = counts(cur, 1.0)
+    ps, pman, ptot = counts(prev, prior_weight)
+
+    teams = sorted({t for t, _ in cs} | {t for t, _ in ps}
+                   | set(ctot) | set(ptot))
+    rows = []
+    for team in teams:
+        shell_counts = {}
+        for (t, shell), n in list(cs.items()) + list(ps.items()):
+            if t == team:
+                shell_counts[shell] = shell_counts.get(shell, 0.0) + n
+        total = sum(shell_counts.values())
+        cur_plays = sum(n for (t, _), n in cs.items() if t == team)
+        prior_plays = sum(n for (t, _), n in ps.items() if t == team)
+        if total < min_plays:
+            continue
+        row = {"defense": team,
+               "plays": round(cur_plays, 1),
+               "plays_prior": round(prior_plays, 1)}
+        # `other` absorbs the rounding as well as COMBO/BLOWN, so the
+        # columns of a published row add to exactly 100 rather than to 99.8.
+        named = 0.0
+        for shell in SHELLS:
+            share = round(100.0 * shell_counts.get(shell, 0.0) / total, 1)
+            row[shell.lower()] = share
+            named += share
+        row["other"] = round(max(100.0 - named, 0.0), 1)
+        man = cman.get(team, 0.0) + pman.get(team, 0.0)
+        tot = ctot.get(team, 0.0) + ptot.get(team, 0.0)
+        row["man_rate"] = round(100.0 * man / tot, 1) if tot else np.nan
+        row["zone_rate"] = round(100.0 - row["man_rate"], 1) if tot else np.nan
+        # Which seasons this row is actually made of, newest first.
+        seasons = ([int(season)] if cur_plays else []) + \
+                  ([int(season) - 1] if prior_plays else [])
+        row["shell_seasons"] = ",".join(str(s) for s in seasons)
+        row["current_season_plays"] = bool(cur_plays)
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    return out.sort_values("man_rate", ascending=False).reset_index(drop=True)
