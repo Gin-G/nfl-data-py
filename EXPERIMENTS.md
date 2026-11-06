@@ -5366,7 +5366,7 @@ a standalone script (n=32 teams with both):
 | their rating | against ours | Spearman | their session |
 |---|---|--:|--:|
 | O-line | run_block | **0.624** | 0.66 |
-| O-line | pass_block | 0.419 | 0.42 |
+| O-line | pass_block | 0.413 | 0.42 |
 | D-front | run_stop | **0.731** | 0.73 |
 | D-front | pass_rush | 0.286 | 0.22 |
 | O-line | their own D-front | 0.598 | 0.6 |
@@ -5377,10 +5377,15 @@ is what overall team strength leaking into both would look like. Biggest
 disagreements on O-line rank: TEN (their 29 / our 12), CIN (18/4), DET (3/16),
 NYJ (8/21), CAR (17/5).
 
-Two figures moved from the first pass (pass_block 0.413 → 0.419, self 0.573 →
-0.598, n 31 → 32) because that pass was a script reading nflverse directly and
-this one is the deployed path. The script was the thing worth distrusting: the
-endpoint had never actually run. `trenches._grades` returns one DataFrame
+Run against production on 2026-11-06 with the week 9 export uploaded for
+real, the figures above are the deployed path's. One moved from the first
+pass and one did not, and the reason is which `play_by_play` each read:
+production uses the loaded table, while a local harness without that table
+falls back to pulling nflverse directly and gives pass_block 0.419 against
+production's 0.413. Same method, slightly different source rows; production
+is the number that counts. The self-correlation really did move, 0.573 →
+0.598, as did n (31 → 32), because the first pass was a standalone script and
+the endpoint had never actually run. `trenches._grades` returns one DataFrame
 while `coverage._grades` returns two, the comparison unpacked the first as a
 pair, and the `ValueError` fell into a broad `except Exception` that reported
 `no_ratings` — indistinguishable from a week with no ratings yet. The suite
@@ -5511,3 +5516,12 @@ spec, an ordinary form field, so Starlette delivered it as a `str` and the
 defect was having no name. Verified against the real week 9 exports renamed to
 `Weekly Smash Report (3).csv` and to `download` with no extension: byte-identical
 content hashes to the original run, 25/25 and 32/32 mapped.
+
+**Week 9 is banked (2026-11-06).** Uploaded to production: 25 pairings and 32
+team lines, nothing unmapped, one `team_fuzzy` (Parrish) and one shadow
+assignment (Benford on Justin Jefferson). The derived per-game table was sent
+too and came back `checked_not_stored` with 30 self-consistent sides and no
+drift against the stored team lines. Live `/external/compare/coverage`: 22 of
+25 matched to our corner grades, Spearman −0.33, five of those grades resting
+on under 20 targets. One week of four, and the shadow count is the number
+that matters: 1.
