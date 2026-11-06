@@ -300,3 +300,107 @@ class TestNothingFetches:
                     continue
                 assert "//" not in node.value and "www." not in node.value, (
                     f"URL-like literal in external.py: {node.value!r}")
+
+
+class TestAFileIdentifiesItself:
+    """Detection must not depend on the filename or on the header being row 1.
+
+    These exports arrive called `table.csv`, `table (1).csv` and whatever the
+    browser names the next one, so the only thing that can identify a file is
+    what is inside it. Before this, the header had to be the very first row
+    and every column had to be in a fixed position: a title row, a blank line
+    or one added column and a perfectly good export was refused.
+    """
+
+    def test_a_title_row_above_the_header(self):
+        text = ("FantasyGuru Weekly Matchups -- Week 9\n"
+                "\n" + WR_CSV)
+        assert ext.detect_kind(text) == "wr_coverage"
+        frame = ext.parse("wr_coverage", text)
+        plain = ext.parse("wr_coverage", WR_CSV)
+        # A preamble must change nothing at all, not merely be survived.
+        pd.testing.assert_frame_equal(frame, plain)
+
+    def test_a_blank_leading_line_on_the_team_table(self):
+        text = "\n\n" + TEAM_CSV
+        assert ext.detect_kind(text) == "team_lines"
+        pd.testing.assert_frame_equal(ext.parse("team_lines", text),
+                                      ext.parse("team_lines", TEAM_CSV))
+
+    def test_columns_in_a_different_order(self):
+        text = ("Primary Receiver,Team,Advantage,Coverage Type,"
+                "Defensive Back,Team,Rank\n"
+                "Jameson Williams,DET,65.38,45% Cover-3 Zone,"
+                "Jason Marshall,MIA,1\n")
+        assert ext.detect_kind(text) == "wr_coverage"
+        row = ext.parse("wr_coverage", text).iloc[0]
+        # The point of the exercise: the receiver's Team column now comes
+        # FIRST, so an absolute-position read would hand the corner DET.
+        assert row.defender == "Jason Marshall"
+        assert row.defender_team == "MIA"
+        assert row.receiver == "Jameson Williams"
+        assert row.receiver_team == "DET"
+        assert row.fg_rank == 1
+
+    def test_an_added_column_does_not_shift_anything(self):
+        text = ("Rank,Defensive Back,Team,Coverage Type,Advantage,"
+                "Primary Receiver,Team,Notes\n"
+                "1,Jason Marshall,MIA,45% Cover-3 Zone,65.38,"
+                "Jameson Williams,DET,some new field\n")
+        row = ext.parse("wr_coverage", text).iloc[0]
+        assert row.defender_team == "MIA"
+        assert row.receiver_team == "DET"
+        assert row.advantage == 65.38
+
+    def test_a_column_inserted_between_the_two_team_columns(self):
+        """The case absolute positions got wrong and anchoring gets right."""
+        text = ("Rank,Defensive Back,Team,Coverage Type,Advantage,Snaps,"
+                "Primary Receiver,Team\n"
+                "1,Jason Marshall,MIA,45% Cover-3 Zone,65.38,312,"
+                "Jameson Williams,DET\n")
+        row = ext.parse("wr_coverage", text).iloc[0]
+        assert row.defender_team == "MIA"
+        assert row.receiver_team == "DET"
+
+    def test_case_padding_and_underscores_in_the_header(self):
+        text = ("  RANK , Defensive_Back ,TEAM, Coverage_Type ,ADVANTAGE,"
+                "Primary_Receiver,Team\n"
+                "1,Jason Marshall,MIA,45% Cover-3 Zone,65.38,"
+                "Jameson Williams,DET\n")
+        assert ext.detect_kind(text) == "wr_coverage"
+        assert ext.parse("wr_coverage", text).iloc[0].defender_team == "MIA"
+
+    def test_a_reordered_line_matchup_still_pairs_the_right_d_front(self):
+        """ADV is own O-line minus OPPONENT D-front, so pairing by name matters."""
+        text = ("HOME,O-LINE (HOME),D-LINE (HOME),O-LINE ADV (HOME),"
+                "AWAY,O-LINE (AWAY),D-LINE (AWAY),O-LINE ADV (AWAY)\n"
+                "BAL,35.97,38.69,-14.486,JAC,49.54,50.45,10.848\n")
+        assert ext.detect_kind(text) == "line_matchups"
+        frame = ext.parse("line_matchups", text)
+        assert len(frame) == 2
+        assert frame.adv_agrees.all(), frame.to_dict("records")
+
+    def test_the_filename_is_never_consulted(self):
+        """There is no filename argument to consult, and that is the point."""
+        import inspect
+        for fn in (ext.detect_kind, ext.parse,
+                   ext.parse_wr_coverage, ext.parse_team_lines,
+                   ext.parse_line_matchups):
+            params = set(inspect.signature(fn).parameters)
+            assert not {"filename", "name", "path"} & params, fn.__name__
+
+    def test_a_header_too_far_down_is_still_refused(self):
+        text = "\n".join(["junk line"] * 20) + "\n" + TEAM_CSV
+        assert ext.detect_kind(text) is None
+
+    def test_a_file_that_is_a_different_export_says_which(self):
+        with pytest.raises(ValueError, match="is a team-lines export, not"):
+            ext.parse("wr_coverage", TEAM_CSV)
+
+    def test_one_team_column_is_refused_rather_than_guessed(self):
+        """Losing a Team column must not quietly reuse the other one."""
+        text = ("Rank,Defensive Back,Coverage Type,Advantage,"
+                "Primary Receiver,Team\n"
+                "1,Jason Marshall,45% Cover-3 Zone,65.38,Jameson Williams,DET\n")
+        with pytest.raises(ValueError, match="no way to tell the corner's team"):
+            ext.parse("wr_coverage", text)

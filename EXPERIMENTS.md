@@ -5483,5 +5483,31 @@ as exact.
 **The duplicate-header trap.** The WR export has two columns both headed
 `Team` — the corner's and the receiver's. `csv.DictReader` keeps the last and
 silently drops the corner's team; `pandas.read_csv` renames it `Team.1`. Both
-produce a plausible-looking frame, so the parser reads that file by position
-and a test pins the failure mode.
+produce a plausible-looking frame, so no name-keyed mapping is built over that
+header, and a test pins the failure mode.
+
+**Identifying a file by its contents (2026-11-06).** The first version read
+all three exports by absolute column position against row 1, which was robust
+to the duplicate header and to nothing else. These files arrive named
+`table.csv`, `table (1).csv` and whatever the browser calls the next one, so
+the filename was already ignored — but a title row, a blank leading line, a
+reordered export or one added column would each have been refused outright,
+and an added column before the receiver's `Team` would have been worse than
+refused: absolute positions would have read the corner's team as the
+receiver's and stored it, silently.
+
+Now the header is *found* rather than assumed — the first row within twelve
+that carries a known export's columns, in any order — and columns are resolved
+by name. The two `Team` columns are the one case a name cannot settle, and
+they are anchored to the column each follows: the corner's team is the first
+`Team` after `Defensive Back`, the receiver's the first after `Primary
+Receiver`. That is the file's actual grammar, each name followed by its team,
+rather than a column number that an upstream change can shift. If the two
+resolve to the same column, parsing raises instead of guessing.
+
+A nameless upload now works too. A multipart part with no filename is, per the
+spec, an ordinary form field, so Starlette delivered it as a `str` and the
+`UploadFile` annotation rejected it with a 422 about types — a file whose only
+defect was having no name. Verified against the real week 9 exports renamed to
+`Weekly Smash Report (3).csv` and to `download` with no extension: byte-identical
+content hashes to the original run, 25/25 and 32/32 mapped.

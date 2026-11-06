@@ -39,9 +39,23 @@ drift apart.
 **The duplicate-header trap.** The WR coverage export has two columns both
 headed ``Team`` — the corner's and the receiver's. ``csv.DictReader`` keeps the
 last and silently drops the corner's team; ``pandas.read_csv`` renames it to
-``Team.1``, which breaks the moment the export's column order changes. Both are
-wrong in a way that produces a plausible-looking frame, so this module reads
-that file by POSITION and never by header name.
+``Team.1``. Both are wrong in a way that produces a plausible-looking frame, so
+no name-keyed mapping is ever built over that header.
+
+**A file identifies itself.** Nothing here reads the filename: these exports
+arrive called ``table.csv``, ``table (1).csv`` and whatever the browser names
+the next one, so the kind is worked out from the header and the filename is
+kept only as a label on the stored snapshot. The header is found by *content*
+rather than assumed to be the first line — exports grow title rows, blank
+leading lines and extra columns — and columns are resolved by name, so a
+reordered or widened export still reads correctly.
+
+The two ``Team`` columns are the one case a name cannot resolve alone, and they
+are handled by what they follow: the corner's team is the first ``Team`` after
+``Defensive Back``, the receiver's the first after ``Primary Receiver``. That
+is the file's actual grammar — each name followed by its team — rather than an
+absolute column number, which an added column would quietly shift. If the two
+resolve to the same column, parsing raises instead of guessing.
 """
 from __future__ import annotations
 
@@ -195,57 +209,164 @@ def _number(value):
         return None
 
 
-def parse_wr_coverage(csv_text: str) -> pd.DataFrame:
-    """The corner-vs-receiver export, read by column POSITION.
+def _norm_header(value) -> str:
+    """A header cell flattened for comparison: case, padding, underscores.
 
-    Rank, Defensive Back, Team, Coverage Type, Advantage, Primary Receiver,
-    Team — note the two columns called Team. See the module docstring: reading
-    this file by header name loses the corner's team without erroring.
+    Deliberately not aggressive: hyphens and parentheses are kept, because
+    "O-LINE (AWAY)" and "O-LINE ADV (AWAY)" differ only in a word and running
+    them together would make two columns indistinguishable.
+    """
+    text = "" if value is None else str(value)
+    return re.sub(r"[\s_]+", " ", text).strip().lower()
+
+
+# What makes a row the header of a known export: columns that must all be
+# present, by name, in any order. A set rather than a sequence because the
+# position of a column is not what identifies it -- and because an export
+# that gains a column should still be recognisable as itself.
+_SIGNATURES = {
+    "wr_coverage": frozenset({"rank", "defensive back", "team",
+                              "coverage type", "advantage",
+                              "primary receiver"}),
+    "team_lines": frozenset({"team", "offensive line", "defensive front"}),
+    "line_matchups": frozenset({"away", "home",
+                                "o-line (away)", "d-line (away)",
+                                "o-line (home)", "d-line (home)",
+                                "o-line adv (away)", "o-line adv (home)"}),
+}
+
+# How far into a file to look for the header. Exports pick up title rows and
+# blank lines; a header that is not in the first few rows is a different file.
+HEADER_SEARCH_ROWS = 12
+
+# What to call each kind in a message aimed at a person. The slugs are an
+# internal key and have no business in an error someone has to read.
+_KIND_NAMES = {"wr_coverage": "WR coverage", "team_lines": "team-lines",
+               "line_matchups": "line-matchup"}
+
+
+def find_header(csv_text: str):
+    """``(row_index, kind, cells)`` for the first row that heads a known export.
+
+    ``(None, None, [])`` when nothing in the first ``HEADER_SEARCH_ROWS``
+    non-empty rows matches. Scanning rather than taking row 0 is what lets a
+    file with a title line, a blank line or an export banner above the header
+    still be read.
     """
     rows = _rows(csv_text)
-    if len(rows) < 2:
-        return pd.DataFrame()
-    header = [c.strip().lower() for c in rows[0]]
-    if header[:2] != ["rank", "defensive back"] or header.count("team") != 2:
+    for i, row in enumerate(rows[:HEADER_SEARCH_ROWS]):
+        cells = [_norm_header(c) for c in row]
+        present = set(cells)
+        for kind, required in _SIGNATURES.items():
+            if required <= present:
+                return i, kind, cells
+    return None, None, []
+
+
+def _column(cells, name, *, after=None):
+    """The index of column ``name``, optionally the first one after ``after``.
+
+    ``after`` is how the two ``Team`` columns are told apart: by the named
+    column each one follows, which is the export's own grammar.
+    """
+    start = 0 if after is None else after + 1
+    for i in range(start, len(cells)):
+        if cells[i] == name:
+            return i
+    return None
+
+
+def _body(csv_text: str, kind: str):
+    """``(column map, data rows)`` for one export, or raise with the reason.
+
+    One place where a file is matched against what it has to contain, so every
+    parser reports a wrong file the same way and none of them reads a column
+    by an absolute number.
+    """
+    rows = _rows(csv_text)
+    if not rows:
+        raise ValueError("that file has no rows")
+    index, found, cells = find_header(csv_text)
+    if found is None:
+        missing = sorted(_SIGNATURES[kind] - {_norm_header(c) for c in rows[0]})
         raise ValueError(
-            "not a FantasyGuru WR coverage export: expected columns Rank, "
-            "Defensive Back, Team, Coverage Type, Advantage, Primary "
-            f"Receiver, Team; got {rows[0]}")
+            f"not a FantasyGuru {_KIND_NAMES[kind]} export: no header row in "
+            f"the first {HEADER_SEARCH_ROWS} rows carries the columns it "
+            f"needs ({', '.join(sorted(_SIGNATURES[kind]))}). The first row "
+            f"is {rows[0]}, missing {', '.join(missing) or 'nothing'}.")
+    if found != kind:
+        raise ValueError(
+            f"that file is a {_KIND_NAMES[found]} export, not "
+            f"{_KIND_NAMES[kind]}: its header is {rows[index]}")
+    return cells, rows[index + 1:]
+
+
+def parse_wr_coverage(csv_text: str) -> pd.DataFrame:
+    """The corner-vs-receiver export, resolved by column name.
+
+    Rank, Defensive Back, Team, Coverage Type, Advantage, Primary Receiver,
+    Team — note the two columns called Team. Neither is read by an absolute
+    number: each is the first ``Team`` following the name it belongs to, so an
+    added or reordered column cannot silently swap the corner's team for the
+    receiver's. See the module docstring for why no name-keyed mapping is
+    built over this header at all.
+    """
+    cells, rows = _body(csv_text, "wr_coverage")
+    if not rows:
+        return pd.DataFrame()
+    i_def = _column(cells, "defensive back")
+    i_rec = _column(cells, "primary receiver")
+    i_def_team = _column(cells, "team", after=i_def)
+    i_rec_team = _column(cells, "team", after=i_rec)
+    if i_def_team is None or i_rec_team is None or i_def_team == i_rec_team:
+        raise ValueError(
+            "that WR coverage export does not have a Team column after each "
+            "of Defensive Back and Primary Receiver, so there is no way to "
+            f"tell the corner's team from the receiver's; header is {cells}")
+    cols = {
+        "fg_rank": _column(cells, "rank"),
+        "defender": i_def,
+        "defender_team": i_def_team,
+        "coverage": _column(cells, "coverage type"),
+        "advantage": _column(cells, "advantage"),
+        "receiver": i_rec,
+        "receiver_team": i_rec_team,
+    }
+    widest = max(cols.values())
     out = []
-    for r in rows[1:]:
-        if len(r) < 7:
+    for r in rows:
+        if len(r) <= widest:
             continue
-        cov = parse_coverage_type(r[3])
+        cov = parse_coverage_type(r[cols["coverage"]])
         out.append({
-            "fg_rank": int(_number(r[0]) or 0) or None,
-            "defender": r[1].strip(),
-            "defender_team": normalize_team(r[2]),
-            "defender_team_raw": r[2].strip(),
+            "fg_rank": int(_number(r[cols["fg_rank"]]) or 0) or None,
+            "defender": r[cols["defender"]].strip(),
+            "defender_team": normalize_team(r[cols["defender_team"]]),
+            "defender_team_raw": r[cols["defender_team"]].strip(),
             **cov,
-            "advantage": _number(r[4]),
-            "receiver": r[5].strip(),
-            "receiver_team": normalize_team(r[6]),
-            "receiver_team_raw": r[6].strip(),
+            "advantage": _number(r[cols["advantage"]]),
+            "receiver": r[cols["receiver"]].strip(),
+            "receiver_team": normalize_team(r[cols["receiver_team"]]),
+            "receiver_team_raw": r[cols["receiver_team"]].strip(),
         })
     return pd.DataFrame(out)
 
 
 def parse_team_lines(csv_text: str) -> pd.DataFrame:
     """The 32-row team export: Team, Offensive Line, Defensive Front."""
-    rows = _rows(csv_text)
-    if len(rows) < 2:
+    cells, rows = _body(csv_text, "team_lines")
+    if not rows:
         return pd.DataFrame()
-    header = [c.strip().lower() for c in rows[0]]
-    if header[:3] != ["team", "offensive line", "defensive front"]:
-        raise ValueError("not a FantasyGuru team-lines export: expected Team, "
-                         f"Offensive Line, Defensive Front; got {rows[0]}")
-    out = [{
-        "team": normalize_team(r[0]),
-        "team_raw": r[0].strip(),
-        "offensive_line": _number(r[1]),
-        "defensive_front": _number(r[2]),
-    } for r in rows[1:] if len(r) >= 3]
-    return pd.DataFrame(out)
+    i_team = _column(cells, "team")
+    i_o = _column(cells, "offensive line")
+    i_d = _column(cells, "defensive front")
+    widest = max(i_team, i_o, i_d)
+    return pd.DataFrame([{
+        "team": normalize_team(r[i_team]),
+        "team_raw": r[i_team].strip(),
+        "offensive_line": _number(r[i_o]),
+        "defensive_front": _number(r[i_d]),
+    } for r in rows if len(r) > widest])
 
 
 def parse_line_matchups(csv_text: str) -> pd.DataFrame:
@@ -255,24 +376,26 @@ def parse_line_matchups(csv_text: str) -> pd.DataFrame:
     the opponent's D-front, so ``adv_stated`` and ``adv_derived`` must agree.
     Where they do, the file adds nothing to ``team_lines`` but the pairing.
     """
-    rows = _rows(csv_text)
-    if len(rows) < 2:
+    cells, rows = _body(csv_text, "line_matchups")
+    if not rows:
         return pd.DataFrame()
-    head = [c.strip().upper() for c in rows[0]]
-    want = ["AWAY", "O-LINE (AWAY)", "D-LINE (AWAY)", "O-LINE ADV (AWAY)",
-            "O-LINE ADV (HOME)", "O-LINE (HOME)", "D-LINE (HOME)", "HOME"]
-    if head[:8] != want:
-        raise ValueError(f"not a FantasyGuru line-matchup export; got {rows[0]}")
+    c = {name: _column(cells, name) for name in (
+        "away", "home", "o-line (away)", "d-line (away)", "o-line (home)",
+        "d-line (home)", "o-line adv (away)", "o-line adv (home)")}
+    widest = max(c.values())
     out = []
-    for r in rows[1:]:
-        if len(r) < 8:
+    for r in rows:
+        if len(r) <= widest:
             continue
-        away, home = normalize_team(r[0]), normalize_team(r[7])
+        away, home = normalize_team(r[c["away"]]), normalize_team(r[c["home"]])
+        # Each side paired with the opponent D-front its own ADV is built from.
         sides = (
-            (away, home, False, _number(r[1]), _number(r[2]), _number(r[3]),
-             _number(r[6])),
-            (home, away, True, _number(r[5]), _number(r[6]), _number(r[4]),
-             _number(r[2])),
+            (away, home, False, _number(r[c["o-line (away)"]]),
+             _number(r[c["d-line (away)"]]), _number(r[c["o-line adv (away)"]]),
+             _number(r[c["d-line (home)"]])),
+            (home, away, True, _number(r[c["o-line (home)"]]),
+             _number(r[c["d-line (home)"]]), _number(r[c["o-line adv (home)"]]),
+             _number(r[c["d-line (away)"]])),
         )
         for team, opp, is_home, oline, dline, adv, opp_dline in sides:
             derived = (None if oline is None or opp_dline is None
@@ -300,23 +423,15 @@ def parse(kind: str, csv_text: str) -> pd.DataFrame:
 
 
 def detect_kind(csv_text: str) -> str | None:
-    """Which export a file is, from its header alone, or None.
+    """Which export a file is, from its own contents, or None.
 
-    So an upload does not depend on the person picking the right kind from a
-    menu — the file says what it is, and a mismatch with what they picked is
-    worth refusing rather than storing under the wrong name.
+    The filename is never consulted: these arrive as ``table.csv``,
+    ``table (1).csv`` and whatever the browser calls the next one, so an
+    upload cannot depend on what a file is called, nor on the person picking
+    the right kind from a menu. A mismatch with what they did pick is worth
+    refusing rather than storing under the wrong name.
     """
-    rows = _rows(csv_text)
-    if not rows:
-        return None
-    header = [c.strip().lower() for c in rows[0]]
-    if header[:2] == ["rank", "defensive back"]:
-        return "wr_coverage"
-    if header[:3] == ["team", "offensive line", "defensive front"]:
-        return "team_lines"
-    if header[:1] == ["away"] and "o-line (away)" in header:
-        return "line_matchups"
-    return None
+    return find_header(csv_text)[1]
 
 
 def _roster_index(roster: pd.DataFrame):
