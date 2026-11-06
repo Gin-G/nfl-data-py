@@ -5525,3 +5525,111 @@ drift against the stored team lines. Live `/external/compare/coverage`: 22 of
 25 matched to our corner grades, Spearman −0.33, five of those grades resting
 on under 20 targets. One week of four, and the shadow count is the number
 that matters: 1.
+
+## Reading a published DFS column against our own board (2026-11-06)
+
+A subscriber write-up for week 9 2026 (FantasyGuru, "DFS Marlin's Catch of the
+Week", finalised Thursday evening), checked claim by claim against our tables.
+Three results, one of them a problem with us rather than with them.
+
+### Their defensive matchup numbers are our raw numbers
+
+31 checkable rank claims ("Detroit has allowed the most fantasy points to
+quarterbacks", "New Orleans the most to running backs", and so on) against
+`/fpa`:
+
+| compared with | Spearman | median gap | within 5 ranks |
+|---|--:|--:|--:|
+| our **raw** points allowed | **0.96** | 1 rank | 100% |
+| our **schedule-adjusted** grade | **0.61** | — | — |
+
+So there is no disagreement about the arithmetic: their matchup table is the
+same raw points-allowed table we compute, and at that level we agree almost
+perfectly. The entire difference is the adjustment — who each defence has
+actually faced — which they do not appear to apply.
+
+That is not a cosmetic gap. The largest divergences invert the recommendation:
+
+| | theirs (raw) | ours (adjusted) | their call |
+|---|--:|--:|---|
+| PHI vs WR | 3rd softest | **30th** (3rd toughest) | "the best wide receiver matchup among the premium group" |
+| NYJ vs QB | 16th | **1st softest** | "a fine mid-tier option, just below Purdy and Goff" |
+| LV vs TE | 4th softest | 20th | "my favorite tight end in this range" |
+| GB vs RB | 9th softest | 27th | "I like him as a script play" |
+| DEN vs RB | 10th softest | 23rd | "the matchup and the volume point the same way" |
+
+A defence that has faced the league's best receivers looks soft on raw points
+and is not. This is the one place our table is straightforwardly better, and
+it is worth saying that the adjustment was previously measured as *not* buying
+accuracy — it buys interpretation, which is what a matchup read is for.
+
+### Their man/zone rates do not reconcile with our charting
+
+Fourteen stated rates ("Cleveland plays man on 49% of its snaps, the highest
+on the board", "Arizona plays zone on 85%") against `coverage.shell_mix`:
+
+| | value |
+|---|--:|
+| Pearson | 0.476 |
+| Spearman | 0.417 |
+| mean absolute gap | 9.5pp |
+| mean, theirs / ours | 27.1% / 33.3% |
+
+Directionally they agree at the top (Cleveland highest in both), but PHI
+(+18.5pp), DET (+16.6), SEA (+16.1), ARI (+14.1) and WAS (+14.0) are too far
+apart to be noise. **This comparison cannot settle anything**, because our
+mix is a 2025 tendency — nflverse stopped publishing participation after 2025
+— and theirs is presumably 2026, so scheme change and a different denominator
+are perfectly confounded. Consistent with the earlier finding that their
+shell *percentage* sits on a denominator nflverse does not share.
+
+### The finding that matters: we are blind to practice participation
+
+Our week 9 board was computed Wednesday 21:32 (run 1, the last scheduled run —
+the cron is Tuesday and Wednesday only). The article, written Thursday
+evening, names 22 players as out or doubtful. **Every one of them is still
+projected at full strength on our board**, including Sam Darnold (12.8, listed
+OUT), Deshaun Watson (13.6, concussion protocol), Mike Evans (11.7, DNP both
+days), Malik Nabers (14.6) and A.J. Brown (7.3). The four quarterbacks
+expected to inherit starting jobs are projected at 3.1 (Lock), 1.4 (Sanders),
+1.1 (Minshew) and absent entirely (Milton).
+
+Re-running would not fix it. Measured on the live feed the same afternoon:
+
+| nflverse week 9 injury feed, Friday | rows |
+|---|--:|
+| total | 340 |
+| carrying a game designation (`report_status`) | **7** |
+| of those, Out | 3 (all Baltimore, Thursday's game) |
+| `practice_status` = Did Not Participate | **99** |
+
+The feed knows perfectly well that Darnold, Evans, Brown and Nabers did not
+practise. We throw it away: `parse_nflverse_injuries` maps any DNP without a
+game designation to QUESTIONABLE, which zeroes nobody, and collapses "did not
+participate" and "limited" into that same bucket. The designation only lands
+on the final report, which arrives Friday and which nflverse had not ingested
+at the time of checking.
+
+So the gap against a human columnist is not matchup modelling or projection
+quality. It is that they read Wednesday and Thursday participation and we read
+only the game designation. That is a concrete, testable candidate — a discount
+graded by participation, not a zero, with DNP-both-days separated from
+limited — and it needs the usual residual treatment before it goes anywhere
+near the board. Noted, not shipped.
+
+One practical corollary: FanDuel's own slate CSV carries an `Injury Indicator`
+(IR / O / Q), and the optimizer already refuses IR/O/D. That is the safety net
+that keeps an out player out of a lineup even when the board still likes him —
+but it does nothing for the inheritor, who stays underprojected.
+
+### Shipped: `/dfs/targets`
+
+The write-up's *shape* is worth copying even where its inputs are not: price
+tiers per position, ordered inside a tier, a sentence per player. Built as
+`nfl_projections.dfs_targets` plus `GET /dfs/targets`, ranking on our
+projection divided by salary and nothing else. Opponent grades ride along per
+player in a `context` block that the response states did not move anybody; no
+Vegas, by standing rule; no named overrides, enforced by a test that renames
+every player and asserts the output is identical. The provenance block reports
+the board's vintage first, because a targets list is read days after the board
+was computed and that interval is where the injuries live.
