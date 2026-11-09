@@ -119,11 +119,17 @@ def merge_board_and_slate(board: pd.DataFrame, slate: pd.DataFrame,
 
 def build(board: pd.DataFrame, slate: pd.DataFrame, *, name_key,
           premium_min: int = PREMIUM_MIN, value_max: int = VALUE_MAX,
-          positions=POSITIONS) -> pd.DataFrame:
-    """One row per rosterable player, with tier, value and ranks attached."""
+          positions=POSITIONS, history=None) -> pd.DataFrame:
+    """One row per rosterable player, with tier, value and ranks attached.
+
+    `history` is each player's own weekly results, attached for reading only --
+    it reaches `summarize` and nothing else. See `attach_history` for why it is
+    not allowed near the ordering.
+    """
     merged = merge_board_and_slate(board, slate, name_key)
     if merged.empty:
         return merged
+    merged = attach_history(merged, history, name_key=name_key)
 
     merged["injury_flag"] = merged.get(
         "Injury Indicator", pd.Series("", index=merged.index)).map(_clean_flag)
@@ -164,6 +170,69 @@ def build(board: pd.DataFrame, slate: pd.DataFrame, *, name_key,
                            ascending=[True, True, False])
 
 
+#: Below this many games a range is one or two outings, not a range.
+HISTORY_MIN_GAMES = 3
+
+#: Columns `attach_history` adds, so a caller can tell "no history supplied"
+#: from "history supplied and this player has none".
+HISTORY_COLUMNS = ("hist_games", "hist_low", "hist_high", "hist_median")
+
+
+def attach_history(frame: pd.DataFrame, history, *, name_key) -> pd.DataFrame:
+    """Add each player's own weekly range: games, low, high, median.
+
+    **Description, not prediction.** Tested on 2026 weeks 5-9, n=617
+    player-weeks: a band of the lowest and highest a player has scored covers
+    71.0% of his next result against the model band's 81.7%, and at a matched
+    width 67.7% against 73.7% — because a min and max over *n* games is not a
+    range, it is an unstable estimate of the 1/(n+1) and n/(n+1) quantiles. At
+    five prior games "the lowest he has scored" is his 17th percentile and gets
+    undercut 16% of the time, and both ends drift outward all season as *n*
+    grows rather than as the player changes.
+
+    So this never feeds `value`, a tier or a rank, and `floor`/`ceiling` stay
+    the model's. What a range is genuinely good for is being read: it says in
+    one line what the player has actually done, which a projection and a band
+    both hide. See EXPERIMENTS.md "a player's own high and low make a worse
+    band than the model's".
+
+    `history` is a long frame, one row per player-week, carrying a name column
+    (`player_name`, `Nickname` or `name`) and a points column
+    (`fantasy_points`, `actual_points`, `points` or `fd_points`).
+    `name_key` is the same normaliser the board and slate were joined on, so a
+    history that spells a name FanDuel's way still lands on the right row.
+    """
+    frame = frame.copy()
+    if history is None or len(history) == 0:
+        return frame
+    points_column = next(
+        (c for c in ("fantasy_points", "actual_points", "points", "fd_points")
+         if c in history.columns), None)
+    if points_column is None:
+        raise ValueError(
+            "history needs a points column, one of fantasy_points, "
+            f"actual_points, points or fd_points; it has {list(history.columns)}")
+    name_column = next((c for c in ("player_name", "Nickname", "name")
+                        if c in history.columns), None)
+    if name_column is None:
+        raise ValueError(
+            "history needs a name column, one of player_name, Nickname or "
+            f"name; it has {list(history.columns)}")
+
+    rows = pd.DataFrame({
+        "_key": history[name_column].map(name_key),
+        "_p": pd.to_numeric(history[points_column], errors="coerce"),
+    }).dropna()
+    stats = rows.groupby("_key")["_p"].agg(
+        hist_games="size", hist_low="min", hist_high="max", hist_median="median")
+    if "_key" not in frame.columns:
+        raise ValueError("attach_history needs the joined frame from "
+                         "merge_board_and_slate, which carries `_key`")
+    merged = frame.merge(stats.reset_index(), on="_key", how="left")
+    merged.index = frame.index
+    return merged
+
+
 def _spread(row) -> float | None:
     """Ceiling minus floor, the board's own uncertainty about a player."""
     lo, hi = row.get("floor"), row.get("ceiling")
@@ -200,6 +269,28 @@ def summarize(row, context: dict | None = None) -> str:
     if spread is not None:
         bits.append(f"Floor {row['floor']:.1f} to ceiling {row['ceiling']:.1f}"
                     f" (a {spread:.1f}-point spread).")
+
+    # What he has actually done, which neither the projection nor the band
+    # shows. Phrased as a record rather than a range he will stay inside,
+    # because measured as a band it is worse than the model's -- see
+    # `attach_history`. The projection sitting outside it is worth saying
+    # outright: it is the board claiming something new about him.
+    games, low = row.get("hist_games"), row.get("hist_low")
+    high, mid = row.get("hist_high"), row.get("hist_median")
+    if (games is not None and not pd.isna(games) and games >= HISTORY_MIN_GAMES
+            and low is not None and not pd.isna(low)
+            and high is not None and not pd.isna(high)):
+        line = (f"Has scored {float(low):.1f} to {float(high):.1f} in"
+                f" {int(games)} games")
+        if mid is not None and not pd.isna(mid):
+            line += f", median {float(mid):.1f}"
+        line += "."
+        if proj is not None and not pd.isna(proj):
+            if proj > float(high):
+                line += " We project above anything done this season."
+            elif proj < float(low):
+                line += " We project below anything done this season."
+        bits.append(line)
 
     fppg, vvf = row.get("fppg"), row.get("value_vs_fppg")
     played = row.get("games_played")

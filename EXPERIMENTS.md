@@ -5633,3 +5633,263 @@ Vegas, by standing rule; no named overrides, enforced by a test that renames
 every player and asserts the output is identical. The provenance block reports
 the board's vintage first, because a targets list is read days after the board
 was computed and that interval is where the injuries live.
+
+## Week 9 scored: why 45 lineups all landed in the same place (2026-11-09)
+
+The week was a loss — 45 entries, nothing much over 100. Scored locally against
+nflverse with the same `fanduel_points` the production scorer uses, because
+`scripts.score_lineups` had run Sunday 19:00, before nflverse published, and
+reports `scored_lineups: 0`. Production will say the same once it runs again.
+
+| | week 9 actual |
+|---|---|
+| the 45 entered lineups | mean **87.24**, best 127.96, worst 66.36 |
+| of those, 100+ | **5 of 45** |
+| FanDuel's own FPPG, one lineup off the same pool | 109.44 |
+| our board, mean objective | 79.74 |
+| our board, ceiling objective | 79.74 — *the same lineup* |
+| best available, hindsight (lower bound) | 224.26 |
+
+Baselines are the 8 skill slots at $56,400 with the NO defense ($3,600, 5.0)
+bolted on each, because the board does not project defenses at all and the
+pool is the 248 board-matched slate players `/dfs/targets` returns, truncated
+at 50 per position-tier — so "best available" is a floor on the real number.
+
+### It was not the board
+
+Every board player whose game was played, projection against actual:
+
+| | n | proj | actual | bias | MAE | inside [floor, ceiling] |
+|---|---|---|---|---|---|---|
+| all | 469 | 4.37 | 4.22 | **+0.15** | 3.16 | 65% |
+| QB | 76 | 6.74 | 5.87 | +0.87 | 3.98 | 30% |
+| RB | 104 | 5.58 | 4.76 | +0.82 | 3.65 | 69% |
+| WR | 182 | 3.72 | 4.18 | −0.46 | 3.26 | 68% |
+| TE | 107 | 2.61 | 2.59 | +0.01 | 1.92 | 83% |
+
+Essentially unbiased, and on the players that matter (projection ≥ 10) the
+band came in at 13% below floor / 79% inside / 8% above ceiling against a
+design of 10/80/10. The board did its job.
+
+The bias lives entirely in the players the optimizer *chose*: **+2.45** on the
+30 it used against **−0.01** on the 439 it did not. That is selection bias, not
+calibration error — maximising a noisy estimate picks the names whose noise ran
+positive, and it is the structural tax on any optimizer. Worth measuring every
+week; not a bug.
+
+Nor was it the injury blindness from last week's entry. The Saturday slate
+re-download did its job: no rostered player was inactive, and the lowest actual
+in any lineup was 1.40, not a zero. That fix held.
+
+### Negative result: `ceiling` and `mean` are the same objective
+
+Across the 245 slate players with a projection:
+
+| pair | pearson | spearman |
+|---|---|---|
+| mean vs ceiling | 0.9961 | **0.9949** |
+| mean vs floor | 0.9673 | 0.9345 |
+| mean vs FPPG | 0.9273 | 0.8647 |
+
+and on points per $1k, which is what the optimizer actually trades on, mean vs
+ceiling ranks at Spearman **0.9927**; the top 30 by each share 28 players. The
+ceiling/mean ratio has median 2.098 and an IQR of just 1.982–2.287.
+
+So the ceiling is the mean times about 2.1, and selecting on it changes almost
+nothing — which is why the mean and ceiling solves above returned the identical
+nine men. All six week-9 builds ran the ceiling objective, believing they were
+chasing upside; they were running the mean optimizer.
+
+This sharpens the known quantile to-do. The bands are *marginally* well
+calibrated (13/79/8) and simultaneously carry almost no cross-player
+information: the model is not saying anybody is unusually skewed, only that
+everyone's ceiling is twice their mean. For DFS the whole point of a ceiling is
+to find the player whose distribution is right-skewed *relative to his mean*,
+and the quantile head is not currently expressing that. Calibrated but
+uninformative. `floor` is the only objective that meaningfully reorders
+(Spearman 0.9147), which fits its by-objective record being the best of the
+four.
+
+### What actually went wrong: 45 entries, 31 bets
+
+| | |
+|---|---|
+| lineups entered | 45 |
+| distinct lineups | **31** |
+| exact duplicates | **14** |
+| builds 32 and 33 | identical, all five lineups |
+| players at 55.6% (25/45) | Gibbs, Hubbard, Cousins, Allgeier, Tucker, Cooper, NO |
+| tightest per-build exposure cap | 46% |
+| mean overlap between any two lineups | 3.53 of 9 slots |
+
+Six builds, each honouring its own exposure cap, pooled into seven players in
+55.6% of the week — and the optimizer is deterministic, so re-running it with
+the same parameters returns the same lineups. 14 of the 45 entries were paid
+for twice. Those seven shared men returned 66.54 points across seven of nine
+slots, so for 25 of the 45 lineups only two slots could differentiate, and the
+whole portfolio landed in a 66–105 band.
+
+`/optimizer/exposure` already reports exactly this, including the `over_cap`
+list and a note that the per-build cap "binds inside a build only". The
+diagnosis was sitting in the API before the games were played. What is missing
+is the step that acts on it: nothing dedupes across builds for a week, and
+nothing warns at build time that the lineups being added duplicate ones already
+entered.
+
+FPPG beating the board this week (109.44 vs 79.74) is one player — Kenneth
+Walker III, whom FPPG priced at 23.0 and we had at 17.1, scored 37.30. The
+season record is `beat_fppg_rate` 0.702 over 319 scored lineups, so week 9 is a
+miss, not a regime change. Not evidence against the model.
+
+### Reporting defect found while doing this
+
+`/optimizer/performance` takes its `projected` from `LineupEntry.projected_points`,
+which is the total of whatever column the objective used. So `error = projected
+− actual` compares a sum of ceilings against a realised total: week 8's
+headline "projected 187.09, actual 102.42, error 84.67" is not model error, it
+is the word "ceiling". The same column reads −69.68 for floor builds. The
+by-objective table is the only part of that response that is internally
+comparable. Either the objective belongs on every row, or `projected` should
+always be the mean projection with the objective total reported beside it.
+
+Separately: `/dfs/targets` lists `DEF` in its default `positions` and silently
+returns no defense group, because the board has no defense rows — the optimizer
+fills that slot from FanDuel's FPPG (`optimizer.py` says so at `/slate-coverage`).
+It should say that rather than omit a tier without comment.
+
+## Negative result: a player's own high and low make a worse band than the model's (2026-11-09)
+
+Proposal: drop the quantile head and report the lowest score a player has posted
+as his floor, the highest as his ceiling, with the projection as the expectation.
+Tested on weeks 5-9 2026, n = **617 player-weeks**, band built only from games
+played before the test week, restricted to projections >= 5 and to players who
+actually played. Week 7's board was computed after that week's Thursday game, so
+CHI and NE are excluded from it. Three bands, same centre:
+
+| band | coverage | mean width | below floor | above ceiling |
+|---|---|---|---|---|
+| model (quantile regression) | **81.7%** | 18.52 | 7.3% | 11.0% |
+| his own min / max | 71.0% | 16.90 | **16.0%** | 13.0% |
+| his own p10 / p90 | 57.4% | 12.92 | 24.6% | 18.0% |
+
+Rescaled so all three have the same mean width — which asks only whether the
+band puts its width in the right *places* — the model still wins: **73.7%**
+against 67.7% for min/max and 68.2% for p10/p90.
+
+### Why min/max loses, which is the useful part
+
+A min and max over *n* games is not a range, it is an unstable estimate of the
+1/(n+1) and n/(n+1) quantiles. With five prior games "the lowest he has ever
+scored" is his 17th percentile, so it should be undercut about 17% of the time —
+and it is, 16.0%. The band's meaning therefore drifts all season as *n* grows:
+
+| prior games | n | width | below min | above max | covered |
+|---|---|---|---|---|---|
+| 3 | 32 | 13.74 | 25.0% | 15.6% | 59.4% |
+| 4 | 161 | 14.82 | 23.6% | 16.8% | 59.6% |
+| 5 | 149 | 16.86 | 13.4% | 14.1% | 72.5% |
+| 6 | 123 | 17.82 | 12.2% | 8.9% | 78.9% |
+| 7 | 106 | 18.66 | 13.2% | 11.3% | 75.5% |
+| 8 | 46 | 20.07 | 8.7% | 8.7% | 82.6% |
+
+Coverage climbs from 59% to 83% and width from 13.7 to 20.1 points with nothing
+about the players changing — it is the sample growing. In week 4 such a "floor"
+is broken a quarter of the time. The model band over the same split holds 79-88%
+at a roughly flat width, because it is a quantile, not an order statistic.
+
+### Neither band's width predicts anything
+
+`|actual - projection|` regressed on band width, controlling for the projection
+(standardised, 95% CI):
+
+| band | width slope |
+|---|---|
+| model | +1.526 [−0.143, +3.194] |
+| min/max | −0.136 [−0.556, +0.284] |
+| p10/p90 | +0.056 [−0.373, +0.486] |
+
+All three include zero. And no ceiling picks out who goes off: against
+`actual − projection`, Spearman is −0.079 (model), −0.030 (min/max), −0.038
+(p10/p90); against a big game (actual > projection + 8, 94 of 617) the
+point-biserial correlations are +0.066, +0.054, +0.083. The p10/p90 one is
+nominally p = 0.039, which is one marginal hit out of six tests on a tiny
+effect — not a finding.
+
+So historical range carries no information about this week's deviation beyond
+the projection itself. This is consistent with the earlier reverted experiment
+where rolling FP standard deviation and boom/bust rate were added as model
+features, failed to widen player-specific bands, and regressed the mean model.
+Player-specific dispersion in this data is largely not predictable.
+
+### What follows
+
+Keep the quantile band as the probabilistic band; it is the best of the three
+and it is marginally calibrated. The proposal's real target — that the band
+should mean something a person can read — is better served by reporting the
+historical range as explicit *context* beside the projection ("4.2 to 28.1 over
+8 games, median 11.4") rather than as the band, which is honest about it being
+descriptive and is the kind of line that made the subscriber column's player
+summaries readable.
+
+The statistically correct version of the instinct is a per-player band built
+from his own *residual* history — how far he has deviated from his own
+projection — not from his raw score range. That cannot be tested yet: only
+weeks 5-9 of boards are archived, so a player has at most four residuals.
+`weeks_archived` grows every run, so it becomes testable later in the season.
+
+### Shipped: a player pool, and lineups that stop repeating (2026-11-09)
+
+Three fixes for the week-9 post-mortem above, none of which touch the board.
+
+**The pool.** `optimize_lineups` takes `player_rules`, a per-player
+`{min_exposure, max_exposure}` in percent of the lineups. It is one dial: 0 is
+an exclusion, 100 a lock, 40 a target. A floor is enforced by forcing the
+player into the lineups he still needs to reach it, which is the thing the
+global `max_usage_percentage` could never do — it caps everyone equally and can
+neither require a player nor name one. A bare number is a target rather than a
+cap deliberately: capping a man at 60% and watching the solver use him twice in
+ten is the failure this exists to fix.
+
+Locks are implemented as a bonus larger than any real lineup can score, so the
+exact solver is untouched: the optimum of the inflated objective is the best
+lineup containing him whenever one exists, and the best without him when none
+does — which is also how a contradictory pool is detected rather than silently
+honoured. Two locked quarterbacks, locks over the cap, more locks than roster
+slots, a floor above its own ceiling, a misspelled name and a lock on a player
+FanDuel marks O are each refused by name. A mistyped lock that quietly does
+nothing is the worst available outcome, so nothing is ignored.
+
+Rules are stored in `slate_player_rules`, keyed on (slate_id, nickname) rather
+than the week: a re-upload replaces the slate, and a rule set against
+Wednesday's file must not attach itself to Saturday's different contest.
+`GET /optimizer/pool` is the table — price, board, value, what the player has
+actually scored, his share of the week so far, and his rule — with
+`POST`/`DELETE` to set and clear, and a column of controls in the dashboard.
+
+**Dedupe.** `seen_lineups` holds back anything already recorded for the week, on
+by default. One trap found while building it: such a build must NOT supersede
+the earlier one. It returned the next-best set precisely because the first set
+exists, so the old "pressing Build twice is not two samples" rule would delete
+the better lineups it had just stepped around and keep only the ones it settled
+for — two clicks leaving the week worse than one. Superseding now happens only
+when nothing was deduped against. `pool_exposure` additionally counts the
+entered lineups toward the percentages, which is the only thing that holds a
+player down across builds.
+
+Also: when dedupe empties a build the refusal says so, rather than blaming the
+cap. That came out of the test suite, where a session-scoped engine let builds
+accumulate until a small slate had no distinct lineup left and every later
+build came back empty — a true answer to a question no test meant to ask.
+
+**The range in the summaries.** `/dfs/targets` now carries each player's own low,
+high and median, and `summarize` adds "Has scored 4.2 to 31.2 in 7 games, median
+19.0", plus a sentence when the projection sits outside it, which is the board
+claiming something new about him. It is description and labelled as such — the
+negative result above is what keeps it out of `value`, the tiers and the ranks.
+
+And `/dfs/targets` no longer drops the DEF tier in silence: the board holds no
+defenses at all, so a `positions_absent` list and a note say which positions
+came back empty and that DEF is not a data gap but a slot that runs on
+FanDuel's own FPPG.
+
+709 → 754 tests in nfl_projections, 714 → 755 on NFL-API.

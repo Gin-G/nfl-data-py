@@ -225,3 +225,104 @@ class TestNothingHereIsAnOverride:
             for banned in ("implied", "spread of", "favorite", "underdog",
                            "moneyline", "total of"):
                 assert banned not in text, (row.Nickname, banned)
+
+
+def _history(rows=None):
+    """One row per player-week, the shape the API hands over."""
+    rows = rows or [
+        ("Alpha Back", [31.2, 8.4, 19.0, 22.6, 11.1, 27.3, 4.2]),
+        ("Alpha Arm", [18.0, 24.4, 9.6, 30.2, 15.5, 21.0, 12.8]),
+        ("Cheap Back", [2.1, 0.4, 6.0]),
+        ("Rookie Catch", [3.0, 5.0]),            # under HISTORY_MIN_GAMES
+    ]
+    return pd.DataFrame([{"player_name": name, "week": week + 1,
+                          "fantasy_points": points}
+                         for name, weeks in rows
+                         for week, points in enumerate(weeks)])
+
+
+class TestHisOwnRange:
+    """The range is reported because it reads well, not because it predicts —
+    measured worse than the model band on 617 player-weeks."""
+
+    def test_the_range_reaches_the_summary(self):
+        frame = _build(history=_history())
+        row = frame[frame["Nickname"] == "Alpha Back"].iloc[0]
+        text = T.summarize(row)
+        assert "Has scored 4.2 to 31.2 in 7 games" in text
+        assert "median 19.0" in text
+
+    def test_a_player_with_no_history_says_nothing_about_a_range(self):
+        frame = _build(history=_history())
+        row = frame[frame["Nickname"] == "Bravo Back"].iloc[0]
+        assert "Has scored" not in T.summarize(row)
+
+    def test_two_games_is_not_a_range(self):
+        frame = _build(history=_history())
+        row = frame[frame["Nickname"] == "Rookie Catch"].iloc[0]
+        assert "Has scored" not in T.summarize(row)
+
+    def test_no_history_at_all_is_the_old_summary(self):
+        with_none = T.summarize(_build().iloc[0])
+        assert "Has scored" not in with_none
+
+    def test_projecting_above_his_best_is_called_out(self):
+        """The board claiming something new about a player is worth a sentence."""
+        frame = _build(history=_history([("Cheap Back", [2.1, 0.4, 6.0])]))
+        row = frame[frame["Nickname"] == "Cheap Back"].iloc[0]
+        text = T.summarize(row)
+        assert "We project above anything done this season." in text
+
+    def test_projecting_below_his_worst_is_called_out(self):
+        frame = _build(history=_history([("Cheap Back", [30.0, 28.0, 33.0])]))
+        row = frame[frame["Nickname"] == "Cheap Back"].iloc[0]
+        assert "We project below anything done this season." in T.summarize(row)
+
+    def test_a_projection_inside_the_range_says_neither(self):
+        frame = _build(history=_history())
+        text = T.summarize(frame[frame["Nickname"] == "Alpha Arm"].iloc[0])
+        assert "anything done this season" not in text
+
+    def test_the_range_is_his_own_games_not_the_board(self):
+        frame = _build(history=_history())
+        row = frame[frame["Nickname"] == "Alpha Back"].iloc[0]
+        assert row["hist_low"] == pytest.approx(4.2)
+        assert row["hist_high"] == pytest.approx(31.2)
+        assert row["hist_games"] == 7
+        # and it is NOT the model band, which is the whole point of having both
+        assert row["floor"] == pytest.approx(8.2)
+        assert row["ceiling"] == pytest.approx(44.3)
+
+    def test_fanduel_spelling_still_joins(self):
+        """History from our own tables spells names its way; the slate spells
+        them FanDuel's. Both go through the same normaliser."""
+        history = _history([("Alpha Back Jr.", [10.0, 20.0, 30.0])])
+        frame = _build(history=history)
+        row = frame[frame["Nickname"] == "Alpha Back"].iloc[0]
+        assert row["hist_games"] == 3
+
+    def test_history_cannot_move_a_ranking(self):
+        """The ordering is value, and nothing else. A range that reordered the
+        board would be the band experiment smuggled back in."""
+        plain = _build()
+        loud = _build(history=_history([
+            ("Cheap Back", [60.0, 62.0, 65.0, 70.0]),     # absurd history
+            ("Alpha Back", [0.1, 0.2, 0.3, 0.4]),
+        ]))
+        for column in ("value", "position_rank", "tier_rank", "tier"):
+            assert list(plain[column]) == list(loud[column])
+        assert list(plain["Nickname"]) == list(loud["Nickname"])
+
+    def test_a_history_with_no_points_column_is_refused(self):
+        bad = pd.DataFrame({"player_name": ["Alpha Back"], "week": [1]})
+        with pytest.raises(ValueError, match="needs a points column"):
+            _build(history=bad)
+
+    def test_a_history_with_no_name_column_is_refused(self):
+        bad = pd.DataFrame({"fantasy_points": [10.0], "week": [1]})
+        with pytest.raises(ValueError, match="needs a name column"):
+            _build(history=bad)
+
+    def test_an_empty_history_is_not_an_error(self):
+        frame = _build(history=pd.DataFrame())
+        assert len(frame) == len(_build())

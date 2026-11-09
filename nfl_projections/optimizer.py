@@ -5,6 +5,7 @@ Works from a FanDuel main-slate player list CSV merged with our projections
 with a per-player usage limit.
 """
 
+import math
 import re
 import warnings
 from collections import Counter
@@ -141,6 +142,125 @@ def _is_lineup_unique(new_lineup, existing_lineups):
     return all(set(l["Nickname"].values) != new_set for l in existing_lineups)
 
 
+# --- the player pool: lock, exclude, exposure ------------------------------
+#
+# These are one dial, not three. Excluding a man is 0% exposure, locking him is
+# 100%, and the interesting cases are in between -- so they share a
+# representation and the loop enforces all of them the same way.
+
+# A forced player is made worth more than any real lineup can score, which
+# needs no change to the exact solver: the optimum of the inflated objective is
+# the best lineup containing him whenever one exists, and the best lineup
+# without him when none does -- which is also how infeasible rules are
+# detected. 1e7 is far above any nine-player total and far below the integer
+# precision of a float64, so subtracting it afterwards returns the true points
+# exactly.
+LOCK_BONUS = 1e7
+
+
+def normalize_player_rules(rules=None, *, lock_players=None, exclude_players=None):
+    """``{nickname: (min_percent, max_percent)}`` from the shorthands people use.
+
+    A rule may be written as:
+
+      * a number — a **target**: he appears in about that share of the lineups,
+        which is both a floor and a ceiling. ``60`` means 60%, not "up to 60%".
+      * ``"lock"`` or ``"exclude"`` — 100% and 0%.
+      * ``{"min": x}``, ``{"max": y}`` or both — one-sided when only one is
+        given, which is how a pure cap is spelled.
+
+    A bare number is a target rather than a cap because a cap alone cannot
+    deliver what it looks like it promises. Capping a player at 60% and then
+    watching the solver use him in two lineups of ten is exactly the gap this
+    exists to close: the point of typing 60 is to get 60.
+
+    `lock_players` and `exclude_players` are merged in as 100% and 0%. An
+    explicit rule for the same player wins, so a pool saved as rules is not
+    silently overridden by a stale argument.
+    """
+    out = {}
+    for nickname in exclude_players or ():
+        out[str(nickname)] = (0.0, 0.0)
+    for nickname in lock_players or ():
+        out[str(nickname)] = (100.0, 100.0)
+
+    def pct(value, label, nickname):
+        number = float(value)
+        if not 0 <= number <= 100:
+            raise ValueError(f"{label} for {nickname} is {number}; exposure is "
+                             "a percentage, 0 to 100")
+        return number
+
+    for nickname, rule in (rules or {}).items():
+        nickname = str(nickname)
+        if rule is None:
+            continue
+        if isinstance(rule, str):
+            word = rule.strip().lower()
+            if word in ("lock", "locked"):
+                out[nickname] = (100.0, 100.0)
+            elif word in ("exclude", "excluded", "out", "fade"):
+                out[nickname] = (0.0, 0.0)
+            elif word in ("", "free", "none", "any"):
+                out.pop(nickname, None)
+            else:
+                try:
+                    share = pct(word, "exposure", nickname)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"rule {rule!r} for {nickname} is not a percentage, "
+                        "'lock' or 'exclude'") from exc
+                out[nickname] = (share, share)
+        elif isinstance(rule, dict):
+            if rule.get("lock"):
+                out[nickname] = (100.0, 100.0)
+                continue
+            if rule.get("exclude"):
+                out[nickname] = (0.0, 0.0)
+                continue
+            low = rule.get("min", rule.get("min_exposure"))
+            high = rule.get("max", rule.get("max_exposure"))
+            if low is None and high is None:
+                share = rule.get("exposure")
+                if share is None:
+                    out.pop(nickname, None)
+                    continue
+                low = high = share
+            low = None if low is None else pct(low, "min exposure", nickname)
+            high = None if high is None else pct(high, "max exposure", nickname)
+            if low is not None and high is not None and low > high:
+                raise ValueError(
+                    f"{nickname} has a {low}% floor above its {high}% ceiling")
+            out[nickname] = (low, high)
+        else:
+            share = pct(rule, "exposure", nickname)
+            out[nickname] = (share, share)
+    return out
+
+
+def _required_count(percent, num_lineups):
+    """How many of `num_lineups` an exposure FLOOR demands."""
+    if not percent:
+        return 0
+    # The epsilon keeps 50% of 10 at 5 rather than 6 when the product lands a
+    # hair above the integer in binary.
+    return min(num_lineups, int(math.ceil(percent / 100.0 * num_lineups - 1e-9)))
+
+
+def _usage_cap_ok(current, num_lineups, percent):
+    """Whether one more appearance keeps `current` inside a `percent` cap."""
+    if percent is None or percent >= 100:
+        return True
+    return (current + 1) / num_lineups * 100 <= percent
+
+
+def _check_usage_limit(nickname, current_lineups, num_lineups, max_usage_percentage):
+    if not current_lineups:
+        return True
+    current = sum(1 for l in current_lineups if nickname in l["Nickname"].values)
+    return _usage_cap_ok(current, num_lineups, max_usage_percentage)
+
+
 def calculate_player_usage(lineups):
     """Usage counts and percentages for players across generated lineups."""
     all_players = []
@@ -151,13 +271,6 @@ def calculate_player_usage(lineups):
     usage = pd.DataFrame.from_dict(counts, orient="index", columns=["Count"])
     usage["Usage_Percentage"] = (usage["Count"] / len(lineups) * 100).round(2)
     return usage.sort_values("Usage_Percentage", ascending=False)
-
-
-def _check_usage_limit(nickname, current_lineups, num_lineups, max_usage_percentage):
-    if not current_lineups:
-        return True
-    current = sum(1 for l in current_lineups if nickname in l["Nickname"].values)
-    return (current + 1) / num_lineups * 100 <= max_usage_percentage
 
 
 def _pareto(frontier):
@@ -923,7 +1036,9 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
                      ownership_exempt_rank=0, rb_vs_opposing_def=True,
                      matchup_boost=0.0, matchup_column="run_matchup",
                      matchup_threshold=58.0, matchup_positions=("RB",),
-                     target=None, sims=None, candidates=None, diversify=None):
+                     target=None, sims=None, candidates=None, diversify=None,
+                     player_rules=None, lock_players=None, seen_lineups=None,
+                     pool_exposure=False, report=None):
     """Build FanDuel lineups: the best one under the cap, then cheaper ones.
 
     Args:
@@ -932,7 +1047,37 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
         num_lineups: how many lineups to generate
         salary_cap: FanDuel salary cap — a hard constraint on every lineup
         exclude_players: nicknames to leave out entirely
-        max_usage_percentage: cap on how often one player appears
+        max_usage_percentage: cap on how often one player appears. A player
+            with his own rule in `player_rules` uses that instead.
+        player_rules: per-player pool rules, `{nickname: rule}`, where a rule is
+            a target percentage, "lock", "exclude", or `{"min": x, "max": y}`.
+            See `normalize_player_rules`. This is the dial the global
+            `max_usage_percentage` cannot express: it caps everyone equally and
+            can neither require a player nor name one.
+
+            A floor is enforced by forcing him into the lineups he still needs
+            to reach it, newest first, so a 60% target over ten lineups returns
+            six rather than however many the solver happened to like. A rule
+            naming nobody on the slate is an error, not a no-op -- a mistyped
+            lock that quietly does nothing is the worst outcome here.
+        lock_players: shorthand for a 100% rule. In every lineup.
+        seen_lineups: lineups already entered elsewhere, as iterables of
+            nicknames. None of them is returned again, which is what makes
+            several builds for one week add up to that many distinct bets
+            rather than the same roster re-solved: the builder is exact and
+            deterministic, so re-running it with the same settings returns the
+            same lineups. 2026 week 9 entered 45 and held 31.
+        pool_exposure: whether `seen_lineups` also count toward the exposure
+            percentages, making them a share of everything entered for the week
+            instead of a share of this build. Off by default because it changes
+            what a percentage means; on, it is the only thing that can hold a
+            player under a cap across builds. In 2026 week 9 six builds each
+            honoured a 46-49% cap and pooled to 55.6% on seven players.
+        report: an optional dict, filled in with what the rules actually did --
+            `duplicates_skipped`, `exposure`, `forced` and `warnings`. The
+            return value is a list of lineups, so there is nowhere else to put
+            it, and a caller that wants to show "three of your five were
+            already entered" needs it.
         objective: which projection drives value - "mean" (default),
             "ceiling" (GPP upside), "floor" (cash safety), or "median".
             Non-mean objectives need a projection made with the quantile model.
@@ -1049,12 +1194,57 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
     df = df.copy()
 
     df["Injury Indicator"] = df.get("Injury Indicator", pd.Series("", index=df.index)).fillna("")
+    # Captured before the filters, so a rule naming a player the slate refuses
+    # can say WHICH refusal it was instead of "not on this slate".
+    on_slate = dict(zip(df["Nickname"].astype(str),
+                        df["Injury Indicator"].astype(str).str.upper()))
     df = df[~df["Injury Indicator"].str.upper().isin(EXCLUDED_INJURY_STATUSES)]
     df = df.replace([np.inf, -np.inf], np.nan).dropna(
         subset=["Salary", "FPPG", "Roster Position", "Nickname"]
     )
-    if exclude_players:
-        df = df[~df["Nickname"].isin(set(exclude_players))]
+
+    rules = normalize_player_rules(player_rules, lock_players=lock_players,
+                                   exclude_players=exclude_players)
+    notes = []
+    missing = sorted(n for n in rules if n not in on_slate)
+    if missing:
+        raise ValueError(
+            "the player pool names "
+            + ", ".join(repr(n) for n in missing)
+            + ", who is not on this slate. FanDuel's spelling is the one that "
+              "counts, so check it against the uploaded list -- a lock that "
+              "quietly does nothing is worse than a refused build.")
+    refused = sorted(n for n, (low, _) in rules.items()
+                     if low and on_slate.get(n) in EXCLUDED_INJURY_STATUSES)
+    if refused:
+        raise ValueError(
+            "; ".join(f"{n} is marked {on_slate[n]} on the slate" for n in refused)
+            + ". FanDuel will not pay him, so he cannot be locked in. Clear his "
+              "rule, or re-download the slate if the news has moved.")
+    dropped = {n for n, (_, high) in rules.items() if high is not None and high <= 0}
+    if dropped:
+        df = df[~df["Nickname"].isin(dropped)]
+    required = {n: low for n, (low, _) in rules.items() if low}
+    gone = sorted(n for n in required if n not in set(df["Nickname"].astype(str)))
+    if gone:
+        raise ValueError(
+            "the player pool requires " + ", ".join(repr(n) for n in gone)
+            + ", who is on the slate but carries no salary or roster position "
+              "in it, so no lineup can hold him.")
+    locks = sorted(n for n, (low, _) in rules.items() if low and low >= 100)
+    roster_size = sum(int(n) for n in roster_slots.values())
+    if len(locks) > roster_size:
+        raise ValueError(
+            f"{len(locks)} players are locked into a {roster_size}-man roster: "
+            + ", ".join(repr(n) for n in locks))
+    if locks:
+        salaries = pd.to_numeric(
+            df.set_index(df["Nickname"].astype(str)).loc[locks, "Salary"],
+            errors="coerce").fillna(0)
+        if salaries.sum() > salary_cap:
+            raise ValueError(
+                f"the {len(locks)} locked players cost ${int(salaries.sum()):,} "
+                f"against a ${salary_cap:,} cap.")
 
     # Optimize toward the chosen projection; DEF has no model projection so it
     # always falls back to FanDuel's FPPG.
@@ -1151,12 +1341,49 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
     step = int(price_step) if price_step else max(salary_step, salary_cap // 100)
     all_lineups = []
     budget = salary_cap
+
+    # Lineups entered elsewhere never come back, and optionally count toward the
+    # percentages too -- which is the difference between "40% of this build" and
+    # "40% of the week".
+    seen = [set(map(str, lineup)) for lineup in (seen_lineups or [])]
+    prior = Counter(n for lineup in seen for n in lineup) if pool_exposure else Counter()
+    denom = (len(seen) + wanted) if pool_exposure else wanted
+    skipped_seen = 0
+
+    def used(nickname):
+        return prior.get(nickname, 0) + sum(
+            1 for l in all_lineups if nickname in l["Nickname"].values)
+
     while len(all_lineups) < wanted and budget >= 0:
+        # A floor is met by forcing the player in once he can no longer reach it
+        # any other way. Checked every pass, because each lineup that does take
+        # him makes the next one less urgent.
+        remaining = wanted - len(all_lineups)
+        forced = {n for n, low in required.items()
+                  if _required_count(low, denom) - used(n) >= remaining}
+
         # Players already at their exposure limit are dropped from the pool
         # rather than rejected after the fact, so the solve stays exact over
-        # whoever is actually still available.
-        pool = df[[_check_usage_limit(n, all_lineups, wanted, max_usage_percentage)
-                   for n in df["Nickname"]]]
+        # whoever is actually still available. A forced player is never dropped:
+        # his own floor is what put him here.
+        def available(nickname):
+            if nickname in forced:
+                return True
+            if not all_lineups and not prior:
+                # A cap never forbids a first appearance. Without this a 50%
+                # cap on a single lineup rules out the whole slate, which is
+                # how the pool came back empty.
+                return True
+            low, high = rules.get(nickname, (None, None))
+            limit = high if high is not None else max_usage_percentage
+            return _usage_cap_ok(used(nickname), denom, limit)
+
+        pool = df[[available(n) for n in df["Nickname"].astype(str)]]
+        if forced:
+            pool = pool.copy()
+            boosted = pool["Nickname"].astype(str).isin(forced)
+            pool.loc[boosted, "lineup_points"] = (
+                pool.loc[boosted, "lineup_points"] + LOCK_BONUS)
         found = best_lineup(pool, budget, roster_slots, salary_step,
                             max_per_team=max_per_team, stack_qb=stack_qb,
                             rb_with_qb=rb_with_qb,
@@ -1165,10 +1392,36 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
             break
         picks, spent, _ = found
         lineup_df = pool.loc[picks]
+        if forced:
+            lineup_df = lineup_df.copy()
+            back = lineup_df["Nickname"].astype(str).isin(forced)
+            lineup_df.loc[back, "lineup_points"] = (
+                lineup_df.loc[back, "lineup_points"] - LOCK_BONUS)
+            missed = forced - set(lineup_df["Nickname"].astype(str))
+            if missed:
+                # The bonus is larger than any real lineup, so a solve that
+                # still leaves him out is saying no legal lineup holds him --
+                # together with whatever else is required, at this budget.
+                if not all_lineups:
+                    raise ValueError(
+                        "no legal lineup holds " + ", ".join(sorted(missed))
+                        + " together with the rest of the pool rules. Something "
+                          "is contradictory: two players needing the same single "
+                          "slot, or locks that cannot fit under the cap "
+                          f"(${salary_cap:,}) alongside a full roster.")
+                notes.append(
+                    f"stopped at {len(all_lineups)} lineups: "
+                    + ", ".join(sorted(missed))
+                    + f" no longer fits under ${budget:,}, and the exposure "
+                      "floor needs every remaining lineup to hold him.")
+                break
         if _is_lineup_unique(lineup_df, all_lineups):
-            all_lineups.append(lineup_df)
-            if target is None:
-                print(f"Created lineup {len(all_lineups)} (${spent:,})")
+            if set(lineup_df["Nickname"].astype(str)) in seen:
+                skipped_seen += 1
+            else:
+                all_lineups.append(lineup_df)
+                if target is None:
+                    print(f"Created lineup {len(all_lineups)} (${spent:,})")
         # Next one has to be cheaper, which is both the variation that was asked
         # for and the reason this terminates.
         budget = spent - step
@@ -1182,7 +1435,43 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
     if len(all_lineups) < num_lineups:
         print(f"Warning: only generated {len(all_lineups)}/{num_lineups} lineups "
               f"under a ${salary_cap:,} cap")
-    return all_lineups[:num_lineups]
+    final = all_lineups[:num_lineups]
+
+    if skipped_seen:
+        notes.append(
+            f"{skipped_seen} solved lineup(s) were already entered for this week "
+            "and were skipped rather than returned again.")
+    if required and final:
+        # A target solves `candidates` lineups and then re-ranks, so the floors
+        # were met over the candidates and the cut can undo them. Say so rather
+        # than report a percentage that is not what was asked for.
+        counts = Counter(n for l in final for n in l["Nickname"].astype(str))
+        for nickname, low in sorted(required.items()):
+            want = _required_count(low, (len(seen) + len(final)) if pool_exposure
+                                   else len(final))
+            got = counts.get(nickname, 0) + prior.get(nickname, 0)
+            if got < want:
+                notes.append(
+                    f"{nickname} came out at {got} of "
+                    f"{(len(seen) + len(final)) if pool_exposure else len(final)} "
+                    f"lineups, short of the {low:g}% asked for"
+                    + (" -- a target re-ranks and then cuts, which can undo an "
+                       "exposure floor" if target is not None else ""))
+    if report is not None:
+        report.update({
+            "duplicates_skipped": skipped_seen,
+            "exposure": {n: round(100.0 * c / max(len(final), 1), 1)
+                         for n, c in Counter(
+                             n for l in final
+                             for n in l["Nickname"].astype(str)).most_common()},
+            "rules_applied": {n: {"min": low, "max": high}
+                              for n, (low, high) in sorted(rules.items())},
+            "pooled_with": len(seen) if pool_exposure else 0,
+            "warnings": notes,
+        })
+    for note in notes:
+        warnings.warn(note, RuntimeWarning, stacklevel=2)
+    return final
 
 
 def rank_by_target(lineups, sims, target, positions):
@@ -1236,14 +1525,19 @@ def _select_diverse(ranked, num_lineups, max_usage_percentage):
 
 def optimize_from_csv(csv_file, num_lineups=5, salary_cap=60000, exclude_players=None,
                       max_usage_percentage=50, objective="mean", max_per_team=4,
-                      stack_qb=0, rb_with_qb=True):
+                      stack_qb=0, rb_with_qb=True, player_rules=None,
+                      lock_players=None, seen_lineups=None, pool_exposure=False,
+                      report=None):
     """Optimize lineups from a merged salary+projection CSV file."""
     df = pd.read_csv(csv_file)
     return optimize_lineups(df, num_lineups=num_lineups, salary_cap=salary_cap,
                             exclude_players=exclude_players,
                             max_usage_percentage=max_usage_percentage,
                             objective=objective, max_per_team=max_per_team,
-                            stack_qb=stack_qb, rb_with_qb=rb_with_qb)
+                            stack_qb=stack_qb, rb_with_qb=rb_with_qb,
+                            player_rules=player_rules, lock_players=lock_players,
+                            seen_lineups=seen_lineups,
+                            pool_exposure=pool_exposure, report=report)
 
 
 def display_lineups(lineups):

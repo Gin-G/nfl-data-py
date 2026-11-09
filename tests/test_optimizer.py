@@ -1175,3 +1175,284 @@ class TestMatchupSwaps:
                                "C-WR0", "B-TE0", "B-RB0", "B-D0")]]
         _, swaps = optimizer.matchup_swaps(lineup, pool, 60000, tolerance=0.15)
         assert all(s["out"] != "A-RB0" for s in swaps)
+
+
+class TestThePlayerPool:
+    """Lock, exclude and a per-player exposure percentage.
+
+    One dial: 0% is an exclusion, 100% is a lock, and the interesting cases are
+    in between. Everything here checks the lineups that come back, never the
+    arguments that went in.
+    """
+
+    @staticmethod
+    def _slate():
+        rows = []
+        for pos, n, lo in (("QB", 8, 60), ("RB", 16, 45), ("WR", 22, 45),
+                           ("TE", 10, 40), ("D", 6, 30)):
+            for i in range(n):
+                salary = (lo + i * 2) * 100
+                rows.append({
+                    "Nickname": f"{pos}{i}", "Roster Position": pos,
+                    "Position": pos, "Team": f"T{i % 8}", "Salary": salary,
+                    "FPPG": 4.0 + salary / 900.0,
+                    "fanduel_fantasy_points": 4.0 + salary / 900.0})
+        return pd.DataFrame(rows)
+
+    @staticmethod
+    def _names(lineups):
+        return [set(l["Nickname"]) for l in lineups]
+
+    # --- lock ---------------------------------------------------------------
+
+    def test_a_locked_player_is_in_every_lineup(self):
+        # WR0 is the cheapest, worst receiver on the slate: nothing but the lock
+        # would put him in a lineup, let alone all five.
+        built = optimizer.optimize_lineups(
+            self._slate(), num_lineups=5, max_usage_percentage=100,
+            lock_players=["WR0"])
+        assert len(built) == 5
+        assert all("WR0" in names for names in self._names(built))
+
+    def test_without_the_lock_he_is_in_none_of_them(self):
+        built = optimizer.optimize_lineups(self._slate(), num_lineups=5,
+                                           max_usage_percentage=100)
+        assert not any("WR0" in names for names in self._names(built))
+
+    def test_a_lock_still_fills_a_legal_roster(self):
+        built = optimizer.optimize_lineups(
+            self._slate(), num_lineups=3, max_usage_percentage=100,
+            lock_players=["WR0", "QB0"])
+        assert built
+        for lineup in built:
+            assert len(lineup) == sum(optimizer.ROSTER_SLOTS.values())
+            assert lineup["Salary"].sum() <= 60000
+
+    def test_a_lock_costs_points_and_the_lineup_is_still_the_best_with_him(self):
+        # This slate's points are deliberately NOT a straight function of
+        # salary: in `_slate()` they are, so every full-cap lineup ties and a
+        # lock could never be shown to cost anything.
+        pool = self._slate()
+        pool["fanduel_fantasy_points"] = np.where(
+            pool["Nickname"] == "WR0", 0.1, pool["fanduel_fantasy_points"])
+        free = optimizer.optimize_lineups(pool, num_lineups=1)[0]
+        locked = optimizer.optimize_lineups(pool, num_lineups=1,
+                                            lock_players=["WR0"])[0]
+        assert "WR0" not in set(free["Nickname"])
+        assert "WR0" in set(locked["Nickname"])
+        assert locked["lineup_points"].sum() < free["lineup_points"].sum()
+
+    def test_the_lock_bonus_does_not_leak_into_the_reported_points(self):
+        locked = optimizer.optimize_lineups(
+            self._slate(), num_lineups=1, lock_players=["WR0"])[0]
+        assert locked["lineup_points"].max() < 1000
+        assert locked.loc[locked["Nickname"] == "WR0", "lineup_points"].iloc[0] \
+            == pytest.approx(4.0 + 4500 / 900.0)
+
+    def test_locking_the_whole_roster_returns_exactly_it(self):
+        # One per team where it matters, so the default four-per-team cap is
+        # not what refuses this, and $45,100 of a $60,000 cap.
+        want = ["QB0", "RB1", "RB2", "WR3", "WR4", "WR5", "TE6", "TE7", "D0"]
+        built = optimizer.optimize_lineups(
+            self._slate(), num_lineups=1, salary_cap=60000,
+            lock_players=want, max_usage_percentage=100)
+        assert self._names(built) == [set(want)]
+
+    # --- exclude ------------------------------------------------------------
+
+    def test_an_excluded_player_appears_nowhere(self):
+        pool = self._slate()
+        best = optimizer.optimize_lineups(pool, num_lineups=1)[0]
+        victim = best.loc[best["lineup_points"].idxmax(), "Nickname"]
+        built = optimizer.optimize_lineups(
+            pool, num_lineups=5, max_usage_percentage=100,
+            player_rules={victim: "exclude"})
+        assert not any(victim in names for names in self._names(built))
+
+    def test_exclude_and_a_zero_percent_rule_are_the_same_thing(self):
+        pool = self._slate()
+        a = optimizer.optimize_lineups(pool, num_lineups=3,
+                                       player_rules={"QB7": "exclude"})
+        b = optimizer.optimize_lineups(pool, num_lineups=3,
+                                       player_rules={"QB7": 0})
+        assert self._names(a) == self._names(b)
+
+    # --- an exposure percentage --------------------------------------------
+
+    @pytest.mark.parametrize("percent,expected", [(100, 10), (50, 5),
+                                                  (30, 3), (20, 2)])
+    def test_a_percentage_is_delivered_not_merely_capped(self, percent, expected):
+        """The point of typing 60 is to get 60. A cap alone would under-deliver."""
+        built = optimizer.optimize_lineups(
+            self._slate(), num_lineups=10, max_usage_percentage=100,
+            player_rules={"WR0": percent})
+        assert len(built) == 10
+        used = sum(1 for names in self._names(built) if "WR0" in names)
+        assert used == expected
+
+    def test_a_max_only_rule_is_a_cap_and_does_not_force_him_in(self):
+        built = optimizer.optimize_lineups(
+            self._slate(), num_lineups=10, max_usage_percentage=100,
+            player_rules={"WR0": {"max": 50}})
+        used = sum(1 for names in self._names(built) if "WR0" in names)
+        assert used == 0          # nothing wanted him; a ceiling cannot require
+
+    def test_a_cap_binds_on_a_player_the_builder_does_want(self):
+        pool = self._slate()
+        free = optimizer.optimize_lineups(pool, num_lineups=10,
+                                          max_usage_percentage=100)
+        hog = Counter(n for names in self._names(free) for n in names).most_common(1)[0][0]
+        built = optimizer.optimize_lineups(
+            pool, num_lineups=10, max_usage_percentage=100,
+            player_rules={hog: {"max": 30}})
+        used = sum(1 for names in self._names(built) if hog in names)
+        assert used <= 3
+
+    def test_a_per_player_rule_overrides_the_global_cap(self):
+        built = optimizer.optimize_lineups(
+            self._slate(), num_lineups=10, max_usage_percentage=20,
+            player_rules={"WR0": 100})
+        assert all("WR0" in names for names in self._names(built))
+
+    # --- the rules have to be readable back --------------------------------
+
+    def test_the_report_says_what_the_rules_did(self):
+        report = {}
+        optimizer.optimize_lineups(
+            self._slate(), num_lineups=10, max_usage_percentage=100,
+            player_rules={"WR0": 40}, report=report)
+        assert report["exposure"]["WR0"] == 40.0
+        assert report["rules_applied"]["WR0"] == {"min": 40.0, "max": 40.0}
+
+    # --- bad rules fail loudly ---------------------------------------------
+
+    def test_a_misspelled_name_is_refused_rather_than_ignored(self):
+        with pytest.raises(ValueError, match="not on this slate"):
+            optimizer.optimize_lineups(self._slate(), num_lineups=1,
+                                       lock_players=["Kenneth Walker III"])
+
+    def test_the_error_names_the_player_it_could_not_find(self):
+        with pytest.raises(ValueError, match="Ken Walkerr"):
+            optimizer.optimize_lineups(self._slate(), num_lineups=1,
+                                       player_rules={"Ken Walkerr": "lock"})
+
+    def test_locking_someone_the_slate_says_is_out_is_refused(self):
+        pool = self._slate()
+        pool.loc[pool["Nickname"] == "WR0", "Injury Indicator"] = "O"
+        with pytest.raises(ValueError, match="marked O on the slate"):
+            optimizer.optimize_lineups(pool, num_lineups=1, lock_players=["WR0"])
+
+    def test_more_locks_than_roster_slots_is_refused(self):
+        with pytest.raises(ValueError, match="locked into a 9-man roster"):
+            optimizer.optimize_lineups(
+                self._slate(), num_lineups=1,
+                lock_players=[f"WR{i}" for i in range(12)])
+
+    def test_locks_over_the_cap_say_what_they_cost(self):
+        with pytest.raises(ValueError, match=r"against a \$20,000 cap"):
+            optimizer.optimize_lineups(
+                self._slate(), num_lineups=1, salary_cap=20000,
+                lock_players=["QB7", "RB15", "WR21", "TE9"])
+
+    def test_two_players_needing_the_same_single_slot_is_refused(self):
+        with pytest.raises(ValueError, match="contradictory|no legal lineup"):
+            optimizer.optimize_lineups(self._slate(), num_lineups=1,
+                                       lock_players=["QB0", "QB1"])
+
+    def test_a_floor_above_its_own_ceiling_is_refused(self):
+        with pytest.raises(ValueError, match="above its"):
+            optimizer.optimize_lineups(
+                self._slate(), num_lineups=4,
+                player_rules={"WR0": {"min": 80, "max": 20}})
+
+    @pytest.mark.parametrize("bad", [-5, 101, "sometimes"])
+    def test_a_percentage_outside_0_to_100_is_refused(self, bad):
+        with pytest.raises(ValueError):
+            optimizer.normalize_player_rules({"WR0": bad})
+
+
+class TestRulesAreNotAboutNames:
+    """The pool is the one place a named player legitimately steers the build —
+    because the user typed his name. Nothing else may."""
+
+    def test_renaming_everyone_changes_the_same_lineups(self):
+        pool = TestThePlayerPool._slate()
+        alias = {n: f"z{i}" for i, n in enumerate(pool["Nickname"])}
+        renamed = pool.assign(Nickname=pool["Nickname"].map(alias))
+        a = optimizer.optimize_lineups(pool, num_lineups=3,
+                                       max_usage_percentage=100)
+        b = optimizer.optimize_lineups(renamed, num_lineups=3,
+                                       max_usage_percentage=100)
+        assert [[alias[n] for n in l["Nickname"]] for l in a] == \
+               [list(l["Nickname"]) for l in b]
+
+
+class TestItDoesNotReturnALineupTwice:
+    """45 entries held 31 distinct lineups in 2026 week 9. The builder is exact
+    and deterministic, so a second build with the same settings repeats the
+    first one unless it is told what has already gone in."""
+
+    def test_a_second_build_repeats_the_first_without_help(self):
+        pool = TestThePlayerPool._slate()
+        first = optimizer.optimize_lineups(pool, num_lineups=5,
+                                           max_usage_percentage=100)
+        again = optimizer.optimize_lineups(pool, num_lineups=5,
+                                           max_usage_percentage=100)
+        assert TestThePlayerPool._names(first) == TestThePlayerPool._names(again)
+
+    def test_told_what_is_entered_it_returns_different_lineups(self):
+        pool = TestThePlayerPool._slate()
+        first = optimizer.optimize_lineups(pool, num_lineups=5,
+                                           max_usage_percentage=100)
+        entered = [set(l["Nickname"]) for l in first]
+        second = optimizer.optimize_lineups(
+            pool, num_lineups=5, max_usage_percentage=100,
+            seen_lineups=entered)
+        assert len(second) == 5
+        for names in TestThePlayerPool._names(second):
+            assert names not in entered
+
+    def test_it_reports_how_many_it_skipped(self):
+        pool = TestThePlayerPool._slate()
+        first = optimizer.optimize_lineups(pool, num_lineups=3,
+                                           max_usage_percentage=100)
+        report = {}
+        with pytest.warns(RuntimeWarning, match="already entered"):
+            optimizer.optimize_lineups(
+                pool, num_lineups=3, max_usage_percentage=100,
+                seen_lineups=[set(l["Nickname"]) for l in first],
+                report=report)
+        assert report["duplicates_skipped"] >= 1
+
+    def test_pooled_exposure_counts_the_lineups_already_entered(self):
+        """Six builds each honoured a 46-49% cap and pooled to 55.6%."""
+        pool = TestThePlayerPool._slate()
+        first = optimizer.optimize_lineups(pool, num_lineups=5,
+                                           max_usage_percentage=100)
+        entered = [set(l["Nickname"]) for l in first]
+        hog = Counter(n for names in entered for n in names).most_common(1)[0][0]
+
+        loose = optimizer.optimize_lineups(
+            pool, num_lineups=5, max_usage_percentage=50, seen_lineups=entered)
+        pooled = optimizer.optimize_lineups(
+            pool, num_lineups=5, max_usage_percentage=50, seen_lineups=entered,
+            pool_exposure=True)
+
+        def share(built):
+            total = len(entered) + len(built)
+            used = sum(1 for names in entered if hog in names)
+            used += sum(1 for l in built if hog in set(l["Nickname"]))
+            return 100.0 * used / total
+
+        assert share(pooled) <= 50.0
+        assert share(pooled) <= share(loose)
+
+    def test_pooling_is_off_unless_asked_for(self):
+        pool = TestThePlayerPool._slate()
+        first = optimizer.optimize_lineups(pool, num_lineups=4,
+                                           max_usage_percentage=100)
+        report = {}
+        optimizer.optimize_lineups(
+            pool, num_lineups=4, max_usage_percentage=100,
+            seen_lineups=[set(l["Nickname"]) for l in first], report=report)
+        assert report["pooled_with"] == 0
