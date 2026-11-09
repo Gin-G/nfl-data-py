@@ -251,6 +251,21 @@ class TestAttachPlayerIds:
         assert ext.attach_player_ids(pd.DataFrame(), ["receiver"],
                                      self._roster()).empty
 
+    def test_the_id_column_is_identifiers_or_nothing(self):
+        """Pinned to object dtype, because the null is part of the contract.
+
+        Given a plain list of strings-and-Nones, pandas 3 infers its new `str`
+        dtype and converts the None to NaN -- so "no id for this name" became a
+        float on new pandas and stayed None on old, passing locally and failing
+        in CI. Asserting the dtype is what catches that on either version.
+        """
+        df = pd.DataFrame({"receiver": ["Justin Jefferson", "Zay Flowers"]})
+        out = ext.attach_player_ids(df, ["receiver"], self._roster())
+        assert out.receiver_id.dtype == object
+        assert out.receiver_match.dtype == object
+        assert out.receiver_id.iloc[0] is None
+        assert out.receiver_match.iloc[0] is None
+
 
 class TestNothingFetches:
     """The source's terms are personal use only, so the only way data arrives

@@ -516,6 +516,12 @@ def attach_player_ids(df: pd.DataFrame, columns, roster: pd.DataFrame | None = N
                     found, how = by_team.get((near[0], team)), "team_fuzzy"
             ids.append(found)
             hows.append(how if found is not None else None)
-        out[f"{name_col}_id"] = ids
-        out[f"{name_col}_match"] = hows
+        # dtype=object, explicitly. Handed a plain list of strings-and-Nones,
+        # pandas 3 infers its new `str` dtype and turns the None into NaN, so
+        # "no id for this name" stopped being `None` and started being a float
+        # — on the newer pandas only, which is how this passed locally and
+        # failed in CI. An id column is identifiers or nothing; object dtype
+        # says so and keeps the null the callers test for.
+        out[f"{name_col}_id"] = pd.Series(ids, index=out.index, dtype=object)
+        out[f"{name_col}_match"] = pd.Series(hows, index=out.index, dtype=object)
     return out
