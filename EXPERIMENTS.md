@@ -5893,3 +5893,87 @@ came back empty and that DEF is not a data gap but a slot that runs on
 FanDuel's own FPPG.
 
 709 → 754 tests in nfl_projections, 714 → 755 on NFL-API.
+
+## Consistency: scoring steadiness is not a property of a player (2026-11-09)
+
+Asked for "the most consistent players — lowest standard deviation from their
+mean". Measured, that request splits in two, and only one half of it exists.
+
+Method: split-half on odd weeks against even, per player, 2025 (210 players
+with 6+ games and a 5-point mean) and 2026 through week 9 (174). The MEAN is
+carried through every test as the yardstick — it is the thing known to be
+measurable, so it says what a good reliability looks like on this data.
+
+### Raw SD ranks the players who do not score
+
+SD correlates **+0.647** with the mean (spearman +0.683); `log(sd) = 0.78 +
+0.49 log(mean)`, r² 0.45. So the ten "most consistent" players of 2025 by
+lowest SD are:
+
+| player | mean | sd |
+|---|---|---|
+| Malik Washington | 5.2 | 3.14 |
+| Darius Slayton | 5.5 | 3.34 |
+| Isiah Pacheco | 6.0 | 3.38 |
+| Greg Dulcich | 5.5 | 3.38 |
+| T.J. Hockenson | 5.8 | 3.43 |
+
+Nobody would roster any of them. Their scores do not move because they do not
+score — the metric is measuring the absence of a role.
+
+### And the level-adjusted version is nil
+
+| split-half, 2025 | r | 95% CI |
+|---|---|---|
+| fantasy mean *(yardstick)* | **+0.643** | [+0.556, +0.716] |
+| fantasy sd | +0.111 | [-0.025, +0.243] |
+| fantasy cv | +0.235 | [+0.103, +0.359] |
+| fantasy sd, level controlled | **-0.047** | [-0.181, +0.089] |
+| fantasy cv, level controlled | +0.021 | [-0.114, +0.156] |
+
+2026 agrees: level-controlled CV **-0.096**, CI [-0.241, +0.054]. CV's bare
++0.235 is inherited from the mean (the two correlate -0.635), and vanishes the
+moment the level is partialled out of both halves. A player who scored steadily
+in one half is no more likely than anyone else to score steadily in the other.
+
+### Volume steadiness is real, and transmits — weakly
+
+| split-half, 2025 | r | 95% CI |
+|---|---|---|
+| opportunity mean | +0.943 | [+0.926, +0.957] |
+| opportunity sd | +0.734 | [+0.665, +0.791] |
+| opportunity sd, volume controlled | **+0.412** | [+0.293, +0.518] |
+| opportunity cv, volume controlled | +0.328 | [+0.201, +0.444] |
+
+and across the halves, **opportunity CV predicts next-half fantasy CV at
++0.231**, CI [+0.099, +0.355] (2026: +0.285, CI [+0.142, +0.416]). Steady usage
+buys some steadiness of scoring. It is the only route to it that measures.
+
+The in-season caveat is power, not contradiction: over 2026's nine weeks the
+volume-dispersion reliability falls to +0.070, CI [-0.080, +0.217]. Four or
+five games a half cannot measure a spread.
+
+### The best predictor of future consistency is the scoring level
+
+Against next-half fantasy CV: **fantasy mean -0.338** (2026: -0.317), past
+fantasy CV +0.235 (2026: +0.072), opportunity mean -0.237 (-0.298). The
+consistent player is mostly just the good player — which is the same shape as
+the quantile finding above, where the band turned out to be 2.1x the mean.
+
+### Shipped
+
+`nfl_projections.consistency` and `GET /dfs/consistency`, ranked on volume
+steadiness (`100 x (1 - the CV of opportunities per game)`) with a floor of 5
+opportunities a game, because a two-target role has a tiny spread and is not
+what anyone means. Scoring range, hit rates and the usage trend ride along as
+description; a test shakes the scoring hard without touching a carry and
+asserts the ranking does not move. The response states the reliabilities,
+including the one that says to read `games` before the rank.
+
+The chart is a scatter — opportunities per game against steadiness, bubble size
+points per game, one position at a time. One position because a quarterback
+sees ~38 opportunities a game and a receiver ~8, and because a scatter is an
+all-pairs form where four categorical hues cannot be separated safely. On first
+render the three direct labels overlapped into a smear (the top three by
+steadiness are clustered by construction); it labels the two extremes instead,
+which are far apart and are the points worth naming.
