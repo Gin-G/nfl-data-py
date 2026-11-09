@@ -63,6 +63,99 @@ correct. Dataset used: 2018–2025, 187,534 rows.
 - #6: median projection is as accurate as the mean model (4.15 ≈ 4.17); it adds
   a floor (q10) and ceiling (q90). Open items on it, tracked below.
 
+## Index
+
+Auto-generated from the `##` headings; regenerate with
+`python scripts/index_experiments.py` after adding an entry. **closed**
+marks an avenue measured and abandoned — read it before proposing the
+idea again.
+
+- [Findings](#findings)
+- [Calibration finding (#8)](#calibration-finding-8)
+- [Component-level finding (#10)](#component-level-finding-10)
+- [Wider band finding (#11)](#wider-band-finding-11)
+- [FPA / matchup — tested three ways, all negative (#4, #5, #12)](#fpa-matchup-tested-three-ways-all-negative-4-5-12) — **closed**
+- [Lineup backtest (#13)](#lineup-backtest-13)
+- [Roadmap item 1 — naive baselines, GBDT, multi-seed (2025 wk1-18)](#roadmap-item-1-naive-baselines-gbdt-multi-seed-2025-wk1-18) — **shipped**
+- [Roadmap follow-up — component-first models (the fair test)](#roadmap-follow-up-component-first-models-the-fair-test)
+- [Coaching / new-HC regime change (probe, 2025) — bias not MAE](#coaching-new-hc-regime-change-probe-2025-bias-not-mae)
+- [Coaching — do prior-job tendencies carry over? (foundation test)](#coaching-do-prior-job-tendencies-carry-over-foundation-test)
+- [Coaching — wk1 scheme prior applied (nfl_projections/coaching.py) — near-neutral](#coaching-wk1-scheme-prior-applied-nfl_projectionscoachingpy-near-neutral) — **shipped**
+- [Rookie draft-capital prior — foundation is STRONG (unlike coaching)](#rookie-draft-capital-prior-foundation-is-strong-unlike-coaching)
+- [Rookie draft-capital prior — BUILT & WINS (nfl_projections/rookies.py)](#rookie-draft-capital-prior-built-wins-nfl_projectionsrookiespy)
+- [Why opponent/matchup keeps failing — defense-vs-position is weak & unstable](#why-opponentmatchup-keeps-failing-defense-vs-position-is-weak-unstable)
+- [Player grades — opportunity-weighted, validated (nfl_projections/player_grades.py)](#player-grades-opportunity-weighted-validated-nfl_projectionsplayer_gradespy)
+- [Vegas implied team total — the definitive matchup test — WASH (not kept)](#vegas-implied-team-total-the-definitive-matchup-test-wash-not-kept) — **closed**
+- [Per-position models — shared model wins (last mean lever, closed)](#per-position-models-shared-model-wins-last-mean-lever-closed)
+- [Usage-based Monte-Carlo simulator (nfl_projections/simulate.py) — distributions + stacks](#usage-based-monte-carlo-simulator-nfl_projectionssimulatepy-distributions-stacks)
+- [#20-21 The preseason board finally has a benchmark — and it exposed a bad one (2026-08-11)](#20-21-the-preseason-board-finally-has-a-benchmark-and-it-exposed-a-bad-one-2026-08-11)
+- [#19 Snap share as the role multiplier — rejected, and the multiplier itself is suspect (2026-08-11)](#19-snap-share-as-the-role-multiplier-rejected-and-the-multiplier-itself-is-suspect-2026-08-11) — **shipped**
+- [#18 Thin-history gating — a negative result worth writing down (2026-08-11)](#18-thin-history-gating-a-negative-result-worth-writing-down-2026-08-11) — **closed**
+- [#17 Component stat lines shrink to the positional mean too (2026-08-10)](#17-component-stat-lines-shrink-to-the-positional-mean-too-2026-08-10) — **shipped**
+- [#14-16 Board ordering — the cap was normalizing teams, and MAE liked it (2026-08-10)](#14-16-board-ordering-the-cap-was-normalizing-teams-and-mae-liked-it-2026-08-10) — **shipped**
+- [Quantile bands — the "floor problem" was never fixable (2026-08-09)](#quantile-bands-the-floor-problem-was-never-fixable-2026-08-09) — **closed**
+- [QB separation — the board was flat for two independent reasons (2026-08-07)](#qb-separation-the-board-was-flat-for-two-independent-reasons-2026-08-07) — **shipped**
+- [Standardized training targets — fixes the broken component stat lines (2026-08-06)](#standardized-training-targets-fixes-the-broken-component-stat-lines-2026-08-06)
+- [Opportunity share vs trailing rate — week 1 2025 (2026-09-09)](#opportunity-share-vs-trailing-rate-week-1-2025-2026-09-09)
+- [Coverage matchup — a null result, and one narrow win (2026-09-09)](#coverage-matchup-a-null-result-and-one-narrow-win-2026-09-09) — **closed**
+- [Opponent-adjusted defence beats raw allowed-per-game (2026-09-09)](#opponent-adjusted-defence-beats-raw-allowed-per-game-2026-09-09) — **shipped**
+- [Granular defensive matchup, and the trait that is stable but inert (2026-09-11)](#granular-defensive-matchup-and-the-trait-that-is-stable-but-inert-2026-09-11) — **closed**
+- [Usage decomposition beats trailing rate — for tight ends and backs (2026-09-11)](#usage-decomposition-beats-trailing-rate-for-tight-ends-and-backs-2026-09-11)
+- [Next Gen Stats add nothing — and the near-miss is the lesson (2026-09-11)](#next-gen-stats-add-nothing-and-the-near-miss-is-the-lesson-2026-09-11) — **closed**
+- [FTN charting: the most stable traits measured here, and they add nothing (2026-09-11)](#ftn-charting-the-most-stable-traits-measured-here-and-they-add-nothing-2026-09-11)
+- [The gate: usage decomposition vs the PRODUCTION model (2026-09-11)](#the-gate-usage-decomposition-vs-the-production-model-2026-09-11) — **closed**
+- [Live week 1, 2026: the first prospective scorecard (2026-09-14)](#live-week-1-2026-the-first-prospective-scorecard-2026-09-14)
+- [The in-season path, run on 2026 for the first time (2026-09-14)](#the-in-season-path-run-on-2026-for-the-first-time-2026-09-14)
+- [Weeks 1 and 2, scored prospectively (2026-09-25)](#weeks-1-and-2-scored-prospectively-2026-09-25) — **shipped**
+- [Four weeks in, and the bias that should not be corrected (2026-10-05)](#four-weeks-in-and-the-bias-that-should-not-be-corrected-2026-10-05) — **shipped**
+- [Training on the current season alone (2026-10-05)](#training-on-the-current-season-alone-2026-10-05)
+- [How far back should training reach (2026-10-05)](#how-far-back-should-training-reach-2026-10-05) — **shipped**
+- [History depth, retrained every week (2026-10-07)](#history-depth-retrained-every-week-2026-10-07)
+- [The trench report: line play, rebuilt from public data (2026-10-14)](#the-trench-report-line-play-rebuilt-from-public-data-2026-10-14)
+- [Line ratings shipped, and which half of a matchup is real (2026-10-14)](#line-ratings-shipped-and-which-half-of-a-matchup-is-real-2026-10-14) — **shipped**
+- [Positional scarcity: replacement level, and a flat bar that cannot work (2026-10-14)](#positional-scarcity-replacement-level-and-a-flat-bar-that-cannot-work-2026-10-14)
+- [Blocking scheme: the most stable trait in this file, and it predicts nothing (2026-10-14)](#blocking-scheme-the-most-stable-trait-in-this-file-and-it-predicts-nothing-2026-10-14)
+- [Vacated share: the assumption held, and the gap was somewhere else (2026-10-14)](#vacated-share-the-assumption-held-and-the-gap-was-somewhere-else-2026-10-14)
+- [The starter is out, and the backup was being charged a backup's rate (2026-10-14)](#the-starter-is-out-and-the-backup-was-being-charged-a-backups-rate-2026-10-14)
+- [The mid-season mover, and two instruments that lie about him (2026-10-14)](#the-mid-season-mover-and-two-instruments-that-lie-about-him-2026-10-14) — **shipped**
+- [The promotion fix, scored the way the board is scored (2026-10-15)](#the-promotion-fix-scored-the-way-the-board-is-scored-2026-10-15) — **shipped**
+- [Charted line play: yards before contact, and the pressure field that exists (2026-10-15)](#charted-line-play-yards-before-contact-and-the-pressure-field-that-exists-2026-10-15) — **shipped**
+- [Blitz rate against quarterback output — and the two positions it actually moves (2026-10-15)](#blitz-rate-against-quarterback-output-and-the-two-positions-it-actually-moves-2026-10-15)
+- [Per-corner coverage grades: the yards are not a trait (2026-10-16)](#per-corner-coverage-grades-the-yards-are-not-a-trait-2026-10-16) — **closed**
+- [Opportunity share: the premise is right, the board already has it (2026-10-16)](#opportunity-share-the-premise-is-right-the-board-already-has-it-2026-10-16)
+- [Scoping the defense slot: it is matchup plus noise (2026-10-16)](#scoping-the-defense-slot-it-is-matchup-plus-noise-2026-10-16)
+- [The first scored lineups: the edge is real and it is in the top five (2026-10-20)](#the-first-scored-lineups-the-edge-is-real-and-it-is-in-the-top-five-2026-10-20)
+- [Week 7 lineups: the hits and the misses differ by one player, not by one shape (2026-10-26)](#week-7-lineups-the-hits-and-the-misses-differ-by-one-player-not-by-one-shape-2026-10-26)
+- [Why week 7's later builds were worse: it was a different board, not a fresher one (2026-10-26)](#why-week-7s-later-builds-were-worse-it-was-a-different-board-not-a-fresher-one-2026-10-26)
+- [Defenses: FanDuel's FPPG is worse than a flat average, and the pieces beat both (2026-10-26)](#defenses-fanduels-fppg-is-worse-than-a-flat-average-and-the-pieces-beat-both-2026-10-26) — **closed**
+- [The optimizer learns that nine players can be one bet (2026-10-26)](#the-optimizer-learns-that-nine-players-can-be-one-bet-2026-10-26)
+- [The field, and the players it has already written off (2026-10-28)](#the-field-and-the-players-it-has-already-written-off-2026-10-28)
+- [A lineup's shape is not a free parameter (2026-10-28)](#a-lineups-shape-is-not-a-free-parameter-2026-10-28)
+- [The starter comes back, and the fill-in keeps the job he lost (2026-10-28)](#the-starter-comes-back-and-the-fill-in-keeps-the-job-he-lost-2026-10-28) — **closed**
+- [Week 8 scored: the field was right, and so was the list we doubted (2026-11-02)](#week-8-scored-the-field-was-right-and-so-was-the-list-we-doubted-2026-11-02)
+- [The 147 the board agreed with and the optimizer would not buy (2026-11-02)](#the-147-the-board-agreed-with-and-the-optimizer-would-not-buy-2026-11-02)
+- [Correction: the ownership page is a vintage, and I scored the flag against the wrong one (2026-11-02)](#correction-the-ownership-page-is-a-vintage-and-i-scored-the-flag-against-the-wrong-one-2026-11-02)
+- [Cash and tournament builds, and the dial that cannot be set from two weeks (2026-11-02)](#cash-and-tournament-builds-and-the-dial-that-cannot-be-set-from-two-weeks-2026-11-02) — **closed**
+- [Coverage is answered; the trench effect gets a prospective record (2026-11-02)](#coverage-is-answered-the-trench-effect-gets-a-prospective-record-2026-11-02)
+- [A good matchup is a tiebreaker, not a reason to climb the board (2026-11-02)](#a-good-matchup-is-a-tiebreaker-not-a-reason-to-climb-the-board-2026-11-02)
+- [Asking the matchup question where the builder decides, and the split that eats it (2026-11-02)](#asking-the-matchup-question-where-the-builder-decides-and-the-split-that-eats-it-2026-11-02)
+- [Correction: it was not the split, and dollars per opportunity does not beat the board (2026-11-02)](#correction-it-was-not-the-split-and-dollars-per-opportunity-does-not-beat-the-board-2026-11-02) — **closed**
+- [The second-half fade for older backs is real, mostly priced, and Henry is the case (2026-11-02)](#the-second-half-fade-for-older-backs-is-real-mostly-priced-and-henry-is-the-case-2026-11-02)
+- [Boom/bust is real, it is volume, and it was mis-simulated](#boombust-is-real-it-is-volume-and-it-was-mis-simulated)
+- [Wind is the one unpriced situational factor worth buying data for](#wind-is-the-one-unpriced-situational-factor-worth-buying-data-for)
+- [A vetting layer, explicitly outside the objective](#a-vetting-layer-explicitly-outside-the-objective) — **closed**
+- [Backtest: one cash lineup a week against the 125 target](#backtest-one-cash-lineup-a-week-against-the-125-target) — **shipped**
+- [Fantasy points allowed, adjusted for who the defence has faced](#fantasy-points-allowed-adjusted-for-who-the-defence-has-faced) — **closed**
+- [Three reports of the same defence: do trenches, coverage and FPA agree?](#three-reports-of-the-same-defence-do-trenches-coverage-and-fpa-agree)
+- [Which lineup objective actually won: the record said floor, the record was wrong](#which-lineup-objective-actually-won-the-record-said-floor-the-record-was-wrong) — **closed**
+- [Did a day-stale roster table corrupt the week 9 board? No](#did-a-day-stale-roster-table-corrupt-the-week-9-board-no)
+- [The Tuesday projection run is structurally blind to injuries](#the-tuesday-projection-run-is-structurally-blind-to-injuries)
+- [FantasyGuru snapshots: storage, a shell mix, and a gate (2026-11-04)](#fantasyguru-snapshots-storage-a-shell-mix-and-a-gate-2026-11-04) — **closed**
+- [Reading a published DFS column against our own board (2026-11-06)](#reading-a-published-dfs-column-against-our-own-board-2026-11-06)
+- [Week 9 scored: why 45 lineups all landed in the same place (2026-11-09)](#week-9-scored-why-45-lineups-all-landed-in-the-same-place-2026-11-09)
+- [Negative result: a player's own high and low make a worse band than the model's (2026-11-09)](#negative-result-a-players-own-high-and-low-make-a-worse-band-than-the-models-2026-11-09) — **closed**
+- [Consistency: scoring steadiness is not a property of a player (2026-11-09)](#consistency-scoring-steadiness-is-not-a-property-of-a-player-2026-11-09) — **closed**
+
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
   In fantasy, variance scales with scoring level (a 20-pt player has more room to
