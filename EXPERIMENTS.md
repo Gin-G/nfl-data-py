@@ -157,6 +157,7 @@ idea again.
 - [Consistency: scoring steadiness is not a property of a player (2026-11-09)](#consistency-scoring-steadiness-is-not-a-property-of-a-player-2026-11-09) — **closed**
 - [A read of all three repos: three production readings, and the record learns about depth (2026-11-10)](#a-read-of-all-three-repos-three-production-readings-and-the-record-learns-about-depth-2026-11-10)
 - [A usage trend is half real: what the game after an "up" or "down" looks like (2026-11-11)](#a-usage-trend-is-half-real-what-the-game-after-an-up-or-down-looks-like-2026-11-11)
+- [Lineup depth: the top of a cash build is worth about ten points, and shrinking toward form is not (2026-11-12)](#lineup-depth-the-top-of-a-cash-build-is-worth-about-ten-points-and-shrinking-toward-form-is-not-2026-11-12)
 
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
@@ -6230,3 +6231,110 @@ one season, nine weeks, overlapping windows per player, so the standard
 errors above are optimistic.
 
 789 tests on NFL-API, 33 on NickKnows.
+
+## Lineup depth: the top of a cash build is worth about ten points, and shrinking toward form is not (2026-11-12)
+
+Two tests from the review's plan, kill rules written into each harness before
+it ran. Harnesses: `experiments/lineup_depth.py`, `experiments/selection_tax.py`.
+
+**Setup shared by both.** Five backtest seasons, 2021-2025 weeks 4-18, on the
+cached leakage-free boards (`evaluate.backtest`, 1 seed, 60 epochs, trained on
+prior seasons), plus the four real 2026 slates (weeks 6-9) from production's
+`/optimizer/pool`, scored on nflverse weekly stats. Backtest salaries are a
+proxy: each position's real 2026 salary regressed on FPPG (r 0.81-0.86),
+applied to the player's season-to-date average. The cash preset builds 25
+lineups of the eight skill slots under $56,000, since the backtest board holds
+no defenses.
+
+Two caveats on the backtest arm, both in the direction of flattering it: its
+board only holds players who recorded a stat line, so nobody in the pool is
+inactive; and a proxy price carries none of FanDuel's own information, so the
+board's edge over the price is larger than on a real slate (in-build rank
+correlation 0.29-0.35 here, 0.09-0.18 on the real slates).
+
+### Trap found first: the 2021-2024 boards carry duplicate rows
+
+About 1,150 player-weeks a season appear twice, as exact copies (the
+dataset's depth-chart merge, noted under "Training on the current season
+alone"). 2025's board is clean. Left in, the builder can put one player in two
+flex slots, and season-to-date averages count his games twice. Both harnesses
+drop them; every number below is after the fix. Anything else built on those
+cached boards should do the same.
+
+### Depth: passes on the backtest, unconfirmed on real slates
+
+Weekly mean of a build's top five against its lineups ranked 11-25, ranked by
+the builder's own projected total:
+
+| cash aggression (usage cap) | weeks | gap | 95% CI | weeks top ahead |
+|---|--:|--:|---|--:|
+| 0 (60%) | 75 | +10.96 | [+7.25, +14.66] | 57 |
+| 50 (80%) | 75 | +10.39 | [+8.22, +12.55] | 66 |
+| 100 (100%) | 75 | +9.42 | [+7.40, +11.45] | 66 |
+| 2026 real slates, aggression 50 | 4 | +1.52 | [-6.98, +10.01] | 3 |
+
+By band at aggression 50, backtest: top 1 118.4, top 5 116.4, ranks 6-10
+112.4, ranks 11-25 106.0. The drop is past rank ten. Every season is positive
+at aggression 50 (2022 the weakest, +5.7). The kill rule (gap under 5, or
+ahead in fewer than two thirds of weeks) is cleared at every aggression.
+
+The real slates do not confirm it: four weeks, ranks 6-10 actually above the
+top five (99.6 against 96.5). Four weeks cannot separate +10 from 0, and the
+rank correlation there is a third of the backtest's, which is the proxy-salary
+caveat showing. The production record of the lineups actually entered points
+the other way: `/optimizer/performance` `depth`, the week's builds deep enough
+to have a rank 11, reads +60.4 (week 6), +23.0 (week 7), +14.1 (week 8). Those
+builds mixed objectives and settings, so they are corroboration, not a test.
+
+**Reading.** For cash, the lineups past the first ten have cost about ten
+points each in five seasons of backtest. So entering a duplicate of an early
+lineup beats entering lineup 20 on expected score. The default dedupe
+(2026-11-09) is right for a tournament and works against this in cash.
+**No default changed**; the real-slate arm needs more weeks, and the `depth`
+block now accrues it every week.
+
+### Selection tax: real, and shrinking toward trailing form does not pay
+
+The tax itself, on the backtest cash builds: the board's total for the chosen
+eight beats what they scored by **+18.4 points a lineup**. Maximising a noisy
+estimate picks the players whose noise ran positive; this is the size of it.
+
+Slope stage, (actual - board) on (trailing-5 - board), players projected 8+,
+CI clustered by week:
+
+| | n | slope | 95% CI |
+|---|--:|--:|---|
+| 2026 live record | 758 | +0.285 | [-0.213, +0.784] |
+| backtest 2021-2025 | 8,423 | +0.087 | [+0.005, +0.168] |
+| by season | | +0.12, +0.03, +0.02, +0.22, -0.04 | |
+
+The backtest scrapes past zero; three of five seasons straddle it. (Before the
+duplicates were dropped it read +0.208, a measure of what they were doing.)
+
+Payment stage: w fitted leaving one season out (0.05-0.10), applied to the 8+
+players only.
+
+| | board | adjusted | paired | 95% CI |
+|---|--:|--:|--:|---|
+| per-player MAE | 6.416 | 6.418 | +0.002 | [-0.003, +0.007] |
+| top-5 lineup actual | 116.38 | 114.72 | **-1.66** | [-2.83, -0.49] |
+| all 25 lineups | 109.35 | 109.33 | -0.02 | [-0.83, +0.79] |
+
+**Killed.** The kill rule asked for +3 a lineup; the adjustment costs 1.7, and
+the interval excludes zero on the wrong side. The board's form blend
+(`blend.py`) already holds the weight trailing form deserves, and more of it
+only reshuffles the near-ties toward worse ones. The tax is real and the
+cure is not this; the cheap defence against it is not reading a lineup's
+projected total as its expected score.
+
+### Found on the way: production scores two FanDuel rules differently
+
+`NFL-API/app/api/utils.py` `fanduel_points` charges -2 for every fumble and
+pays nothing for a two-point conversion. FanDuel charges only fumbles lost and
+pays +2 for a two-point conversion. On 2026 weeks 1-9, 151 of 2,872 scored
+player-weeks differ by +2 and 15 by more, against nflverse scored through
+`nfl_projections.opportunity._points`, which uses FanDuel's rules. The
+training target (`dataset.py`) uses production's rule, so the system is
+internally consistent and differs from the site; `opportunity._points` is the
+odd one out inside the package. Changing it moves the training target and
+every frozen accuracy and lineup record, so it is noted, not changed.
