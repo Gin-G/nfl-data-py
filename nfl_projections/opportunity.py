@@ -109,29 +109,9 @@ def _volume(d: pd.DataFrame) -> pd.DataFrame:
 
 def _points(d: pd.DataFrame) -> pd.Series:
     """FanDuel points per player-week, from the same scoring the board uses."""
-    from .scoring import fanduel_points
+    from .scoring import fanduel_points_from_stats
 
-    def col(name):
-        # `d.get(name)` returns None for a column that is not there, and
-        # `pd.to_numeric(None)` is a scalar nan rather than a Series -- so the
-        # convenient form breaks on any frame missing one of these, which real
-        # nflverse frames are (the 2pt and fumble columns come and go).
-        if name not in d.columns:
-            return pd.Series(0.0, index=d.index)
-        return pd.to_numeric(d[name], errors="coerce").fillna(0.0)
-
-    return fanduel_points(
-        passing_yards=col("passing_yards"), passing_tds=col("passing_tds"),
-        interceptions=col("passing_interceptions"),
-        rushing_yards=col("rushing_yards"), rushing_tds=col("rushing_tds"),
-        receptions=col("receptions"), receiving_yards=col("receiving_yards"),
-        receiving_tds=col("receiving_tds"),
-        fumbles=(col("rushing_fumbles_lost") + col("receiving_fumbles_lost")
-                 + col("sack_fumbles_lost")),
-        two_point_conversions=(col("passing_2pt_conversions")
-                               + col("rushing_2pt_conversions")
-                               + col("receiving_2pt_conversions")),
-    )
+    return fanduel_points_from_stats(d)
 
 
 def opportunity_context(season: int, week: int, weekly: pd.DataFrame | None = None,

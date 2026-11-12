@@ -55,7 +55,7 @@ import numpy as np
 import pandas as pd
 
 from .ratings import to_grade
-from .scoring import fanduel_points
+from .scoring import fanduel_points_from_stats
 
 logger = logging.getLogger(__name__)
 
@@ -107,19 +107,9 @@ def _points(weekly: pd.DataFrame) -> pd.Series:
     for col in ("fanduel_points", "fd", "actual"):
         if col in weekly.columns:
             return pd.to_numeric(weekly[col], errors="coerce")
-    fumbles = (_num(weekly, "rushing_fumbles_lost")
-               + _num(weekly, "receiving_fumbles_lost"))
-    return pd.Series(fanduel_points(
-        passing_yards=_num(weekly, "passing_yards"),
-        passing_tds=_num(weekly, "passing_tds"),
-        interceptions=_num(weekly, "passing_interceptions", "interceptions"),
-        rushing_yards=_num(weekly, "rushing_yards"),
-        rushing_tds=_num(weekly, "rushing_tds"),
-        receptions=_num(weekly, "receptions"),
-        receiving_yards=_num(weekly, "receiving_yards"),
-        receiving_tds=_num(weekly, "receiving_tds"),
-        fumbles=fumbles,
-    ), index=weekly.index)
+    # Lost fumbles and two-point conversions, as FanDuel scores them. This
+    # used to skip conversions and sack fumbles.
+    return fanduel_points_from_stats(weekly)
 
 
 def deltas(weekly: pd.DataFrame, *, min_prior_games=MIN_PRIOR_GAMES) -> pd.DataFrame:

@@ -158,6 +158,7 @@ idea again.
 - [A read of all three repos: three production readings, and the record learns about depth (2026-11-10)](#a-read-of-all-three-repos-three-production-readings-and-the-record-learns-about-depth-2026-11-10)
 - [A usage trend is half real: what the game after an "up" or "down" looks like (2026-11-11)](#a-usage-trend-is-half-real-what-the-game-after-an-up-or-down-looks-like-2026-11-11)
 - [Lineup depth: the top of a cash build is worth about ten points, and shrinking toward form is not (2026-11-12)](#lineup-depth-the-top-of-a-cash-build-is-worth-about-ten-points-and-shrinking-toward-form-is-not-2026-11-12)
+- [FanDuel scoring corrected: lost fumbles and two-point conversions (2026-11-12)](#fanduel-scoring-corrected-lost-fumbles-and-two-point-conversions-2026-11-12)
 
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
@@ -6338,3 +6339,53 @@ training target (`dataset.py`) uses production's rule, so the system is
 internally consistent and differs from the site; `opportunity._points` is the
 odd one out inside the package. Changing it moves the training target and
 every frozen accuracy and lineup record, so it is noted, not changed.
+
+## FanDuel scoring corrected: lost fumbles and two-point conversions (2026-11-12)
+
+Fixed, on the user's instruction, after the depth entry above found it.
+FanDuel charges -2 for a fumble **lost** and pays +2 for a two-point
+conversion. The training target (`dataset.py`) and production's scorer
+(`NFL-API api/utils.fanduel_points`) charged every fumble and paid nothing for
+a conversion; inside the package `opportunity` and `scarcity` had it right and
+`fpa` charged lost fumbles but skipped sack fumbles and conversions. Four
+versions of one rule.
+
+Now there is one: `scoring.fanduel_points_from_stats`, used by the training
+target, `opportunity`, `scarcity` and `fpa`. NFL-API mirrors it, and a test
+there scores one row both ways and requires them to agree. Neither side falls
+back to the all-fumbles columns when the lost ones are missing, since that
+would restore the old rule without saying so.
+
+**What moved in the training target**, 68,486 skill-position rows of the
+local dataset:
+
+| | rows changed | mean shift | share of rows |
+|---|--:|--:|--:|
+| all | 5,230 | +0.102 | 7.6% |
+| QB | | **+0.607** | **31.3%** |
+| RB | | +0.075 | 6.9% |
+| WR | | +0.039 | 4.5% |
+| TE | | +0.042 | 4.3% |
+
+Where a row moves it moves by 1.5 points on average, almost all +2 (a
+recovered fumble no longer charged, or a conversion paid) and +4. The handful
+of ±0.1-0.2 differences are nflverse stat revisions since the CSV was built,
+not the rule. Quarterbacks carry most of it: sack fumbles their team recovers
+and two-point throws. Not a model change to A/B: a correction of what the
+model is asked to predict, like #1's interception column. The production
+model picks it up the next time it trains rather than reusing the cache,
+which is the first run after week 10's games.
+
+**The frozen records.** The rule is stamped on every row now
+(`scoring_rule`, `api.utils.SCORING_RULE`). The daily accuracy and lineup jobs
+re-score anything stamped with an older rule or none, and they re-score the
+**actual** side only: actual points, error, band, the naive baseline and the
+lineup baselines. Frozen projections are never touched, which is the promise
+the frozen tables exist to keep. On 2026 weeks 1-9, 166 of 2,872 scored
+player-weeks change, 151 of them by +2. The shadow-model grade reads those
+same rows, so it follows. The projection scorer's old `--rescore` deletes and
+rebuilds rows from current projections and is still not the tool for this.
+
+Not changed: return touchdowns. FanDuel pays a skill player's kick, punt or
+fumble-recovery return TD, and no scorer here counts `special_teams_tds`. It
+is rare at these positions and was not part of this fix.

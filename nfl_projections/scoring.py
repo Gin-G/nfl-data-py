@@ -53,3 +53,40 @@ def fanduel_points(
     if points.ndim == 0:
         return float(points)
     return points
+
+
+def fanduel_points_from_stats(stats, scoring=None):
+    """FanDuel points for every row of an nflverse weekly stats frame.
+
+    The one place that decides which nflverse columns a FanDuel rule reads, so
+    the training target, the accuracy record and every report score the same
+    way. FanDuel charges -2 for a fumble LOST (rushing, receiving and sack) and
+    pays +2 for a two-point conversion (passing, rushing or receiving). Until
+    2026-11-12 the training target charged every fumble and paid nothing for a
+    conversion, while three other modules each had their own version.
+
+    Only the lost-fumble columns are read: falling back to the all-fumbles
+    ones when they are absent would quietly restore the old rule. A missing
+    column counts as zero. Returns a float Series on the frame's index.
+    """
+    import pandas as pd
+
+    def col(*names):
+        for name in names:
+            if name in stats.columns:
+                return pd.to_numeric(stats[name], errors="coerce").fillna(0.0)
+        return pd.Series(0.0, index=stats.index)
+
+    return pd.Series(fanduel_points(
+        passing_yards=col("passing_yards"), passing_tds=col("passing_tds"),
+        interceptions=col("passing_interceptions", "interceptions"),
+        rushing_yards=col("rushing_yards"), rushing_tds=col("rushing_tds"),
+        receptions=col("receptions"), receiving_yards=col("receiving_yards"),
+        receiving_tds=col("receiving_tds"),
+        fumbles=(col("rushing_fumbles_lost") + col("receiving_fumbles_lost")
+                 + col("sack_fumbles_lost")),
+        two_point_conversions=(col("passing_2pt_conversions")
+                               + col("rushing_2pt_conversions")
+                               + col("receiving_2pt_conversions")),
+        scoring=scoring,
+    ), index=stats.index, dtype=float)

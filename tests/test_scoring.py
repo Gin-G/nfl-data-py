@@ -45,3 +45,56 @@ def test_full_stat_line():
     assert fanduel_points(
         passing_yards=320, passing_tds=3, interceptions=1, rushing_yards=25
     ) == expected
+
+
+# ── fanduel_points_from_stats: the one rule every module scores nflverse by ──
+
+def _frame(**cols):
+    import pandas as pd
+    return pd.DataFrame({k: [v] for k, v in cols.items()})
+
+
+def test_from_stats_charges_lost_fumbles_only():
+    from nfl_projections.scoring import fanduel_points_from_stats
+    kept = _frame(rushing_yards=50, rushing_fumbles=1, rushing_fumbles_lost=0)
+    lost = _frame(rushing_yards=50, rushing_fumbles=1, rushing_fumbles_lost=1)
+    sack = _frame(sack_fumbles=1, sack_fumbles_lost=1)
+    assert fanduel_points_from_stats(kept).iloc[0] == 5.0
+    assert fanduel_points_from_stats(lost).iloc[0] == 3.0
+    assert fanduel_points_from_stats(sack).iloc[0] == -2.0
+
+
+def test_from_stats_never_falls_back_to_all_fumbles():
+    """Without the lost columns a fumble costs nothing: falling back to the
+    all-fumbles columns would quietly bring the old rule back."""
+    from nfl_projections.scoring import fanduel_points_from_stats
+    assert fanduel_points_from_stats(_frame(rushing_yards=50, rushing_fumbles=2)).iloc[0] == 5.0
+
+
+def test_from_stats_pays_two_point_conversions():
+    from nfl_projections.scoring import fanduel_points_from_stats
+    for col in ("passing_2pt_conversions", "rushing_2pt_conversions",
+                "receiving_2pt_conversions"):
+        assert fanduel_points_from_stats(_frame(**{col: 1})).iloc[0] == 2.0
+
+
+def test_from_stats_reads_either_interception_name_and_survives_nan():
+    from nfl_projections.scoring import fanduel_points_from_stats
+    assert fanduel_points_from_stats(_frame(passing_interceptions=2)).iloc[0] == -2.0
+    assert fanduel_points_from_stats(_frame(interceptions=2)).iloc[0] == -2.0
+    assert fanduel_points_from_stats(_frame(passing_yards=float("nan"), rushing_tds=1)).iloc[0] == 6.0
+
+
+def test_every_module_scores_the_same_way():
+    """The training target, opportunity, FPA and scarcity used to disagree."""
+    import pandas as pd
+    from nfl_projections import fpa, opportunity
+    from nfl_projections.scoring import fanduel_points_from_stats
+    row = _frame(passing_yards=312, passing_tds=2, passing_interceptions=1,
+                 rushing_yards=104, rushing_tds=1, receptions=3, receiving_yards=22,
+                 rushing_fumbles=2, rushing_fumbles_lost=1, sack_fumbles_lost=1,
+                 passing_2pt_conversions=1)
+    want = fanduel_points_from_stats(row).iloc[0]
+    assert opportunity._points(row).iloc[0] == want
+    assert fpa._points(row).iloc[0] == want
+    assert isinstance(fanduel_points_from_stats(row), pd.Series)

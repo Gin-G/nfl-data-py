@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from . import config
-from .scoring import fanduel_points
+from .scoring import fanduel_points_from_stats
 from .utils import to_pandas
 
 logger = logging.getLogger(__name__)
@@ -257,21 +257,9 @@ def build_dataset(seasons=None, output_path=config.DATASET_PATH):
         df[col] = df[col].clip(0, 100)
 
     print("Calculating FanDuel fantasy points...")
-    fumbles = sum(
-        df[col].fillna(0) if col in df.columns else 0
-        for col in ["rushing_fumbles", "receiving_fumbles", "sack_fumbles"]
-    )
-    df["fanduel_fantasy_points"] = fanduel_points(
-        passing_yards=df.get("passing_yards", 0),
-        passing_tds=df.get("passing_tds", 0),
-        interceptions=df.get("passing_interceptions", 0),
-        rushing_yards=df.get("rushing_yards", 0),
-        rushing_tds=df.get("rushing_tds", 0),
-        receptions=df.get("receptions", 0),
-        receiving_yards=df.get("receiving_yards", 0),
-        receiving_tds=df.get("receiving_tds", 0),
-        fumbles=fumbles,
-    )
+    # FanDuel's rule: fumbles LOST, plus two-point conversions. The target
+    # used to charge every fumble and pay nothing for a conversion.
+    df["fanduel_fantasy_points"] = fanduel_points_from_stats(df)
 
     print("Adding season averages...")
     df = add_season_averages(df)

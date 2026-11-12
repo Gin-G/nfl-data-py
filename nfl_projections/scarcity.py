@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 
 from . import config
-from .scoring import fanduel_points
+from .scoring import fanduel_points_from_stats
 from .utils import to_pandas
 
 logger = logging.getLogger(__name__)
@@ -68,19 +68,7 @@ def weekly_points(seasons=None, *, scoring=None) -> pd.DataFrame:
     stats, loaded = load_through_latest(nfl.load_player_stats, seasons, "player stats")
     d = stats[stats.get("season_type", "REG") == "REG"].copy()
     d = d[d.position.isin(POSITIONS) & d.player_id.notna()]
-    d["points"] = fanduel_points(
-        passing_yards=d.get("passing_yards", 0), passing_tds=d.get("passing_tds", 0),
-        interceptions=d.get("passing_interceptions", 0),
-        rushing_yards=d.get("rushing_yards", 0), rushing_tds=d.get("rushing_tds", 0),
-        receptions=d.get("receptions", 0), receiving_yards=d.get("receiving_yards", 0),
-        receiving_tds=d.get("receiving_tds", 0),
-        fumbles=(d.get("rushing_fumbles_lost", 0).fillna(0)
-                 + d.get("receiving_fumbles_lost", 0).fillna(0)
-                 + d.get("sack_fumbles_lost", 0).fillna(0)),
-        two_point_conversions=(d.get("passing_2pt_conversions", 0).fillna(0)
-                               + d.get("rushing_2pt_conversions", 0).fillna(0)
-                               + d.get("receiving_2pt_conversions", 0).fillna(0)),
-        scoring=scoring)
+    d["points"] = fanduel_points_from_stats(d, scoring=scoring)
     name = d.player_display_name if "player_display_name" in d else d.player_name
     out = pd.DataFrame({"season": d.season, "week": d.week, "player_id": d.player_id,
                         "player_name": name, "position": d.position,
