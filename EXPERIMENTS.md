@@ -155,6 +155,8 @@ idea again.
 - [Week 9 scored: why 45 lineups all landed in the same place (2026-11-09)](#week-9-scored-why-45-lineups-all-landed-in-the-same-place-2026-11-09)
 - [Negative result: a player's own high and low make a worse band than the model's (2026-11-09)](#negative-result-a-players-own-high-and-low-make-a-worse-band-than-the-models-2026-11-09) — **closed**
 - [Consistency: scoring steadiness is not a property of a player (2026-11-09)](#consistency-scoring-steadiness-is-not-a-property-of-a-player-2026-11-09) — **closed**
+- [A read of all three repos: three production readings, and the record learns about depth (2026-11-10)](#a-read-of-all-three-repos-three-production-readings-and-the-record-learns-about-depth-2026-11-10)
+- [A usage trend is half real: what the game after an "up" or "down" looks like (2026-11-11)](#a-usage-trend-is-half-real-what-the-game-after-an-up-or-down-looks-like-2026-11-11)
 
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
@@ -6070,3 +6072,161 @@ all-pairs form where four categorical hues cannot be separated safely. On first
 render the three direct labels overlapped into a smear (the top three by
 steadiness are clustered by construction); it labels the two extremes instead,
 which are far apart and are the points worth naming.
+
+## A read of all three repos: three production readings, and the record learns about depth (2026-11-10)
+
+A review pass, not an experiment. Three things read off production through the
+public API that change what the notes above assume, and one instrument fixed.
+Nothing here touches the board.
+
+### The weekend refresh had never run
+
+`NFL-API/k8s/projections-refresh-cronjob.yaml` (commit c860255, 2026-10-28)
+schedules Fri/Sat/Sun runs for exactly the gap "The Tuesday projection run is
+structurally blind to injuries" describes. On 2026-11-09 `GET
+/projections/refresh` gave `last_run_at` 2026-11-05T04:32Z — the Wednesday run
+— and `/projections/runs` held one row for week 9, `players_zeroed` 106 =
+`ir_players` 106. A full Friday, Saturday and Sunday had passed. `k8s/` is
+applied by hand and ArgoCD syncs only the chart, so the manifest was a file,
+not a job. Whether it was never applied or applied and failing cannot be told
+over HTTPS; either way no late-week board existed for week 9, and the entries
+of 2026-11-03 and 2026-11-06 that call the cron "Tuesday and Wednesday only"
+were describing production correctly and the repo incorrectly.
+
+Moved into `helm/nfl-api/templates/` under the same object name, so it deploys
+on sync and adopts the hand-applied copy if there is one. **Not yet verified
+live** — that needs a push and then a Friday.
+
+What it should be worth is already measured, in "The promotion fix, scored the
+way the board is scored": re-ranking on a known absence is +6.10% [+4.49%,
++7.74%] on the promoted and takes a QB2's error from 9.709 to 6.418. That same
+entry found a practice-only trigger scores 4.0095 against the designation's
+4.0084, so the participation-graded discount floated on 2026-11-06 buys
+nothing once a run sees the designation. Dropped as a candidate.
+
+The test, weeks 10-13: the Wednesday board against the Sunday 06:00 board, on
+players whose projection moved 2+ points, a scratched player scored as 0 (the
+standing scorer drops him, which hides half the effect). Expect ~80 rows;
+that detects about 1.1 points of paired MAE. Under 0.5 with an interval
+covering zero, cut it back to one Saturday run.
+
+### The training window is a tie, prospectively
+
+`GET /projections/shadow/accuracy`, weeks 5-9, identical player-weeks:
+
+| | n | live (2026 only) | shadow (2020+) | delta |
+|---|--:|--:|--:|--:|
+| pooled | 1,529 | 3.979 | 3.975 | −0.004 |
+| by week | | | | +0.032, +0.001, −0.022, +0.021, −0.056 |
+
+Three weeks one way and two the other, pooled inside a hundredth. The backtest
+cost of +0.068 to +0.097 (#26) has not shown up in five live weeks. Five weeks
+is not many, but the sign flips are the #28 shape again. Nothing to change.
+
+### The DEF slot is not on FPPG
+
+`_attach_defense` joins `defense.project` onto the slate and week 9's exposure
+shows New Orleans `from_model: true`. The board still holds no DEF rows, which
+is what `/dfs/targets` reports; the optimizer's slot is a separate path and has
+been on the component model since it shipped. CLAUDE.md said otherwise and is
+corrected.
+
+### A selection tax, derived rather than measured
+
+Mean-objective builds, season to date: 67 lineups projected 100.45 and scored
+102.41. The board runs 1.38 low per scored player (it is a median), so nine
+unselected players would beat their total by about 12; these beat it by 2.
+That puts the cost of choosing on a noisy estimate near **10 points a
+lineup**, consistent in sign with week 9's +2.45 on the chosen thirty. It is
+arithmetic on two aggregates with different populations (the −1.38 includes
+players no lineup would hold, and is −1.02 above 12 projected), so it is an
+order of magnitude and not a number to fit anything to.
+
+The test that would make it one: the residual test on players projected 8+,
+candidate = trailing-5 minus board, both already frozen per row in
+`projection_accuracy` (~2,800 rows). A slope interval covering zero ends it.
+`blend.py` found the form-weight curve flat board-wide, so the prior is under
+even; the claim is only about the selected tail.
+
+### Shipped: `/optimizer/performance` stops confusing depth with objective
+
+The defects named on 2026-11-03 and 2026-11-09, both still live when read:
+`projected 217.32, actual 87.24, error 130.08` for week 9, and a verdict of
+"floor best, ceiling worst" resting on pooled builds of unequal size.
+
+- `projected_scale` names the objective a total is a sum of ("mixed" when a
+  bucket holds several), and `error` is only drawn for mean builds.
+- `matched_depth`: objectives compared inside one (week, contest, lineups
+  requested) cell, every build cut to the shallowest build's scored count, an
+  objective built twice counted once. This is the table that had to be
+  computed by hand on 2026-11-03.
+- `depth`: each build's top five against its lineups ranked eleventh and
+  below, averaged within a week so a week is one observation.
+- the pooled verdict stays and says `basis: "pooled"`.
+
+`depth` is the instrument for the open question the last four weeks keep
+circling. Week 7 at one vintage read 111.8 against 84.0 (mean), 149.7 against
+71.8 (ceiling), 114.9 against 101.0 (floor) — top five against ranks 11-25,
+from the table in that entry — while week 8's commit build lost to its hedge
+(88.9 against 106.9) and week 9's single best lineup scored 79.74 under a
+portfolio mean of 87.24. If the gap is real, then in a cash contest a
+duplicate of lineup 2 is a better entry than lineup 30, and deduping by
+default (shipped 2026-11-09) is right for a tournament and wrong for cash.
+**No default was changed on this.** The offline version is the test: the cash
+preset at 25 lineups over 2025 weeks 4-18 on proxy salaries (#13's harness)
+plus the saved 2026 slates, weekly top-5 minus ranks 11-25, clustered by week.
+Under 5 points, or ahead in fewer than 13 of ~19 weeks, and the spread stays.
+
+766 → 774 tests on NFL-API.
+
+## A usage trend is half real: what the game after an "up" or "down" looks like (2026-11-11)
+
+Built for a chart, not for the board: NFL-API `GET /opportunities/weekly/` and
+the NickKnows page `/NFL/Opportunities/Trends` draw each player's
+opportunities, targets and rush attempts by week and call a direction. The
+call is his last three games against the games before them, in looks a game,
+and it is `up` or `down` only when the change clears both a minimum (2.0
+opportunities, 1.5 targets or carries) and the standard error of that
+difference from his own games. Under five games there is no call, and if the
+last three games reach back more than five weeks — across an absence — the
+call is withheld as `interrupted`.
+
+On 2026 weeks 1-9, 295 players at 3+ opportunities a game: 38 up, 34 down,
+121 steady, 77 too few games, 25 interrupted. The old percent-change trend in
+the same file calls a one-target player going to three "+200%"; this one
+mostly says steady, which is the point.
+
+### Does a called trend carry into the next game?
+
+Walk-forward inside the season: call the direction on a player's games before
+game *t* (t from his sixth), then read game *t*. Run before the `interrupted`
+rule was added, so absences are in it.
+
+| metric | call | n | called change | next game vs his earlier average | next game vs his season average |
+|---|---|--:|--:|--:|--:|
+| opportunities | up | 119 | +4.42 | **+2.31** | +0.04 ± 0.39 |
+| opportunities | down | 65 | −4.25 | **−2.53** | −0.39 ± 0.58 |
+| opportunities | steady | 363 | +0.25 | +0.28 | +0.14 ± 0.20 |
+| targets | up | 95 | +3.14 | +1.59 | −0.05 ± 0.27 |
+| targets | down | 61 | −3.00 | −1.23 | +0.30 ± 0.36 |
+| carries | up | 54 | +5.13 | +3.95 | +1.44 ± 0.78 |
+| carries | down | 37 | −4.74 | −3.60 | −1.24 ± 0.86 |
+
+**About half of a called change in opportunities or targets shows up in the
+next game, and about three quarters of a change in carries.** Against the
+player's whole-season average the next game is indistinguishable from zero for
+opportunities and targets — the recent three and the earlier games are worth
+roughly equal weight, which is what "half" means. Carries are the exception:
+the next game sits about 1.3 beyond even the season average in the direction
+of the call, at under two standard errors on 54 and 37 calls.
+
+That is consistent with everything above it in this file. The board already
+reads trailing-3 and trailing-5 form, so a trend that is half regression is
+not new information to it, and "the mid-season mover" found the same decay
+through the network. **Nothing here feeds a projection**; the page says the
+call describes what has happened and states the one-half figure. If any of it
+is worth the residual test it is rush attempts, and n is too small to say:
+one season, nine weeks, overlapping windows per player, so the standard
+errors above are optimistic.
+
+789 tests on NFL-API, 33 on NickKnows.

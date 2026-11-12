@@ -44,7 +44,8 @@ These come from the user and from measured results. Do not relitigate them.
 - **Matchup/coverage context never enters the optimizer's objective.** It is
   measured as null against the board's own error. Show it, never score it.
 - **Nothing feeds `/projections` until the grading gate passes**
-  (`scripts/grade_external.py`).
+  (`scripts/grade_external.py`, which lives in the **NFL-API** repo under
+  `app/scripts/`, not here).
 - **No scraping from FantasyGuru.** Their terms are personal use only. The only
   route in is a human uploading a CSV. `external.py` imports no network library
   and has a test that fails if one is added.
@@ -63,7 +64,9 @@ and ownership tilt as an improvement rather than a trade.
 ## The standard yardstick
 
 Model changes get the leakage-free backtest (2025 wk1–18, train <2025, epochs
-60) against the 4.17 MAE / 0.611 corr baseline. **Single-seed deltas under
+60) against the **4.187 MAE** / 0.611 corr baseline (4.17 was measured with
+postseason weeks in the population; see the correction at the top of the
+ledger). **Single-seed deltas under
 ~0.05 MAE are noise.** Log it; revert what loses.
 
 For a feature claimed to beat the board, the residual test is the method: a
@@ -77,12 +80,17 @@ a null at n=100 is "inconclusive", not "no".
   only home of coverage shell, man/zone, route and pressure data. No
   current-season substitute exists; `coverage.shell_mix` falls back and stamps
   the staleness onto every row.
-- The board **does not project defenses at all**. The DEF slot runs on
-  FanDuel's own FPPG from the uploaded slate.
+- The board **does not project defenses**: `/projections` and `/dfs/targets`
+  hold no DEF rows. The optimizer's DEF slot is a separate thing and is *not*
+  on FPPG any more — NFL-API attaches `defense.project` to the slate and falls
+  back to FanDuel's FPPG per row only where that is missing.
 - `parse_nflverse_injuries` zeroes a player only on `report_status`, which clubs
-  file on the **final Friday** report. The projections cron is Tue+Wed, so no
-  scheduled run ever sees a game designation. The board is structurally blind to
-  late-week news.
+  file on the **final Friday** report. The Tue+Wed projection runs therefore
+  never see a game designation. The Fri/Sat/Sun refresh cron that fixes this
+  was written 2026-10-28 and **had never run as of 2026-11-09** — it sat in
+  NFL-API's hand-applied `k8s/` directory. It is in the helm chart from
+  2026-11-10; before trusting a weekend board, check `computed_at` on
+  `GET /projections/runs` rather than assuming the refresh fired.
 - The quantile band is ~2.1× the mean (spearman 0.9949), so the optimizer's
   `ceiling` objective **is** its `mean` objective. Only `floor` reorders.
 - `evaluate.backtest` skips `roles.py` entirely; `promotion_endtoend.py` is the
