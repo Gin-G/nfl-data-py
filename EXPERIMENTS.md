@@ -160,6 +160,7 @@ idea again.
 - [Lineup depth: the top of a cash build is worth about ten points, and shrinking toward form is not (2026-11-12)](#lineup-depth-the-top-of-a-cash-build-is-worth-about-ten-points-and-shrinking-toward-form-is-not-2026-11-12)
 - [FanDuel scoring corrected: lost fumbles and two-point conversions (2026-11-12)](#fanduel-scoring-corrected-lost-fumbles-and-two-point-conversions-2026-11-12)
 - [Player identity: names were doing an id's job (2026-11-13)](#player-identity-names-were-doing-an-ids-job-2026-11-13) — **shipped**
+- [Reruns on clean data: what the identity bugs did to earlier results (2026-11-13)](#reruns-on-clean-data-what-the-identity-bugs-did-to-earlier-results-2026-11-13)
 
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
@@ -6480,3 +6481,186 @@ on the name joins, the duplicated rows and the old target. A/B deltas mostly
 share that flaw across both arms; the ones at risk are tests OF snaps, roles
 and depth, thin-margin closures, and lineup results on real slates. Those are
 being rerun on the clean data, each logged against its original.
+
+## Reruns on clean data: what the identity bugs did to earlier results (2026-11-13)
+
+Every model experiment before 2026-11-13 ran on `data/nfl_dataset.csv` as built
+2026-10-28 (snap counts joined by name, 24,500 duplicated pre-2025
+player-weeks, the old FanDuel target) or on boards cached from it, and the
+role experiments ran production's name-keyed depth lookup. The dataset and the
+2021-25 boards were rebuilt clean (174,379 rows, zero duplicated player-weeks;
+the stale ones kept in `experiments/_cache/pre_idfix/`), and the experiments at
+risk are rerun here against their originals. Order: role and promotion, usage,
+training window, lineup record, quarterback findings, then spot checks of the
+closed avenues. "Held" is a result too.
+
+**1. The starter is out (`starter_out.py`) -- HELD, sample was inflated.** The
+harness decided who played by matching snap counts to stats on a normalised
+name, so a starter the two feeds spell differently read as absent in weeks he
+played. Availability is now by gsis id (pfr id through `load_players`).
+
+| | original | id-matched |
+|---|--:|--:|
+| entering starter missed | 16.3% | **14.4%** |
+| RB2 usage, starter in / out | 8.28 / 16.11 (x1.95) | 8.39 / 15.91 (x1.90) |
+| QB2 usage factor | x5.06 | x4.51 |
+| out-of-sample factor RB / QB / WR / TE | 1.42 / 1.29 / 1.00 / 1.10 | **1.38 / 1.33 / 1.00 / 1.00** |
+
+About one "starter out" week in eight was a name mismatch. The conclusion
+stands: an extra factor helps at RB and QB, not WR or TE. The refit moves the
+factors ~3%, inside what this harness can resolve; constants unchanged. (The RB
+factor was later set to 1.0 end to end; that entry is rerun next.)
+
+**3. Snap share as the role multiplier, #19 (`experiments/role_multiplier_rerun.py`,
+new; the original ran inline) -- HELD, one diagnostic weaker.** Clean 2024
+board, 5,714 rows, 5,345 with a depth rank. The snap-share arm is a
+reconstruction (trailing five-game offensive snap share; the original did not
+record its form).
+
+| actual / raw prediction | RB2 | RB3 | WR2 | WR3 | TE2 | TE3 | QB2 |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| original | 1.12 | 1.00 | 1.09 | 1.03 | 1.01 | -- | 0.82 |
+| clean | 1.03 | 0.96 | 0.96 | 1.09 | 0.93 | 0.88 | 0.84 |
+| multiplier applied | 0.80 | 0.55 | 0.92 | 0.72 | 0.55 | 0.30 | 0.35 |
+
+| arm | MAE | bias | spearman QB / RB / TE / WR |
+|---|--:|--:|---|
+| none | 4.281 | -0.07 | 0.478 / 0.703 / 0.591 / 0.636 |
+| rank multiplier (shipped) | **4.215** | -0.74 | 0.496 / 0.696 / 0.565 / 0.638 |
+| snap share | 4.277 | -2.12 | 0.471 / 0.685 / 0.560 / 0.633 |
+
+Rank multiplier vs none -0.066 MAE [-0.123, -0.015] (original -0.052); snap
+share vs none -0.003 [-0.074, +0.059]. Snap share stays rejected, more firmly:
+no MAE gain now and no better ordering. The double-counting diagnostic is
+weaker: on clean data the raw model is roughly calibrated for backups (0.84-1.09)
+rather than under-projecting them, though the multiplier still cuts 20-70%,
+far more than those ratios ask for. Spearman here is per position over
+player-weeks; the original's ~0.94 was a different population and is not
+comparable in level. No change.
+
+**2. The promotion fix, end to end (`promotion_endtoend.py`) -- HELD on every
+line.** The harness's oracle (who played), its practice-report trigger and
+production's depth lookup now all key on gsis id; 5-seed history models
+retrained on the clean dataset; 2025 wk 1-18 plus 2026 wk 1-9 (28 weeks,
+8,569 player-weeks; the original had 23 weeks, 7,334).
+
+A first pass was itself contaminated and is discarded: the harness's cached
+2026 snap, injury and roster files dated from 2026-10-28 and stopped at week
+7-8, so weeks 8-9 were scored with no oracle and no week-9 report (it showed
+51 "promotions whose superior played", all in those two weeks). Stale caches
+are a contamination class of their own; the 2026 files were refreshed.
+
+| | original | clean |
+|---|--:|--:|
+| production trigger precision / recall | 1.000 / 0.690 | **1.000 / 0.751** |
+| parameter-free lift vs pre-fix, the promoted | +6.10% | **+7.10%** |
+| shipped RB x1.42 vs parameter-free, promoted RBs | -6.1% [-10.6, -2.1] | **-6.1% [-9.6, -3.0]** |
+| QB x1.29 vs parameter-free | +2.4% [-6.0, +10.4] | +5.7% [-0.6, +12.7] |
+| WR re-ranking vs pre-fix | +2.1% [+0.9, +3.3] | +3.2% [+2.2, +4.1] |
+| TE re-ranking vs pre-fix | -1.5% [-8.4, +4.3] | -0.8% [-7.1, +5.2] |
+| placebo (absences below) vs pre-fix | -7.25% | -7.19% |
+
+`PROMOTION_FACTOR` RB 1.0 stands; QB 1.29 stands (positive, still unresolved
+at n=69). No change.
+
+**4. Usage decomposition, #31 (`usage_share.py`) -- UNAFFECTED, not rerun.**
+Raw target and carry counts with depth ranks joined by gsis id; it reads
+neither the dataset nor fantasy points.
+
+**5. Opportunity share, #53 (`opportunity_share.py`) -- DECISION HELD, two
+findings moved.** Clean boards 2021-25: 21,014 scored player-weeks, board MAE
+4.4026 (original 27,297 and 4.1935: the duplicated rows were disproportionately
+low-scoring depth players, which flattered MAE).
+
+| | original | clean |
+|---|--:|--:|
+| volume-TD gap slope RB / WR / TE | +0.61 / +0.63 / +0.72 | +0.40 / +0.38 / +0.69 |
+| gap correction, MAE gain WR / TE / RB | +0.33% / +0.46% / +0.20% | **+0.07% / +0.31% / -0.06%**, all CIs span zero |
+| opp share slope RB / WR | +0.10 / +0.06 (null) | **+0.34 [+0.03, +0.65] / +0.63 [+0.06, +1.23]** |
+| opp share correction, MAE gain WR | +0.14% | **+1.43%, 74/75 weeks** |
+| opp share correction, MAE gain TE | +1.95% | **+2.56%, 71/75 weeks** |
+| xFP correction, MAE gain WR / TE | null | +0.50% / +1.22% |
+| WR opp share, top-24 overlap | +0.0020 [+0.0005, +0.0040] | +0.0022 [-0.0011, +0.0061] |
+
+The decision (context beside `value`, never in the objective) HOLDS and is if
+anything stronger: no term moves the order anywhere, and the one ordering gain
+the original reported no longer clears zero. The touchdown-luck finding
+weakens: the board still leans on recent touchdowns (slopes positive) but
+correcting it no longer pays. What is new is that **volume itself is now under-
+used by the board for MAE** -- opportunity share pays 1.4% at WR and 2.6% at TE,
+nearly every week. That is a projection-accuracy lead for /projections (not for
+lineups), and it goes through the standard backtest before anything ships.
+
+**6. Blitz rate against quarterback output, #51 (`blitz_qb.py`, `BLITZ_BOARD=1`)
+-- HELD.** No name joins in the harness; rerun on the clean 2021-25 boards
+(25,791 scored player-weeks, board MAE 4.3322; original 31,574 and 4.1791).
+Own-mean slopes match closely (RB fp -0.527 vs -0.541, WR +0.211 vs +0.219).
+
+| | original | clean |
+|---|---|---|
+| board-error slope RB | -0.284 [-0.458, -0.128] | -0.243 [-0.425, -0.079] |
+| board-error slope WR | +0.136 [+0.022, +0.256] | +0.129 [+0.014, +0.240] |
+| slope-only MAE gain, every position | ~0, all CIs span 0 | ~0 (QB -0.0040 [-0.0084, -0.0003]) |
+| ordering, QB / WR | -0.0045 / -0.0044, CIs below 0 | +0.0000 / +0.0006, CIs span 0 |
+
+The information is still in the board's error and still worth nothing applied.
+The one softening is that it no longer actively damages the order; the
+verdict (not built) rested on "worth nothing" and stands.
+
+**7. Closed avenues, spot checks -- NONE NEEDED A RERUN, for stated reasons.**
+- Coverage matchup #28 (`coverage_wk1.py`) and opponent-adjusted allowed #12
+  (`fpa_adjusted.py`): raw nflverse yards and receptions (prop markets) with
+  gsis-keyed participation; no dataset, board or FanDuel points. Unaffected.
+- FPA adjusted for schedule #76: built from raw stats by player id through
+  `fpa.py`; only the old scoring touched it, its verdict was already a wash
+  and it stays display-only. Not rerun.
+- Vegas implied total #16: tested the line as a model *feature*, which the
+  standing rule now forbids; no rerun could produce a usable result.
+- Per-position models #17: not a thin margin (shared model ahead by 0.11 WR,
+  0.18 TE, tie QB) and both arms shared the data; not rerun.
+The bugs were in volume, roles and the target; the matchup harnesses never
+touched them.
+
+**8. Training on the current season alone, #39 weekly retrain
+(`train_window_expanding.py`, SEEDS=3) -- FLIPPED.** Stopped by
+the host for low memory after week 14; weeks 15-18 still to run. 2025, each
+week retrained on that season's prior weeks only, against one model trained on
+all prior seasons, identical player-weeks:
+
+| week | current rows | current only | full history | delta |
+|--:|--:|--:|--:|--:|
+| 5 | 4,390 | 4.202 | 4.085 | +0.117 |
+| 6 | 5,351 | 4.243 | 4.225 | +0.018 |
+| 7 | 6,365 | 4.387 | 4.399 | -0.013 |
+| 8 | 7,400 | 4.380 | 4.395 | -0.015 |
+| 9 | 8,292 | 4.052 | 4.069 | -0.017 |
+| 10 | 9,240 | 4.158 | 4.198 | -0.040 |
+| 11 | 10,203 | 4.055 | 4.104 | -0.048 |
+| 12 | 11,235 | 3.943 | 4.071 | -0.127 |
+| 13 | 12,202 | 3.786 | 3.939 | -0.153 |
+| 14 | 13,283 | 4.022 | 4.016 | +0.006 |
+| pooled 5-14 | | **4.118** | **4.147** | **-0.029** (n=3,158) |
+
+The original (one seed, name-joined data, old target) had current-only worse
+in 12 of 14 weeks, +0.068 pooled, "never closes". Clean, it trails at week 5,
+catches up by week 7 and leads through week 13. That supports the live
+model's current-season-only window (the user's call, 2026-10-07) rather than
+contradicting it.
+
+Weeks 15-18, run separately after the host stopped the first pass:
+
+| week | current rows | current only | full history | delta |
+|--:|--:|--:|--:|--:|
+| 15 | 14,257 | 4.384 | 4.373 | +0.011 |
+| 16 | 15,312 | 4.273 | 4.315 | -0.042 |
+| 17 | 16,410 | 4.103 | 4.136 | -0.034 |
+| 18 | 17,473 | 3.888 | 3.908 | -0.020 |
+
+**Final, weeks 5-18, 4,554 player-weeks (the original's exact population
+size): current-only 4.132 vs full history 4.158, -0.026; current-only wins 10
+of 14 weeks; mean weekly delta -0.026, 95% CI by week [-0.060, +0.009].**
+The original read +0.068 and 2 of 14. **FLIPPED in direction**; the interval
+still touches zero, so the honest reading is "current-season-only is at least
+as good after the first few weeks", which is what the live model already does.
+Two differences between the runs, not one: clean data and corrected target,
+and 3 seeds against 1. The original's "never closes" claim is withdrawn.

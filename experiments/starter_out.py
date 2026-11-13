@@ -48,14 +48,21 @@ def _load(name, loader):
 
 
 def snaps():
+    """Snap rows with the player's gsis id (pfr id through nflreadpy's
+    crosswalk). Until 2026-11-13 availability was decided by matching these to
+    stats on a normalised NAME, so a starter whose name the two feeds spell
+    differently read as absent in weeks he played."""
     def one(season):
         import nflreadpy as nfl
         d = nfl.load_snap_counts(seasons=[season]).to_pandas()
-        keep = ["season", "week", "team", "player", "position", "offense_snaps",
-                "offense_pct", "game_type"]
+        keep = ["season", "week", "team", "player", "pfr_player_id", "position",
+                "offense_snaps", "offense_pct", "game_type"]
         d = d[[c for c in keep if c in d.columns]]
         return d[d.get("game_type", "REG") == "REG"]
-    d = _load("snaps_2018_2025", one)
+    d = _load("snaps_ids_2018_2025", one)
+    import nflreadpy as nfl
+    xw = nfl.load_players().to_pandas()[["gsis_id", "pfr_id"]].dropna()
+    d["player_id"] = d.pfr_player_id.map(dict(zip(xw.pfr_id, xw.gsis_id)))
     d["key"] = [normalize_player_name(n) for n in d.player]
     return d
 
@@ -124,10 +131,16 @@ def build():
                               .rank(ascending=False, method="first"))
 
     played = sn[sn.offense_snaps.fillna(0) >= PLAYED_SNAPS]
-    avail = set(zip(played.season, played.week, played.team, played.key))
+    # By id; the name key only for the ~0.3% of snap rows the crosswalk misses.
+    avail_id = set(zip(played.season[played.player_id.notna()],
+                       played.week[played.player_id.notna()],
+                       played.player_id.dropna()))
+    unmapped = played[played.player_id.isna()]
+    avail_key = set(zip(unmapped.season, unmapped.week, unmapped.team, unmapped.key))
     panel["available"] = [
-        (s, w, t, k) in avail
-        for s, w, t, k in zip(panel.season, panel.week, panel.team, panel.key)]
+        (s, w, pid) in avail_id or (s, w, t, k) in avail_key
+        for s, w, t, k, pid in zip(panel.season, panel.week, panel.team, panel.key,
+                                   panel.player_id)]
 
     # what he actually did that week (no stats row = nothing)
     got = st.set_index(["season", "week", "player_id"])["usage"]

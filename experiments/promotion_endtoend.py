@@ -173,10 +173,17 @@ def played_sets(season):
     sn = snaps(season)
     sn = sn[(sn.game_type == "REG") & sn.position.isin(POSITIONS)].copy()
     sn["key"] = sn.player.map(normalize_player_name)
+    # 2026-11-13: by gsis id (pfr id through nflreadpy's crosswalk); the name
+    # key survives only for the snap rows the crosswalk misses. Matching on the
+    # name alone read a starter whose name the feeds spell differently as out.
+    import nflreadpy as nfl
+    xw = nfl.load_players().to_pandas()[["gsis_id", "pfr_id"]].dropna()
+    sn["gsis"] = sn.pfr_player_id.map(dict(zip(xw.pfr_id, xw.gsis_id)))
     by_week, teams_by_week = {}, {}
     for week, g in sn.groupby("week"):
         on = g[g.offense_snaps > 0]
-        by_week[int(week)] = set(zip(on.team, on.key))
+        by_week[int(week)] = (set(on.gsis.dropna())
+                              | set(zip(on.team[on.gsis.isna()], on.key[on.gsis.isna()])))
         teams_by_week[int(week)] = set(g.team.unique())
     return by_week, teams_by_week
 
@@ -200,11 +207,10 @@ def practice_out_ranks(projector, inj):
     from nfl_projections.utils import normalize_player_name
 
     w = inj[inj.week == projector.week]
-    dnp = set(zip(w.team,
-                  w.full_name.map(normalize_player_name).where(
-                      w.practice_status.astype(str).str.contains(
-                          "Did Not Participate", case=False, na=False))))
-    dnp.discard((None, None))
+    w = w[w.practice_status.astype(str).str.contains(
+        "Did Not Participate", case=False, na=False)]
+    dnp = set(w.gsis_id.dropna()) if "gsis_id" in w.columns else set()
+    dnp |= set(zip(w.team, w.full_name.map(normalize_player_name)))
     out = {}
     for _, player in projector.rosters.iterrows():
         name = player.get("player_name")
@@ -212,13 +218,14 @@ def practice_out_ranks(projector, inj):
         if not name or position not in config.POSITIONS:
             continue
         team = _extract_team(player)
-        absent = (team, normalize_player_name(name)) in dnp
+        pid = player.get("gsis_id", player.get("player_id"))
+        absent = pid in dnp or (team, normalize_player_name(name)) in dnp
         if not absent and not projectable_status(player.get("status"),
                                                  player.get("week"), projector.week):
-            absent = not projector.injury_analyzer.should_boost_backup(name, team)
+            absent = not projector.injury_analyzer.should_boost_backup(name, team, pid)
         if not absent:
             continue
-        role = projector.depth_analyzer.get_player_role(name, team)
+        role = projector.depth_analyzer.get_player_role(name, team, pid)
         if role and role.get("depth_rank") is not None:
             out.setdefault((team, position), []).append(role["depth_rank"])
     return {k: tuple(v) for k, v in out.items()}
@@ -244,9 +251,10 @@ def oracle_out_ranks(projector, played, teams_playing):
         team = _extract_team(player)
         if team not in teams_playing:
             continue
-        if (team, normalize_player_name(name)) in played:
+        pid = player.get("gsis_id", player.get("player_id"))
+        if pid in played or (team, normalize_player_name(name)) in played:
             continue
-        role = projector.depth_analyzer.get_player_role(name, team)
+        role = projector.depth_analyzer.get_player_role(name, team, pid)
         if role and role.get("depth_rank") is not None:
             out.setdefault((team, position), []).append(role["depth_rank"])
     return {k: tuple(v) for k, v in out.items()}
@@ -274,21 +282,24 @@ def candidates(projector):
     for _, player in projector.rosters.iterrows():
         name = player.get("player_name")
         position = player.get("position")
-        if not name or position not in config.POSITIONS or name in seen:
+        if not name or position not in config.POSITIONS:
             continue
         team = _extract_team(player)
         pid = player.get("player_id", player.get("gsis_id", "")) or ""
         if pd.isna(pid):
             pid = ""
+        key = pid or f"name:{name}"          # one row per player id, as production
+        if key in seen:
+            continue
         if projector.injury_analyzer.should_zero_out_player(name, team, pid):
-            seen.add(name)
+            seen.add(key)
             zeroed.append((name, position, team, pid))
             continue
         if (not projectable_status(player.get("status"), player.get("week"),
                                    projector.week)
-                and not projector.injury_analyzer.should_boost_backup(name, team)):
+                and not projector.injury_analyzer.should_boost_backup(name, team, pid)):
             continue
-        seen.add(name)
+        seen.add(key)
         live.append((name, position, team, pid, player))
     return live, zeroed
 
@@ -353,7 +364,7 @@ def week_frame(ds, trained, season, week, ros, dc, sch, played, teams_playing,
             stat_row, n_games = last_nm.loc[key], int(counts_nm[key])
         if n_games < 2:
             continue                          # routed to the rookie prior
-        role = proj.depth_analyzer.get_player_role(name, team)
+        role = proj.depth_analyzer.get_player_role(name, team, pid)
         rank = role["depth_rank"] if role else None
         rows.append({
             "season": season, "week": week, "player_id": pid, "player_name": name,

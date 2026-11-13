@@ -14,6 +14,7 @@ trains in seconds, where the historical model is most of an hour.
     TEST_SEASON=2024 SEEDS=5 python experiments/train_window_expanding.py
 """
 import os
+import pathlib
 import warnings
 
 import pandas as pd
@@ -29,6 +30,13 @@ FIRST = int(os.environ.get("FIRST_WEEK", 5))     # first week a 4-week model exi
 LAST = int(os.environ.get("LAST_WEEK", 18))
 SEEDS = int(os.environ.get("SEEDS", 1))
 EPOCHS = int(os.environ.get("EPOCHS", 60))
+CACHE = pathlib.Path(__file__).resolve().parent / "_cache"
+
+
+def predictions_path(season=TEST_SEASON, seeds=SEEDS, first=FIRST, last=LAST):
+    """Where each arm's per-player projections are kept, for the lineup test
+    (experiments/window_lineups.py) to build from without retraining."""
+    return CACHE / f"window_preds_{season}_w{first}-{last}_{seeds}s{EPOCHS}e.parquet"
 
 
 def main():
@@ -42,7 +50,7 @@ def main():
         history, n_seeds=SEEDS, epochs=EPOCHS,
         min_season=config.TRAINING_MIN_SEASON, plot_path=None, verbose=0)
 
-    rows = []
+    rows, preds = [], []
     for week in range(FIRST, LAST + 1):
         current = df[(df["season"] == TEST_SEASON) & (weeks_num < week)]
         n_rows = int(weeks_num[current.index].notna().sum())
@@ -55,6 +63,10 @@ def main():
             res = evaluate.backtest(df, TEST_SEASON, weeks=[week], trained=trained)
             got[name] = res.set_index("player_id")
         common = got["current"].index.intersection(got["full"].index)
+        for name, res in got.items():
+            r = res.loc[common, ["position", "predicted", "actual"]].reset_index()
+            r["arm"], r["week"], r["season"] = name, week, TEST_SEASON
+            preds.append(r)
         rec = dict(week=week, train_rows=n_rows, n=len(common))
         for name, res in got.items():
             r = res.loc[common]
@@ -66,6 +78,9 @@ def main():
               f"current {rec['mae_current']:.3f} vs full {rec['mae_full']:.3f} "
               f"({rec['delta']:+.3f}) on {len(common)} players")
 
+    CACHE.mkdir(exist_ok=True)
+    pd.concat(preds, ignore_index=True).to_parquet(predictions_path())
+    print(f"saved per-player projections to {predictions_path().name}")
     out = pd.DataFrame(rows)
     pd.set_option("display.width", 200)
     print("\n" + out.round(3).to_string(index=False))

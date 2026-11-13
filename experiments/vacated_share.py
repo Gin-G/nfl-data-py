@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 
 from nfl_projections import shares
-from nfl_projections.scoring import fanduel_points
+from nfl_projections.scoring import fanduel_points_from_stats
 
 CACHE = pathlib.Path(__file__).parent / "_cache"
 SEASONS = tuple(range(2018, 2026))
@@ -49,18 +49,16 @@ def weekly(seasons=SEASONS) -> pd.DataFrame:
     for season in seasons:
         d = nfl.load_player_stats(seasons=[season]).to_pandas()
         d = d[(d.season_type == "REG") & d.position.isin(shares.SKILL)]
+        # Points by the package's one FanDuel rule (fumbles lost, 2-pt,
+        # return TDs), scored before the columns are trimmed.
+        d = d.assign(fanduel_fantasy_points=fanduel_points_from_stats(d))
         keep = ["season", "week", "player_id", "player_display_name", "position",
                 "team", "carries", "targets", "passing_yards", "passing_tds",
                 "passing_interceptions", "rushing_yards", "rushing_tds",
-                "receptions", "receiving_yards", "receiving_tds"]
+                "receptions", "receiving_yards", "receiving_tds",
+                "fanduel_fantasy_points"]
         frames.append(d[[c for c in keep if c in d.columns]])
     d = pd.concat(frames, ignore_index=True)
-    d["fanduel_fantasy_points"] = fanduel_points(
-        passing_yards=d.get("passing_yards", 0), passing_tds=d.get("passing_tds", 0),
-        interceptions=d.get("passing_interceptions", 0),
-        rushing_yards=d.get("rushing_yards", 0), rushing_tds=d.get("rushing_tds", 0),
-        receptions=d.get("receptions", 0), receiving_yards=d.get("receiving_yards", 0),
-        receiving_tds=d.get("receiving_tds", 0))
     d = d.rename(columns={"player_display_name": "player_name"})
     d["offensive_snap_pct"] = np.nan
     CACHE.mkdir(parents=True, exist_ok=True)

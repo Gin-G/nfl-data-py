@@ -30,14 +30,10 @@ warnings.filterwarnings("ignore")
 API = "https://nfl-api.nickknows.net/projections/"
 
 
-def fanduel(r):
-    g = lambda c: float(r[c]) if c in r and pd.notna(r[c]) else 0.0
-    py, ry, recy = g("passing_yards"), g("rushing_yards"), g("receiving_yards")
-    fum = g("rushing_fumbles") + g("receiving_fumbles") + g("sack_fumbles")
-    return (py * .04 + g("passing_tds") * 4 - g("passing_interceptions") + 3 * (py >= 300)
-            + ry * .1 + g("rushing_tds") * 6 + 3 * (ry >= 100)
-            + g("receptions") * .5 + recy * .1 + g("receiving_tds") * 6 + 3 * (recy >= 100)
-            - 2 * fum)
+def fanduel(frame):
+    """The package's one FanDuel rule (fumbles lost, 2-pt, return TDs)."""
+    from nfl_projections.scoring import fanduel_points_from_stats
+    return fanduel_points_from_stats(frame)
 
 
 def load(season, week):
@@ -47,7 +43,7 @@ def load(season, week):
 
     st = nfl.load_player_stats([season - 1, season]).to_pandas()
     st = st[st.season_type == "REG"].copy()
-    st["fp"] = st.apply(fanduel, axis=1)
+    st["fp"] = fanduel(st)
     act = st[(st.season == season) & (st.week == week)].set_index("player_id").fp.rename("actual")
     prior = st[(st.season == season - 1) | ((st.season == season) & (st.week < week))]
     naive = (prior.sort_values(["player_id", "season", "week"]).groupby("player_id")
