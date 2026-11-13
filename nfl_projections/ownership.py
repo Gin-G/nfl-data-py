@@ -151,13 +151,23 @@ def attach(pool, own, *, name_col=None, floor=None, warn=True):
     pool = pool.copy()
     if name_col is None:
         name_col = "Nickname" if "Nickname" in pool.columns else "player_name"
-    keys = [normalize_name(str(n)) for n in pool[name_col]]
     if own is None or own.empty:
         pool["ownership"] = np.nan
         pool["ownership_listed"] = False
         return pool
-    lookup = dict(zip(own["merge_name"], own["ownership"]))
-    values = [lookup.get(k) for k in keys]
+    # The one slate matcher (names.Matcher). The page lists no team, so this is
+    # a name that is unique on the page, then a unique last name at the
+    # position with agreeing first names -- never the first of two namesakes.
+    from .names import Matcher
+
+    m = Matcher(own.reset_index(drop=True), name="name", team="_no_team",
+                pos="position")
+    pos_col = next((c for c in ("Position", "position") if c in pool.columns), None)
+    pct = own["ownership"].reset_index(drop=True)
+    values = []
+    for i, n in enumerate(pool[name_col]):
+        hit = m.match(n, None, pool[pos_col].iloc[i] if pos_col else None)
+        values.append(None if hit is None else float(pct.iloc[hit]))
     pool["ownership_listed"] = [v is not None for v in values]
     fill = UNKNOWN if floor is None else float(floor)
     pool["ownership"] = [fill if v is None else v for v in values]

@@ -105,15 +105,13 @@ def merge_board_and_slate(board: pd.DataFrame, slate: pd.DataFrame,
     s["_key"] = s["Nickname"].map(name_key)
     out = s
     if board is not None and len(board):
-        b = board.copy()
-        b["_key"] = b["player_name"].map(name_key)
-        keep = [c for c in ("_key", "projected_points", "floor", "median",
-                            "ceiling", "position", "team", "player_id")
-                if c in b.columns]
-        # Two rows for one name would duplicate a slate entry; the board is
-        # one row per player, so this only guards a bad upstream join.
-        out = s.merge(b[keep].drop_duplicates("_key"), on="_key", how="left",
-                      suffixes=("", "_board"))
+        # The one slate matcher (names.match_slate): name + team first, so a
+        # name two players share cannot hand one of them the other's line.
+        from .names import attach_board
+
+        keep = [c for c in ("projected_points", "floor", "median", "ceiling",
+                            "position", "team", "player_id") if c in board.columns]
+        out = attach_board(s, board.reset_index(drop=True), keep)
     return out
 
 
@@ -219,16 +217,25 @@ def attach_history(frame: pd.DataFrame, history, *, name_key) -> pd.DataFrame:
             "history needs a name column, one of player_name, Nickname or "
             f"name; it has {list(history.columns)}")
 
+    if "_key" not in frame.columns:
+        raise ValueError("attach_history needs the joined frame from "
+                         "merge_board_and_slate, which carries `_key`")
+    # By player id wherever both sides have one: by name, the Browns'
+    # linebacker Justin Jefferson's scoreless weeks were the receiver's too.
+    by_id = "player_id" in history.columns and "player_id" in frame.columns
     rows = pd.DataFrame({
-        "_key": history[name_column].map(name_key),
+        "_key": (history["player_id"].astype("object") if by_id
+                 else history[name_column].map(name_key)),
         "_p": pd.to_numeric(history[points_column], errors="coerce"),
     }).dropna()
     stats = rows.groupby("_key")["_p"].agg(
         hist_games="size", hist_low="min", hist_high="max", hist_median="median")
-    if "_key" not in frame.columns:
-        raise ValueError("attach_history needs the joined frame from "
-                         "merge_board_and_slate, which carries `_key`")
-    merged = frame.merge(stats.reset_index(), on="_key", how="left")
+    if by_id:
+        merged = frame.merge(stats.rename_axis("_hid").reset_index(),
+                             left_on="player_id", right_on="_hid", how="left"
+                             ).drop(columns="_hid")
+    else:
+        merged = frame.merge(stats.reset_index(), on="_key", how="left")
     merged.index = frame.index
     return merged
 

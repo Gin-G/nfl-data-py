@@ -118,13 +118,15 @@ def merge_fanduel_salaries(fanduel_df, predictions_df, opportunity_context=None)
     over (`volume_td_gap`) buys 0.2 points of top-24 overlap in 4 weeks out of
     83. The optimizer reads nothing but the order, so it stays outside.
     """
-    fanduel_df = fanduel_df.copy()
-    predictions_df = predictions_df.copy()
-    fanduel_df["Normalized_Name"] = fanduel_df["Nickname"].apply(normalize_name)
-    predictions_df["Normalized_Name"] = predictions_df["player_name"].apply(normalize_name)
+    # names.match_slate: name + team, then a unique name, then a unique last
+    # name on the team at the position. This joined on name alone, so FanDuel's
+    # "Tre' Harris", "Joshua Palmer" and "Matt Hibner" never met the board's
+    # "Tre Harris", "Josh Palmer" and "Matthew Hibner", and a name two players
+    # share would have given one of them the other's projection.
+    from .names import attach_board
 
-    merged = pd.merge(fanduel_df, predictions_df, on="Normalized_Name", how="left")
-    merged = merged.drop(columns=["Normalized_Name"])
+    merged = attach_board(fanduel_df.copy(), predictions_df,
+                          list(predictions_df.columns))
     merged["value"] = (merged["fanduel_fantasy_points"] / merged["Salary"]) * 1000
     if opportunity_context is not None:
         from . import opportunity

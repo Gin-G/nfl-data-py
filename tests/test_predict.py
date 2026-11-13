@@ -54,6 +54,44 @@ class TestDepthChartAnalyzer:
         assert analyzer.get_player_role(float("nan")) is None
 
 
+class TestDepthRolesById:
+    """2026-11-13: nflverse's depth chart spells names with suffixes the roster
+    lacks, and 14 skill players a week missed their role; one wrong name match
+    gave a teammate's rank away."""
+
+    def _charts(self):
+        return pd.DataFrame({
+            "team": ["BUF", "BUF", "ATL", "ATL", "ATL", "IND"],
+            "pos_abb": ["RB", "RB", "TE", "RB", "RB", "TE"],
+            "pos_rank": [1, 2, 1, 1, 3, 4],
+            "player_name": ["James Cook III", "Ty Johnson", "Kyle Pitts Sr.",
+                            "Bijan Robinson", "Brian Robinson", "Drew Ogletree"],
+            "gsis_id": ["cook", "tyj", "pitts", "bijan", "brian", "ogle"],
+        })
+
+    def test_id_finds_a_differently_spelled_player(self):
+        a = DepthChartAnalyzer(self._charts())
+        assert a.get_player_role("Andrew Ogletree", "IND", "ogle")["depth_rank"] == 4
+
+    def test_suffix_alone_does_not_lose_the_role(self):
+        a = DepthChartAnalyzer(self._charts())
+        assert a.get_player_role("James Cook", "BUF")["depth_rank"] == 1
+        assert a.get_player_role("Kyle Pitts", "ATL")["depth_rank"] == 1
+
+    def test_a_teammate_with_a_similar_name_is_not_borrowed(self):
+        a = DepthChartAnalyzer(self._charts())
+        assert a.get_player_role("Brian Robinson", "ATL", "brian")["depth_rank"] == 3
+        charts = self._charts()
+        charts = charts[charts.gsis_id != "brian"]
+        a = DepthChartAnalyzer(charts)
+        # Off the chart: no role, rather than Bijan's.
+        assert a.get_player_role("Brian Robinson", "ATL", "brian") is None
+
+    def test_an_id_on_another_team_does_not_count(self):
+        a = DepthChartAnalyzer(self._charts())
+        assert a.get_player_role("James Cook", "MIA", "cook") is None
+
+
 def make_snapshots():
     """nflverse's 2025+ format: dated league-wide snapshots, newest rows first."""
     rows = [
@@ -253,6 +291,20 @@ class TestRosterHelpers:
         assert len(out) == 2
         assert out[out["player_name"] == "A"]["team"].iloc[0] == "PHI"
 
+    def test_dedupe_is_by_id_not_by_name(self):
+        """Two players sharing a name are two players; one player under two
+        spellings is one."""
+        rosters = pd.DataFrame({
+            "player_name": ["Justin Jefferson", "Justin Jefferson", "James Cook",
+                            "James Cook III"],
+            "gsis_id": ["wr", "lb", "cook", "cook"],
+            "week": [10, 10, 9, 10],
+            "team": ["MIN", "CLE", "BUF", "BUF"],
+        })
+        out = dedupe_rosters(rosters)
+        assert sorted(out.gsis_id) == ["cook", "lb", "wr"]
+        assert out[out.gsis_id == "cook"].player_name.iloc[0] == "James Cook III"
+
     def test_dedupe_creates_player_name_from_full_name(self):
         rosters = pd.DataFrame({"full_name": ["A"], "week": [1]})
         out = dedupe_rosters(rosters)
@@ -276,7 +328,7 @@ class _FakeInjuries:
     def should_zero_out_player(self, name, team=None, player_id=None):
         return name in self.out_names
 
-    def should_boost_backup(self, name, team=None):
+    def should_boost_backup(self, name, team=None, player_id=None):
         return False
 
     def get_adjustment_info(self, name, team=None, player_id=None):
@@ -287,7 +339,7 @@ class _FakeDepth:
     def __init__(self, ranks):
         self.ranks = ranks
 
-    def get_player_role(self, name, team=None):
+    def get_player_role(self, name, team=None, player_id=None):
         rank = self.ranks.get(name)
         return None if rank is None else {"depth_rank": rank, "role": "x"}
 

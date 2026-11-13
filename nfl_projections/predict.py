@@ -115,32 +115,70 @@ class DepthChartAnalyzer:
                 "backup": sorted_group.iloc[1]["player_name"] if len(sorted_group) > 1 else None,
             }
 
+        # Three keys onto one role. The id is the one that cannot be wrong;
+        # names are only for frames without one (the ESPN preseason path). Until
+        # 2026-11-13 this was keyed by display name alone, and nflverse's depth
+        # chart carries suffixes the roster does not ("James Cook III" vs "James
+        # Cook"): 14 skill players a week missed their row, fell to the unknown
+        # rank, and were discounted as backups -- Cook, BUF's RB1, at x0.55 all
+        # season, Kyle Pitts at x0.30. The name fallback also handed Bijan
+        # Robinson's RB1 rank to his teammate Brian Robinson.
         self.player_roles = {}
+        self.roles_by_id = {}
+        self.roles_by_norm = {}
         for _, row in self.offensive_depth.iterrows():
             if not isinstance(row["player_name"], str):
                 continue
-            self.player_roles[row["player_name"]] = {
+            pid = row.get("gsis_id")
+            info = {
                 "team": row["team"],
                 "position": row["pos_abb"],
                 "depth_rank": row["pos_rank"],
                 "role": row["depth_role"],
+                "player_id": pid if isinstance(pid, str) and pid else None,
             }
+            self.player_roles[row["player_name"]] = info
+            if info["player_id"]:
+                self.roles_by_id[info["player_id"]] = info
+            self.roles_by_norm.setdefault(
+                normalize_player_name(row["player_name"]), []).append(info)
         logger.info("Processed depth charts: %d offensive players", len(self.offensive_depth))
 
-    def get_player_role(self, player_name, team=None):
-        """Depth role for a player. With ``team``, only that team's chart counts:
-        the name fallback otherwise lends one team's rank to a namesake on another
-        (NO's Travis Etienne read CAR's RB4 slot, his brother Trevor's)."""
-        def on_team(role_info):
-            return not team or team in ("UNK", "Unknown") or role_info["team"] == team
+    def get_player_role(self, player_name, team=None, player_id=None):
+        """Depth role for a player: by id, then by suffix-free name on his team.
 
+        With ``team``, only that team's chart counts: the name fallback otherwise
+        lends one team's rank to a namesake on another (NO's Travis Etienne read
+        CAR's RB4 slot, his brother Trevor's). A name never bridges two different
+        known ids, which is what kept Brian Robinson on Bijan's line.
+        """
+        def known(v):
+            return isinstance(v, str) and v not in ("", "UNK", "Unknown")
+
+        def on_team(role_info):
+            return not known(team) or role_info["team"] == team
+
+        def same_player(role_info):
+            other = role_info.get("player_id")
+            return not (known(player_id) and known(other) and other != player_id)
+
+        if known(player_id):
+            hit = self.roles_by_id.get(player_id)
+            if hit and on_team(hit):
+                return hit
         exact = self.player_roles.get(player_name)
-        if exact and on_team(exact):
+        if exact and on_team(exact) and same_player(exact):
             return exact
-        for depth_name, role_info in self.player_roles.items():
-            if self._names_similar(player_name, depth_name) and on_team(role_info):
-                return role_info
-        return None
+        norm = normalize_player_name(player_name)
+        same = [r for r in self.roles_by_norm.get(norm, ()) if on_team(r) and same_player(r)]
+        if len(same) == 1:
+            return same[0]
+        # Last resort, a nickname ("Drew" Ogletree): same last name, first name
+        # a prefix or initial match -- and only when exactly one row qualifies.
+        loose = [r for depth_name, r in self.player_roles.items()
+                 if on_team(r) and same_player(r)
+                 and self._names_similar(norm, normalize_player_name(depth_name))]
+        return loose[0] if len(loose) == 1 else None
 
     def get_team_competition(self, team, position):
         info = self.team_position_depth.get((team, position))
@@ -152,10 +190,10 @@ class DepthChartAnalyzer:
             "competition_level": "high" if total >= 4 else "medium" if total >= 3 else "low",
         }
 
-    def analyze_rookie_opportunity(self, player_name, team, position):
+    def analyze_rookie_opportunity(self, player_name, team, position, player_id=None):
         """Rate a rookie's opportunity from where they sit on the depth chart."""
         team_depth = self.get_team_competition(team, position)
-        player_role = self.get_player_role(player_name, team)
+        player_role = self.get_player_role(player_name, team, player_id)
 
         if not team_depth:
             return {"opportunity": "unknown", "context": "No team depth chart data"}
@@ -272,12 +310,16 @@ class InjuryStatusAnalyzer:
             return status_info["status"] in ["OUT", "DOUBTFUL"]
         return False
 
-    def should_boost_backup(self, player_name, team=None):
+    def should_boost_backup(self, player_name, team=None, player_id=None):
+        if player_id is not None and not pd.isna(player_id) and str(player_id):
+            for info in self.backup_situations.values():
+                if str(info.get("player_id") or "") == str(player_id):
+                    return self._same_player(info, team, player_id)
         info = self.backup_situations.get(player_name)
         if info is None:
             match = self.backup_by_normalized.get(self._normalize_name(player_name))
             info = match[1] if match else None
-        return info is not None and self._same_player(info, team)
+        return info is not None and self._same_player(info, team, player_id)
 
     def get_adjustment_info(self, player_name, team=None, player_id=None):
         status_info = self.check_player_status(player_name, team, player_id)
@@ -392,18 +434,25 @@ class RookiePredictor:
                 }
         return baselines
 
-    def get_draft_info(self, player_name):
+    def get_draft_info(self, player_name, player_id=None):
+        """Draft slot by gsis id, then by suffix-free exact name.
+
+        Was a lower-case exact match falling back to an unanchored regex
+        ``contains`` -- "James Cook" found any longer name holding it, and a
+        suffix on either side ("Kyle Pitts Sr.") missed the exact one.
+        """
         if self.draft_data.empty:
             return None
-        matches = self.draft_data[
-            self.draft_data["pfr_player_name"].str.lower() == player_name.lower()
-        ]
+        matches = self.draft_data.iloc[0:0]
+        if (isinstance(player_id, str) and player_id
+                and "gsis_id" in self.draft_data.columns):
+            matches = self.draft_data[self.draft_data["gsis_id"] == player_id]
         if matches.empty:
+            norm = normalize_player_name(player_name)
             matches = self.draft_data[
-                self.draft_data["pfr_player_name"].str.contains(
-                    player_name, case=False, na=False
-                )
-            ]
+                self.draft_data["pfr_player_name"].map(normalize_player_name) == norm]
+            if len(matches) > 1 and "season" in self.draft_data.columns:
+                matches = matches.sort_values("season", ascending=False)
         if matches.empty:
             return None
         draft_info = matches.iloc[0]
@@ -413,8 +462,8 @@ class RookiePredictor:
             "team": draft_info["team"],
         }
 
-    def predict_rookie(self, player_name, position, team):
-        draft_info = self.get_draft_info(player_name)
+    def predict_rookie(self, player_name, position, team, player_id=None):
+        draft_info = self.get_draft_info(player_name, player_id)
 
         # Preferred path: calibrated draft-capital prior (pick -> expected PPG +
         # floor/ceiling + component estimates). Falls back to the legacy multiplier
@@ -447,7 +496,7 @@ class RookiePredictor:
             draft_multiplier, tier = 0.4, "undrafted"
 
         opportunity = self.depth_analyzer.analyze_rookie_opportunity(
-            player_name, team, position
+            player_name, team, position, player_id
         )
         depth_multiplier = {
             "high": 1.5, "medium": 0.8, "low": 0.3,
@@ -477,9 +526,18 @@ def dedupe_rosters(rosters):
     rosters = rosters.copy()
     if "player_name" not in rosters.columns and "full_name" in rosters.columns:
         rosters["player_name"] = rosters["full_name"]
-    if rosters["player_name"].duplicated().any():
-        rosters = rosters.sort_values(["player_name", "week"], ascending=[True, False])
-        rosters = rosters.drop_duplicates(subset=["player_name"], keep="first")
+    # One row per PLAYER, which is an id: two players can share a name (two
+    # Justin Jeffersons in 2026) and one player can carry two spellings.
+    key = "gsis_id" if "gsis_id" in rosters.columns else (
+        "player_id" if "player_id" in rosters.columns else "player_name")
+    ids = rosters[key].where(rosters[key].notna() & (rosters[key].astype(str) != ""),
+                             "name:" + rosters["player_name"].astype(str))
+    if ids.duplicated().any():
+        order = ["week"] if "week" in rosters.columns else []
+        rosters = (rosters.assign(_key=ids)
+                   .sort_values(["_key", *order], ascending=[True] + [False] * len(order))
+                   .drop_duplicates(subset=["_key"], keep="first")
+                   .drop(columns="_key"))
     return rosters
 
 
@@ -636,8 +694,11 @@ class Projector:
 
     def predict_player(self, player_name):
         """Project one player. Returns a dict of stats or None."""
+        # Exact on the suffix-free name; an unanchored regex here found any
+        # longer name containing this one.
         matches = self.rosters[
-            self.rosters["player_name"].str.contains(player_name, case=False, na=False)
+            self.rosters["player_name"].map(normalize_player_name)
+            == normalize_player_name(player_name)
         ]
         if matches.empty:
             logger.info("%s not found on any roster", player_name)
@@ -654,7 +715,7 @@ class Projector:
                                    and (seasons == self.season).sum() == 0)
         return self._preseason
 
-    def _apply_rookie_role(self, pred, player_name, position, team):
+    def _apply_rookie_role(self, pred, player_name, position, team, player_id=None):
         """Give a draft-capital projection the same depth-rank discount a veteran's
         gets (in place).
 
@@ -666,7 +727,7 @@ class Projector:
         """
         from . import roles
 
-        depth_role = self.depth_analyzer.get_player_role(player_name, team)
+        depth_role = self.depth_analyzer.get_player_role(player_name, team, player_id)
         mult = roles.per_game_role_multiplier(
             position, depth_role["depth_rank"] if depth_role else None)
         if mult >= 1.0:
@@ -704,10 +765,10 @@ class Projector:
             if not absent and not projectable_status(player.get("status"),
                                                     player.get("week"), self.week):
                 # off the active roster, and not an elevated fill-in
-                absent = not self.injury_analyzer.should_boost_backup(name, team)
+                absent = not self.injury_analyzer.should_boost_backup(name, team, player_id)
             if not absent:
                 continue
-            role = self.depth_analyzer.get_player_role(name, team)
+            role = self.depth_analyzer.get_player_role(name, team, player_id)
             if role and role.get("depth_rank") is not None:
                 out.setdefault((team, position), []).append(role["depth_rank"])
         return {k: tuple(v) for k, v in out.items()}
@@ -744,10 +805,11 @@ class Projector:
         if len(actual_games) < 2:
             if self.rookie_predictor:
                 rookie_pred = self.rookie_predictor.predict_rookie(
-                    player_name, position, team
+                    player_name, position, team, player_id
                 )
                 if rookie_pred:
-                    self._apply_rookie_role(rookie_pred, player_name, position, team)
+                    self._apply_rookie_role(rookie_pred, player_name, position, team,
+                                            player_id)
                     return {
                         "player_id": player_id,
                         "player_name": player_name,
@@ -806,7 +868,7 @@ class Projector:
         # players we most want to discount). See roles.py.
         from . import roles
 
-        depth_role = self.depth_analyzer.get_player_role(player_name, team)
+        depth_role = self.depth_analyzer.get_player_role(player_name, team, player_id)
         depth_rank = depth_role["depth_rank"] if depth_role else None
         role_mult = roles.per_game_role_multiplier(position, depth_rank)
         out_ranks = self._out_ranks(team, position)
@@ -901,15 +963,19 @@ class Projector:
         for _, player in tqdm(roster_rows.iterrows(), total=len(roster_rows),
                               desc=f"Predicting {position}"):
             player_name = player["player_name"]
-            if player_name in processed:
-                continue
-
             team = _extract_team(player)
             player_id = player.get("player_id", player.get("gsis_id", ""))
+            if player_id is None or pd.isna(player_id):
+                player_id = ""
+            # One projection per player id; the name only stands in without one.
+            key = player_id or f"name:{player_name}"
+            if key in processed:
+                continue
+
             if self.injury_analyzer.should_zero_out_player(player_name, team, player_id):
                 adjustment = self.injury_analyzer.get_adjustment_info(
                     player_name, team, player_id)
-                processed.add(player_name)
+                processed.add(key)
                 predictions.append({
                     "player_id": player_id,
                     "player_name": player_name,
@@ -926,19 +992,22 @@ class Projector:
             # Skip players off the active roster (practice squad etc.) unless
             # they're a backup elevated by an injury
             if (not projectable_status(player.get("status"), player.get("week"), self.week)
-                    and not self.injury_analyzer.should_boost_backup(player_name, team)):
+                    and not self.injury_analyzer.should_boost_backup(
+                        player_name, team, player_id)):
                 continue
 
             pred = self._predict_roster_row(player)
             if pred:
-                processed.add(player_name)
+                processed.add(key)
                 predictions.append(pred)
 
         if not predictions:
             return pd.DataFrame()
 
         df = pd.DataFrame(predictions)
-        df = df.drop_duplicates(subset=["player_name"], keep="first")
+        ids = df["player_id"].where(df["player_id"].astype(str) != "",
+                                    "name:" + df["player_name"].astype(str))
+        df = df[~ids.duplicated(keep="first")]
         df = df.sort_values("fanduel_fantasy_points", ascending=False).reset_index(drop=True)
         df["rank"] = range(1, len(df) + 1)
         return df

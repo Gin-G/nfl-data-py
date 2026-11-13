@@ -159,6 +159,7 @@ idea again.
 - [A usage trend is half real: what the game after an "up" or "down" looks like (2026-11-11)](#a-usage-trend-is-half-real-what-the-game-after-an-up-or-down-looks-like-2026-11-11)
 - [Lineup depth: the top of a cash build is worth about ten points, and shrinking toward form is not (2026-11-12)](#lineup-depth-the-top-of-a-cash-build-is-worth-about-ten-points-and-shrinking-toward-form-is-not-2026-11-12)
 - [FanDuel scoring corrected: lost fumbles and two-point conversions (2026-11-12)](#fanduel-scoring-corrected-lost-fumbles-and-two-point-conversions-2026-11-12)
+- [Player identity: names were doing an id's job (2026-11-13)](#player-identity-names-were-doing-an-ids-job-2026-11-13) — **shipped**
 
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
@@ -6411,3 +6412,49 @@ null and count as zero, which only matters for those seasons' FPPG history.
 `SCORING_RULE` is now `fanduel-2026-11-13`, so the daily jobs re-score every
 record's actual side once more. `record_signals.py` had a fifth private copy of
 the rule (no return TDs, its own column choices) and now calls the package's.
+
+## Player identity: names were doing an id's job (2026-11-13)
+
+Found by reading the week 10 FantasyGuru position articles against the board:
+the disagreements that were too large to be opinion (James Cook projected 9.3
+after 15-25 every week, Kyle Pitts 2.5 after five straight games of 5+
+targets) were our joins, not their reads. Fixed on the user's instruction:
+"use player id and ensure we are mapping stats to the appropriate players".
+
+**Depth-chart roles (shipped).** `DepthChartAnalyzer` keyed roles by display
+name; nflverse's chart carries suffixes the roster lacks ("James Cook III",
+"Kyle Pitts Sr.", "Aaron Jones Sr."). 14 rostered skill players in week 10 had
+a chart row by gsis id and missed it by name, fell to `_UNKNOWN_RANK` = 3, and
+were discounted as backups: RB x0.55, TE x0.30. The fuzzy fallback (last name +
+first initial) also handed Bijan Robinson's RB1 rank to his teammate Brian
+Robinson (RB3). On the 2026 record those 15 players were under-projected by
+3.25 points a game against 1.39 for the board (n=64); Cook by 11.7 a game over
+seven weeks, Minshew 11.3, Pitts 5.4. Roles are now looked up by gsis id, then
+by suffix-free name on the same team, and a name never bridges two different
+known ids. The draft-slot lookup (rookie prior) was an unanchored regex
+`contains`; now id, then exact suffix-free name.
+
+**One row per player (shipped).** Rosters and projections de-duplicated by
+NAME: one player under two spellings came out as two rows with one id, and the
+simulator's `float(sm.loc[pid])` killed the 2026-11-13 Friday refresh (NFL-API
+guards it too). Two players sharing a name ("Justin Jefferson", MIN WR and CLE
+LB) were one. Both are keyed by id now.
+
+**FanDuel slates (shipped).** No shared id exists, so `names.Matcher` is now
+the one matcher for everything that reads a slate (optimizer, /dfs/targets,
+ownership, lineup scoring, /dfs salaries): name + team, then a name unique on
+the board, then a unique last name at the position on the team with agreeing
+first names. FanDuel spells "Tre' Harris", "Joshua Palmer", "Matt Hibner" and
+writes JAC/LAR; all missed before. In lineup scoring a miss became "his team
+played, so he scored 0" -- a false zero in the FPPG and best-possible
+baselines. Unmatched stays visible as no projection; it is never guessed.
+
+**Training data (held for the backtest).** `build_dataset` joined snap counts
+on display name: 78 of 1,255 2026 player-weeks with 5+ looks had no snaps
+(Burden III, Metcalf, Gordon II, Fannin Jr., DJ Moore), and the CLE linebacker
+took the MIN receiver's 63 week-5 snaps. The pre-2025 depth-chart merge
+multiplied rows (one per formation slot): ~6,000 duplicated player-weeks a
+season in 2018-2024 -- the source of the cached-board duplicates logged above.
+The fix (snaps by pfr_id -> gsis_id through `load_players`, 99.7% coverage;
+one depth row per player-week) changes what the model trains on, so it goes
+through the standard backtest before it ships. Result to follow.
