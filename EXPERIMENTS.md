@@ -6386,6 +6386,28 @@ player-weeks change, 151 of them by +2. The shadow-model grade reads those
 same rows, so it follows. The projection scorer's old `--rescore` deletes and
 rebuilds rows from current projections and is still not the tool for this.
 
-Not changed: return touchdowns. FanDuel pays a skill player's kick, punt or
-fumble-recovery return TD, and no scorer here counts `special_teams_tds`. It
-is rare at these positions and was not part of this fix.
+Not changed in that fix: return touchdowns. FanDuel pays a skill player's
+kick, punt or fumble-recovery return TD, and no scorer here counted
+`special_teams_tds`. Added the next day; see below.
+
+**Return and fumble-recovery touchdowns (2026-11-13).** Added on the user's
+instruction. FanDuel pays +6 for each. nflverse holds them in two columns that
+never overlap on 2018-2026 skill rows: `special_teams_tds` (kick, punt and
+blocked-kick returns; 96 player-weeks) and `fumble_recovery_tds` (falling on
+a teammate's loose ball in the end zone; 19). nflverse's own `fantasy_points`
+counts the first and not the second, which is why some of those rows show
+0.0 for a touchdown. Both are now in `fanduel_points_from_stats` and in
+NFL-API's mirror, and the cross-repo test row carries both.
+
+Size: 9-21 skill player-weeks a season out of ~5,800 (0.2%), 86 of 115 of
+them WRs. On the 2026 scored record, 2 of 2,872 rows move, +6 each (weeks 3
+and 8, both return men). Too small to move an MAE; it is here so an actual
+is what FanDuel paid.
+
+Plumbing: NFL-API's `player_stats` table had `special_teams_tds` but no
+`fumble_recovery_tds`; the column is added by the light migration and filled
+by the loader's forced current-season reload. Rows from earlier seasons stay
+null and count as zero, which only matters for those seasons' FPPG history.
+`SCORING_RULE` is now `fanduel-2026-11-13`, so the daily jobs re-score every
+record's actual side once more. `record_signals.py` had a fifth private copy of
+the rule (no return TDs, its own column choices) and now calls the package's.

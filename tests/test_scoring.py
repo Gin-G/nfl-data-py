@@ -85,6 +85,15 @@ def test_from_stats_reads_either_interception_name_and_survives_nan():
     assert fanduel_points_from_stats(_frame(passing_yards=float("nan"), rushing_tds=1)).iloc[0] == 6.0
 
 
+def test_return_and_fumble_recovery_touchdowns_pay_six():
+    """FanDuel pays a skill player for both; neither was counted before 2026-11-13."""
+    from nfl_projections.scoring import fanduel_points_from_stats
+    assert fanduel_points_from_stats(_frame(special_teams_tds=1)).iloc[0] == 6.0
+    assert fanduel_points_from_stats(_frame(fumble_recovery_tds=1)).iloc[0] == 6.0
+    both = _frame(receiving_yards=40, special_teams_tds=1, fumble_recovery_tds=1)
+    assert fanduel_points_from_stats(both).iloc[0] == 16.0
+
+
 def test_every_module_scores_the_same_way():
     """The training target, opportunity, FPA and scarcity used to disagree."""
     import pandas as pd
@@ -93,7 +102,7 @@ def test_every_module_scores_the_same_way():
     row = _frame(passing_yards=312, passing_tds=2, passing_interceptions=1,
                  rushing_yards=104, rushing_tds=1, receptions=3, receiving_yards=22,
                  rushing_fumbles=2, rushing_fumbles_lost=1, sack_fumbles_lost=1,
-                 passing_2pt_conversions=1)
+                 passing_2pt_conversions=1, special_teams_tds=1, fumble_recovery_tds=1)
     want = fanduel_points_from_stats(row).iloc[0]
     assert opportunity._points(row).iloc[0] == want
     assert fpa._points(row).iloc[0] == want

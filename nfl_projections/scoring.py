@@ -65,6 +65,13 @@ def fanduel_points_from_stats(stats, scoring=None):
     2026-11-12 the training target charged every fumble and paid nothing for a
     conversion, while three other modules each had their own version.
 
+    It also pays +6 for a return touchdown and for an offensive fumble
+    recovery touchdown. nflverse keeps those in two columns that never
+    overlap: `special_teams_tds` (kick, punt and blocked-kick returns) and
+    `fumble_recovery_tds` (a player falling on a loose ball in the end zone).
+    Neither was counted before 2026-11-13. nflverse's own `fantasy_points`
+    counts the first and not the second.
+
     Only the lost-fumble columns are read: falling back to the all-fumbles
     ones when they are absent would quietly restore the old rule. A missing
     column counts as zero. Returns a float Series on the frame's index.
@@ -88,5 +95,6 @@ def fanduel_points_from_stats(stats, scoring=None):
         two_point_conversions=(col("passing_2pt_conversions")
                                + col("rushing_2pt_conversions")
                                + col("receiving_2pt_conversions")),
+        return_tds=col("special_teams_tds") + col("fumble_recovery_tds"),
         scoring=scoring,
     ), index=stats.index, dtype=float)
