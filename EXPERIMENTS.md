@@ -6457,4 +6457,26 @@ multiplied rows (one per formation slot): ~6,000 duplicated player-weeks a
 season in 2018-2024 -- the source of the cached-board duplicates logged above.
 The fix (snaps by pfr_id -> gsis_id through `load_players`, 99.7% coverage;
 one depth row per player-week) changes what the model trains on, so it goes
-through the standard backtest before it ships. Result to follow.
+through the standard backtest before it ships.
+
+**Backtest (2025 wk 1-18, train <2025, 60 epochs, both arms on the corrected
+FanDuel target, paired on 5,880 player-weeks):**
+
+| arm | rows | duplicated player-weeks | MAE 1 seed | MAE 3 seeds | corr 3 seeds |
+|---|--:|--:|--:|--:|--:|
+| name joins (as shipped) | 198,879 | 24,500 | 4.194 | 4.165 | 0.635 |
+| id joins | 174,379 | 0 | 4.212 | **4.165** | **0.640** |
+
+Paired 3-seed difference **+0.000, 95% CI by week [-0.017, +0.015]**, the id
+arm better in 9 of 18 weeks; by position QB +0.028, RB +0.006, WR -0.021,
+TE +0.021, none outside noise. The single-seed gap (+0.018) was seed noise:
+each arm moved ~0.03-0.05 between one seed and three. A tie on accuracy, a
+slightly better ranking, and correct data. **Kept.** 4.165 (3 seeds, corrected
+target, id joins) is the new reference for the reruns that follow.
+
+Note for the ledger as a whole: every model experiment before this one loaded
+`data/nfl_dataset.csv` (built 2026-10-28) or a board cached from it, so it ran
+on the name joins, the duplicated rows and the old target. A/B deltas mostly
+share that flaw across both arms; the ones at risk are tests OF snaps, roles
+and depth, thin-margin closures, and lineup results on real slates. Those are
+being rerun on the clean data, each logged against its original.

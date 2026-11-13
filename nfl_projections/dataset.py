@@ -50,16 +50,10 @@ def process_snap_counts(snap_data):
     """Rename snap columns to our schema, add total_snaps, clean percentages."""
     processed = snap_data.copy()
 
-    player_id_col = None
-    for col in ["player", "player_id", "player_display_name", "gsis_id"]:
-        if col in processed.columns:
-            player_id_col = col
-            break
-    if player_id_col is None:
-        logger.warning("Could not find player ID column in snap data")
-        return processed
-
-    mapping = {player_id_col: "player_id", **SNAP_COLUMN_MAPPING}
+    # The player is identified by `pfr_player_id` (and `player`, a display
+    # name); merge_snaps turns that into a gsis id. This used to rename the
+    # NAME column to `player_id` and join on it.
+    mapping = dict(SNAP_COLUMN_MAPPING)
     processed = processed.rename(
         columns={old: new for old, new in mapping.items() if old in processed.columns}
     )
@@ -83,6 +77,78 @@ def process_snap_counts(snap_data):
             processed[col] = processed[col].fillna(0)
 
     return processed
+
+
+def _norm(series):
+    from .utils import normalize_player_name
+    return series.map(normalize_player_name)
+
+
+def merge_snaps(player_stats, snap_data, crosswalk=None):
+    """Attach snap counts to stats rows by PLAYER ID, not by name.
+
+    Snap counts come from PFR and carry PFR's id; stats carry the gsis id. The
+    crosswalk (nflreadpy.load_players: gsis_id <-> pfr_id) bridges them, and
+    covered 99.7% of 2026 skill snap rows. The rest fall back to the suffix-free
+    name on the same team and week.
+
+    Until 2026-11-13 this joined on display name. The two feeds spell names
+    differently ("Luther Burden III", "DK Metcalf", "Ollie Gordon II"), so 78 of
+    1,255 2026 player-weeks with 5+ looks had no snaps, and names collide: the
+    Browns' linebacker Justin Jefferson took the Vikings receiver's 63 week-5
+    snaps, and the receiver got a second week-5 row with none.
+    """
+    snap = snap_data.copy()
+    snap["gsis_id"] = pd.NA
+    if (crosswalk is not None and not crosswalk.empty
+            and "pfr_player_id" in snap.columns):
+        xw = crosswalk.dropna(subset=["pfr_id", "gsis_id"]).drop_duplicates("pfr_id")
+        snap["gsis_id"] = snap["pfr_player_id"].map(dict(zip(xw.pfr_id, xw.gsis_id)))
+    name_col = ("player_display_name" if "player_display_name" in player_stats.columns
+                else "player_name")
+    team_col = "team" if "team" in player_stats.columns else "recent_team"
+    missing = snap["gsis_id"].isna()
+    if missing.any() and "player" in snap.columns and team_col in player_stats.columns:
+        keys = player_stats[["player_id", name_col, team_col, "season", "week"]].copy()
+        keys["_n"] = _norm(keys[name_col])
+        keys = keys.drop_duplicates(["_n", team_col, "season", "week"], keep=False)
+        lookup = {(n, t, s_, w): pid for pid, n, t, s_, w in zip(
+            keys.player_id, keys._n, keys[team_col], keys.season, keys.week)}
+        sub = snap[missing]
+        snap.loc[missing, "gsis_id"] = [
+            lookup.get((n, t, s_, w)) for n, t, s_, w in zip(
+                _norm(sub["player"]), sub.get("team"), sub["season"], sub["week"])]
+    snap = snap.dropna(subset=["gsis_id"])
+    keep = ["gsis_id", "season", "week"] + [c for c in SNAP_COLUMNS if c in snap.columns]
+    snap = snap[keep].drop_duplicates(["gsis_id", "season", "week"], keep="first")
+    out = player_stats.merge(snap, left_on=["player_id", "season", "week"],
+                             right_on=["gsis_id", "season", "week"], how="left")
+    return out.drop(columns=["gsis_id"])
+
+
+def merge_depth(df, depth_charts):
+    """Attach each player-week's best depth-chart line, once.
+
+    Before 2025 nflverse's weekly charts list a player once per formation slot,
+    and joining them as they were multiplied the rows: ~6,000 duplicated
+    player-weeks a season in 2018-2024, which the cached backtest boards then
+    carried (EXPERIMENTS.md, duplicate rows). One row per player-week now, the
+    highest line he appears on.
+    """
+    cols = [c for c in ("gsis_id", "season", "week", "position", "depth_team")
+            if c in depth_charts.columns]
+    if not {"gsis_id", "season", "week"} <= set(cols):
+        return df
+    d = depth_charts[cols].dropna(subset=["gsis_id"]).copy()
+    if "depth_team" in d.columns:
+        d["_line"] = pd.to_numeric(d["depth_team"], errors="coerce")
+        d = d.sort_values("_line", na_position="last").drop(columns="_line")
+    d = d.drop_duplicates(["gsis_id", "season", "week"], keep="first")
+    out = df.merge(d, left_on=["player_id", "season", "week"],
+                   right_on=["gsis_id", "season", "week"],
+                   how="left", suffixes=("", "_depth_chart"))
+    return out.drop(columns=[c for c in ("gsis_id", "gsis_id_depth_chart")
+                             if c in out.columns])
 
 
 def add_season_averages(df):
@@ -218,29 +284,19 @@ def build_dataset(seasons=None, output_path=config.DATASET_PATH):
         load_through_latest(nfl.load_snap_counts, seasons, "snap counts")[0])
 
     print("Merging snap count data...")
-    name_col = "player_display_name" if "player_display_name" in player_stats.columns else "player_name"
-    snap_for_merge = snap_data.rename(columns={"player_id": name_col}).drop(
-        columns=["position", "team", "opponent", "game_id", "pfr_game_id", "game_type"],
-        errors="ignore",
-    )
-    df = pd.merge(player_stats, snap_for_merge, on=[name_col, "season", "week"], how="left")
+    try:
+        crosswalk = to_pandas(nfl.load_players())[["gsis_id", "pfr_id"]]
+    except Exception as exc:  # pragma: no cover - network
+        logger.warning("No player id crosswalk (%s); snaps join on name + team", exc)
+        crosswalk = None
+    df = merge_snaps(player_stats, snap_data, crosswalk)
 
     if "offensive_snaps" in df.columns:
         coverage = df["offensive_snaps"].notna().sum()
         print(f"Snap count coverage: {coverage:,}/{len(df):,} ({coverage / len(df) * 100:.1f}%)")
 
     print("Merging depth chart data...")
-    depth_slim = depth_charts[["gsis_id", "season", "week", "position", "depth_team"]].copy()
-    df = pd.merge(
-        df, depth_slim,
-        left_on=["player_id", "season", "week"],
-        right_on=["gsis_id", "season", "week"],
-        how="left", suffixes=("", "_depth_chart"),
-    )
-    if "gsis_id_depth_chart" in df.columns:
-        df = df.drop(columns=["gsis_id_depth_chart"])
-    if "gsis_id" in df.columns:
-        df = df.drop(columns=["gsis_id"])
+    df = merge_depth(df, depth_charts)
 
     for col in SNAP_COLUMNS:
         if col not in df.columns:

@@ -118,3 +118,49 @@ class TestLoadThroughLatest:
         load, _ = self._loader(2024, "404 Client Error")
         with pytest.raises(ConnectionError):
             dataset.load_through_latest(load, [2024, 2025, 2026], "stats")
+
+
+class TestMergeSnapsById:
+    def _stats(self):
+        return pd.DataFrame({
+            "player_id": ["wr", "lb", "burden"],
+            "player_display_name": ["Justin Jefferson", "Justin Jefferson",
+                                    "Luther Burden"],
+            "team": ["MIN", "CLE", "CHI"], "season": 2026, "week": 5,
+        })
+
+    def _snaps(self):
+        return dataset.process_snap_counts(pd.DataFrame({
+            "player": ["Justin Jefferson", "Justin Jefferson", "Luther Burden III"],
+            "pfr_player_id": ["JeffJu00", "JeffJu01", "BurdLu00"],
+            "team": ["MIN", "CLE", "CHI"], "season": 2026, "week": 5,
+            "offense_snaps": [63, 0, 40], "offense_pct": [0.89, 0.0, 0.6],
+            "defense_snaps": [0, 55, 0], "st_snaps": [0, 10, 2],
+        }))
+
+    def test_namesakes_get_their_own_snaps(self):
+        xw = pd.DataFrame({"gsis_id": ["wr", "lb", "burden"],
+                           "pfr_id": ["JeffJu00", "JeffJu01", "BurdLu00"]})
+        out = dataset.merge_snaps(self._stats(), self._snaps(), xw)
+        assert len(out) == 3
+        assert out.set_index("player_id").offensive_snaps.to_dict() == {
+            "wr": 63, "lb": 0, "burden": 40}
+
+    def test_without_a_crosswalk_falls_back_to_name_on_team(self):
+        out = dataset.merge_snaps(self._stats(), self._snaps(), None)
+        assert len(out) == 3
+        snaps = out.set_index("player_id").offensive_snaps
+        assert snaps["wr"] == 63 and snaps["lb"] == 0
+        assert snaps["burden"] == 40          # the suffix does not lose him
+
+
+class TestMergeDepth:
+    def test_one_row_per_player_week_at_his_best_line(self):
+        df = pd.DataFrame({"player_id": ["a"], "season": [2023], "week": [3],
+                           "position": ["WR"]})
+        depth = pd.DataFrame({"gsis_id": ["a", "a", "a"], "season": 2023, "week": 3,
+                              "position": ["WR", "WR", "KR"],
+                              "depth_team": ["2", "1", "3"]})
+        out = dataset.merge_depth(df, depth)
+        assert len(out) == 1
+        assert out.depth_team.iloc[0] == "1"
