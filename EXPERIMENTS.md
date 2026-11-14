@@ -6622,7 +6622,7 @@ The bugs were in volume, roles and the target; the matchup harnesses never
 touched them.
 
 **8. Training on the current season alone, #39 weekly retrain
-(`train_window_expanding.py`, SEEDS=3) -- FLIPPED.** Stopped by
+(`train_window_expanding.py`, SEEDS=3) -- original OVERTURNED, now a TIE.** Stopped by
 the host for low memory after week 14; weeks 15-18 still to run. 2025, each
 week retrained on that season's prior weeks only, against one model trained on
 all prior seasons, identical player-weeks:
@@ -6664,3 +6664,31 @@ still touches zero, so the honest reading is "current-season-only is at least
 as good after the first few weeks", which is what the live model already does.
 Two differences between the runs, not one: clean data and corrected target,
 and 3 seeds against 1. The original's "never closes" claim is withdrawn.
+
+**Correction the same night: the flip is run-to-run noise.** The identical
+harness retrained on the cluster (experiment run 1, nfl-data-py ec0cecd, CPU
+rather than this workstation's GPU, same 3 seeds) read **4.143 vs 4.136,
++0.007**, current-only ahead in 9 of 14 weeks. Two runs of one configuration
+differ by 0.033, more than the effect. What both runs agree on: the original
++0.068 does not reproduce on clean data; full history is better in weeks 5-10
+(+0.056 here) and current-only slightly better in weeks 11-18 (-0.027 here,
+about -0.05 locally). The honest verdict is a **TIE**, not a win either way.
+
+**And in lineups (`window_lineups.py`, same cluster run):** 25 cash lineups a
+week from each model's projections, 2025 weeks 5-18, salary model fitted on
+the 2026 slates, eight skill slots, cash bar 113.8 (120 less an average
+defence):
+
+| | current only | full history | paired (95% CI by week) | current ahead |
+|---|--:|--:|--:|--:|
+| the #1 lineup, actual | 112.9 | 121.4 | -8.5 [-21.4, +4.4] | 5/14 |
+| top 5 | 113.1 | 119.1 | -6.0 [-14.7, +2.8] | 8/14 |
+| all 25 | 111.4 | 114.8 | -3.5 [-9.5, +2.5] | 5/14 |
+| #1 lineup clears the bar | 7/14 | 8/14 | | |
+
+The point estimates favour full history, carried by three weeks (8, 14, 15)
+where its builds scored 45-50 more; every interval spans zero. Per-player MAE
+cannot see this, which is the reason the lineup test exists. Inconclusive at
+14 weeks. Nothing changes in production; the live window stays the user's
+call, and the shadow record (GET /projections/shadow/accuracy) is the
+prospective read.
