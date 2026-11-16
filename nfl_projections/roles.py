@@ -98,6 +98,17 @@ DEFAULT_BUDGETS = {"QB": 22.4, "RB": 31.0, "WR": 41.9, "TE": 14.4}
 # player-weeks that cannot resolve its size — confirmed in sign, not in size.
 PROMOTION_FACTOR = {"RB": 1.0, "QB": 1.29, "WR": 1.0, "TE": 1.0}
 
+# The one RB promotion that does get a factor: the RB2 taking over the RB1's
+# job. The October end-to-end test set the RB factor to 1.0 because x1.42 hurt
+# the promoted backs as a whole -- but that pool was mostly RB3-5, who barely
+# play either way. Split by rank (clean rerun, 2026-11-16), the RB2 whose RB1
+# is out averages 10.57 points against 6.42 projected without the factor and
+# 9.12 with it, at identical MAE (6.825 vs 6.851, CI spanning zero), and the
+# whole-board MAE and RB top-12 overlap do not move. One in five of them
+# scored 20+. 2026 week 10: Kenneth Walker ruled out, Emmett Johnson projected
+# 6.0 and capped at x1.25 by the promotion alone; he scored 35.1.
+PROMOTION_INTO_STARTER = {"RB": 1.42}
+
 _SKILL = ("RB", "WR", "TE")
 
 
@@ -151,6 +162,8 @@ def promotion_multiplier(position, depth_rank, out_ranks=()) -> float:
     if static <= 0:
         return 1.0
     lift = per_game_role_multiplier(position, promoted) / static
+    if rank == 2 and promoted == 1 and position in PROMOTION_INTO_STARTER:
+        return lift * PROMOTION_INTO_STARTER[position]
     return lift * PROMOTION_FACTOR.get(position, 1.0)
 
 

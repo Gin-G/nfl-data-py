@@ -123,10 +123,22 @@ def test_promotion_undoes_the_discount():
     (experiments/promotion_endtoend.py). Asserted against the constant rather
     than a literal so the test states the composition, not the number.
     """
-    promo = roles.promotion_multiplier("RB", 2, [1])
-    expected = (1.0 / 0.80) * roles.PROMOTION_FACTOR["RB"]
+    promo = roles.promotion_multiplier("RB", 3, [1, 2])
+    expected = (1.0 / 0.55) * roles.PROMOTION_FACTOR["RB"]
     assert promo == pytest.approx(expected, rel=1e-6)
     assert roles.PROMOTION_FACTOR["RB"] == 1.0
+
+
+def test_the_rb2_taking_over_the_job_gets_the_starter_factor():
+    """The exception, scoped by rank (2026-11-16): the RB2 whose RB1 is out
+    averaged 10.6 points against 6.4 projected parameter-free, and x1.42 there
+    is MAE-neutral. Deeper backs keep the parameter-free promotion."""
+    promo = roles.promotion_multiplier("RB", 2, [1])
+    assert promo == pytest.approx((1.0 / 0.80) * 1.42, rel=1e-6)
+    # an RB3 promoted only to RB2 (RB2 out) is not taking the starter's job
+    assert roles.promotion_multiplier("RB", 3, [2]) == pytest.approx(0.80 / 0.55)
+    # a receiver promoted into the top spot gets no such factor
+    assert roles.promotion_multiplier("WR", 2, [1]) == pytest.approx(1.0 / 0.92)
 
 
 def test_only_the_quarterback_keeps_an_extra_factor():
@@ -138,6 +150,7 @@ def test_only_the_quarterback_keeps_an_extra_factor():
     assert roles.PROMOTION_FACTOR["QB"] > 1.0
     for position in ("RB", "WR", "TE"):
         assert roles.PROMOTION_FACTOR[position] == 1.0
+    for position in ("WR", "TE"):
         promo = roles.promotion_multiplier(position, 2, [1])
         static = roles.per_game_role_multiplier(position, 2)
         assert promo == pytest.approx(1.0 / static, rel=1e-6)

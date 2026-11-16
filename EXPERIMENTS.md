@@ -161,6 +161,7 @@ idea again.
 - [FanDuel scoring corrected: lost fumbles and two-point conversions (2026-11-12)](#fanduel-scoring-corrected-lost-fumbles-and-two-point-conversions-2026-11-12)
 - [Player identity: names were doing an id's job (2026-11-13)](#player-identity-names-were-doing-an-ids-job-2026-11-13) — **shipped**
 - [Reruns on clean data: what the identity bugs did to earlier results (2026-11-13)](#reruns-on-clean-data-what-the-identity-bugs-did-to-earlier-results-2026-11-13)
+- [The RB2 who takes the job: Kenneth Walker out, and two failures (2026-11-16)](#the-rb2-who-takes-the-job-kenneth-walker-out-and-two-failures-2026-11-16) — **shipped**
 
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
@@ -6692,3 +6693,45 @@ cannot see this, which is the reason the lineup test exists. Inconclusive at
 14 weeks. Nothing changes in production; the live window stays the user's
 call, and the shadow record (GET /projections/shadow/accuracy) is the
 prospective read.
+
+## The RB2 who takes the job: Kenneth Walker out, and two failures (2026-11-16)
+
+2026 week 10, main slate. Kenneth Walker (KC RB1, the board's #1 RB at 20.4)
+was ruled out. Emmett Johnson, projected 6.0, played the whole backfield: 22
+carries, 7 targets, **35.1** FanDuel points. Neither the board nor a build
+used him.
+
+**Operational.** The weekend refresh did not run: the cluster was unreachable
+(Cloudflare 523 on nickknows.net, 503 on the API). And the lineup builder had
+no way to react to a scratch without a full projection run. Built: a pool rule
+`out` (dashboard: the person-x button; builds: `Name:out`) that zeroes the
+player and applies production's own `roles.promotion_multiplier` to his
+teammates on the stored board -- arithmetic, no model, no cluster job. Depth
+rank is now stored on every projection row for it; boards written before that
+fall back to the board's own order within team and position.
+
+**In the model.** Even a refresh that ran would have priced Johnson at 7.5:
+the RB2-into-RB1 promotion was x1.25, the backup discount undone and nothing
+more, because the October end-to-end test set the RB factor to 1.0. That test
+pooled every promoted back, mostly RB3-5. Split by rank on the clean rerun's
+saved arms (2025 + 2026 wk 1-10):
+
+| promoted RB | n | actual | parameter-free | x1.42 | MAE free / x1.42 |
+|---|--:|--:|--:|--:|--:|
+| RB2 into RB1 | 87 | **10.57** | 6.42 | 9.12 | 6.825 / 6.851 |
+| RB3 | 190 | 2.97 | 2.38 | 3.37 | 2.618 / 2.967 |
+| RB4 | 74 | 2.16 | 1.50 | 2.12 | 1.949 / 2.027 |
+
+At RB2-into-RB1 the factor is a tie on MAE (gain -0.026, 90% [-0.394,
++0.349]) and removes a -4.2-point under-projection; one in five of those backs
+scored 20+. Applied only there (`roles.PROMOTION_INTO_STARTER = {"RB": 1.42}`):
+whole board 3.9793 -> 3.9795 (90% [-0.0041, +0.0036]), RB top-12 overlap
+0.4464 both ways, and the promoted RB2's median board rank 34 -> 25.
+
+**Shipped as a judgment call, recorded as neutral.** It wins nothing measured
+here -- MAE and top-12 overlap are flat -- and #31 ("the bias that should not be
+corrected") argues against inflating to remove bias. It ships anyway because the
+metrics are flat while the bias sits in exactly the cheap-value backs a lineup
+builder should see, and it is scoped so the deep backups that made x1.42 lose in
+October are untouched. Johnson under it: 6.0 x 1.25 x 1.42 = 10.7. If the
+prospective record shows promoted RB2s now over-projected, it comes out.
