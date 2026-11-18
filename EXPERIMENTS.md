@@ -162,6 +162,8 @@ idea again.
 - [Player identity: names were doing an id's job (2026-11-13)](#player-identity-names-were-doing-an-ids-job-2026-11-13) — **shipped**
 - [Reruns on clean data: what the identity bugs did to earlier results (2026-11-13)](#reruns-on-clean-data-what-the-identity-bugs-did-to-earlier-results-2026-11-13)
 - [The RB2 who takes the job: Kenneth Walker out, and two failures (2026-11-16)](#the-rb2-who-takes-the-job-kenneth-walker-out-and-two-failures-2026-11-16) — **shipped**
+- [Vacated opportunity: pricing the inherited work, and week 10 rebuilt with the scratch (2026-11-16)](#vacated-opportunity-pricing-the-inherited-work-and-week-10-rebuilt-with-the-scratch-2026-11-16) — negative (model); scratch tool confirmed
+- [ESPN injury overlay: Sunday news the Friday report never carries (2026-11-16)](#espn-injury-overlay-sunday-news-the-friday-report-never-carries-2026-11-16) — **shipped**, not backtestable
 
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
@@ -6735,3 +6737,92 @@ metrics are flat while the bias sits in exactly the cheap-value backs a lineup
 builder should see, and it is scoped so the deep backups that made x1.42 lose in
 October are untouched. Johnson under it: 6.0 x 1.25 x 1.42 = 10.7. If the
 prospective record shows promoted RB2s now over-projected, it comes out.
+
+
+## Vacated opportunity: pricing the inherited work, and week 10 rebuilt with the scratch (2026-11-16)
+
+Script: `experiments/vacated_opportunity.py`. Follow-up to the entry above, and
+the Rams question (several pass catchers out at once). The user's framing for
+the RB case: the backup's projection should be the vacated *opportunity* times
+his own value per opportunity, not a rank multiplier on his backup number.
+
+**Feature.** For each active player on a team with a *fresh* absence (a regular
+-- 2+ games, 6+ backfield or 3+ target opportunities a game -- who played the
+team's previous game and has no offensive snap this week, by gsis id):
+inherited = vacated per-game opportunities x his share of the active pool x his
+trailing FanDuel points per opportunity, shrunk with 30 pseudo-opportunities.
+Carries to RBs only, targets to WR/TE/RB. Board: the clean promotion harness's
+`proposed` arm with the shipped RB2-into-RB1 x1.42, 2025 + 2026 wk 1-10, 6,090
+rows. (A first pass without the "fresh" rule tagged 40% of rows, every IR
+player counted vacated every week; discarded.)
+
+**Slope stage** (board residual on inherited points, 95% CI):
+
+| rows | n | mean inherited | mean residual | slope |
+|---|--:|--:|--:|--:|
+| all touched | 1046 | 1.74 | +1.78 | +0.156 +- 0.164 |
+| RB | 134 | 4.95 | +2.18 | +0.231 +- 0.287 |
+| WR/TE | 912 | 1.27 | +1.72 | +0.070 +- 0.319 |
+| RB2 into RB1 | 29 | 8.98 | +5.11 | -0.033 +- 0.887 |
+
+Untouched rows run +1.04 (RB) and +0.81 (WR/TE), so a fresh absence adds about
+a point of under-projection to every teammate, flat: by inherited quartile the
+WR/TE residual is 1.1 / 2.1 / 2.0 / 1.7, no slope. RBs do rise (1.2 / 1.4 / 2.0
+/ 4.1, n=33-34 each) but the CI covers zero.
+
+**Payment stage** (fit on one season, applied to the other, intercept dropped;
+positive = worse): RB k = 0.07 / 0.58 between folds; touched RB MAE 4.767 ->
+5.129 (+0.362, 90% [+0.090, +0.661]). WR/TE k = 0.97 / 0.69; touched 3.965 ->
+4.078 (+0.113, [+0.033, +0.196]); whole board +0.024 [+0.007, +0.041].
+**Both lose.** Pricing the full job for the RB2 into RB1 (own + starter's
+opportunities x own rate, no fitted parameter): mean 17.1 against actual 13.2
+and board 8.1, MAE 9.64 vs 7.89, corr -0.10. The outcomes are bimodal (0.7 to
+33.9 across 29 backs) and nothing in the usage history says which ones boom.
+Not shipped. The Rams-type redistribution has no ordering signal at this n.
+
+**What the board cannot do, the lineup builder can.** Week 10 rebuilt on
+production with the new Out rule (`track=false`, nothing saved), 5 lineups,
+mean objective, skill-player actual points (DEF not scored; Omar Cooper Jr., in
+two lineups, did not play):
+
+| build | lineups' actual | mean | best | clear 113.8 |
+|---|---|--:|--:|--:|
+| as the board stood | 92.5, 99.9, 82.0, 68.1, 123.6 | 93.2 | 123.6 | 1/5 |
+| Kenneth Walker III:out | 117.4, 99.9, 113.4, 173.1, 141.0 | 129.0 | 173.1 | 3/5 |
+
+Johnson (10.8 at $5,100 after promotion) enters two lineups, and the salary he
+frees goes where the user said it would: Smith-Njigba in one, McCaffrey plus
+Cook in the other. One week, a hindsight-known scratch and big outcomes
+(35.1, 47.3, 41.0), so this is a demonstration that the tool reacts the right
+way, not a measurement of its worth. The board's x1.42 level for these backs
+(8.1 vs 13.2 actual on fresh absences here) is still low; the evidence does not
+support going further from the usage history, and the user's own read of the
+situation (90% field ownership) is the extra information the board lacks.
+
+
+## ESPN injury overlay: Sunday news the Friday report never carries (2026-11-16)
+
+Not a model test; a data-source change, recorded because it changes the board
+and cannot be backtested. nflverse's `load_injuries` row for Kenneth Walker,
+2026 week 10, still read Questionable / DNP after the game; he was ruled out
+Sunday. ESPN's public feed (`site.api.espn.com/.../nfl/injuries`) and
+Sleeper's both had him Out. ESPN chosen: athlete ids map to gsis through
+nflverse's `load_players.espn_id` (Walker 4567048 -> 00-0038134); Sleeper's
+gsis is null for most players.
+
+`injuries.integrate_injuries_detailed(source="nflverse+espn")` overlays ESPN on
+the report for news dated inside the projected week (the day after the prior
+week's last game, 10:00 UTC, to the same point after this week's), in both
+directions: Q -> Out benches, Doubtful -> Active clears. Outside the window it
+does nothing, so backtests and harnesses (which never pass the source) are
+untouched, and last Sunday's stale "Out" never benches anyone on a Tuesday run.
+Live check: week 10 window, 385 skill rows, 339 dated in-window, 57 status
+changes against the report; week 11 (run Monday) 0 in-window. NFL-API's
+projection job uses it by default (`INJURY_SOURCE`), and
+`GET /optimizer/injury-check` (dashboard: "Check injuries") lists the slate
+players whose ESPN status disagrees with the board, with who moves up, and
+applies nothing.
+
+Why no backtest: the feed is current-state only, one row per player, no
+history. What would show it is wrong: a prospective week where an ESPN-only
+Out played. Each run's changes are in its provenance (`espn_changes`).

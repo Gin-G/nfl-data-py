@@ -15,6 +15,7 @@ no longer required.
 import json
 import logging
 import os
+import re
 import time
 
 import pandas as pd
@@ -327,6 +328,185 @@ def fetch_nflverse_injuries(season, week):
     return _nflverse_injuries_with_coverage(season, week)[0]
 
 
+# -- ESPN overlay: the news that lands after Friday --------------------------
+#
+# nflverse carries the clubs' Friday designation and nothing after it. 2026
+# week 10: Kenneth Walker went into the weekend Questionable, was ruled out on
+# Sunday, and nflverse still listed him Questionable after the game. ESPN's
+# public injuries feed had him Out. It is a current-state snapshot -- one row per
+# player, the status as of the latest news, no history -- so it is used as an
+# overlay on the report, and only for news dated inside the week being
+# projected. Outside that window (an old week, or last Sunday's news on a Tuesday
+# run) it contributes nothing, which also keeps it out of every backtest.
+
+ESPN_INJURIES_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries"
+_ESPN_STATUS_MAP = {
+    "OUT": "OUT",
+    "DOUBTFUL": "DOUBTFUL",
+    "QUESTIONABLE": "QUESTIONABLE",
+    "INJURED RESERVE": "OUT",
+    "SUSPENSION": "OUT",
+    "ACTIVE": "ACTIVE",
+}
+# A Monday-night game is over by about 04:00 UTC Tuesday; news after this hour on
+# the day after a week's last gameday belongs to the next week.
+_WEEK_ROLLOVER_HOUR_UTC = 10
+
+
+def fetch_espn_payload(timeout=30):
+    """The raw ESPN injuries JSON: all 32 teams, one call, no key."""
+    response = requests.get(ESPN_INJURIES_URL, timeout=timeout,
+                            headers={"accept": "application/json"})
+    response.raise_for_status()
+    return response.json()
+
+
+def espn_crosswalk():
+    """ESPN athlete id -> gsis id, from nflverse's player table."""
+    import nflreadpy as nfl
+
+    players = to_pandas(nfl.load_players())[["espn_id", "gsis_id"]].dropna()
+    ids = pd.to_numeric(players.espn_id, errors="coerce")
+    players = players[ids.notna()]
+    return dict(zip(ids[ids.notna()].astype("int64").astype(str), players.gsis_id))
+
+
+def _espn_id(athlete):
+    for link in athlete.get("links") or []:
+        m = re.search(r"/id/(\d+)", str(link.get("href", "")))
+        if m:
+            return m.group(1)
+    m = re.search(r"/players/full/(\d+)\.", str((athlete.get("headshot") or {}).get("href", "")))
+    return m.group(1) if m else ""
+
+
+def parse_espn_injuries(payload, crosswalk=None):
+    """One row per skill player in the feed: who, team, status, when.
+
+    ``status`` is normalized (OUT / DOUBTFUL / QUESTIONABLE / ACTIVE); entries
+    with a status this does not know are dropped rather than guessed at. Teams go
+    through ``names.team_key`` (ESPN writes WSH and LAR), ids through the
+    crosswalk to gsis where nflverse has one.
+    """
+    from .names import team_key
+
+    crosswalk = crosswalk or {}
+    rows = []
+    for team in (payload or {}).get("injuries", []):
+        for entry in team.get("injuries", []):
+            athlete = entry.get("athlete") or {}
+            position = str((athlete.get("position") or {}).get("abbreviation", "")).upper()
+            if position not in SKILL_POSITIONS:
+                continue
+            status = _ESPN_STATUS_MAP.get(str(entry.get("status", "")).strip().upper())
+            if status is None:
+                continue
+            espn_id = _espn_id(athlete)
+            details = entry.get("details") or {}
+            rows.append({
+                "player_name": athlete.get("displayName", ""),
+                "team": team_key((athlete.get("team") or {}).get("abbreviation", "")),
+                "position": position,
+                "status": status,
+                "injury_type": details.get("type") or "Not specified",
+                "espn_id": espn_id,
+                "player_id": crosswalk.get(espn_id, ""),
+                "updated": pd.to_datetime(entry.get("date"), utc=True, errors="coerce"),
+                "comment": entry.get("shortComment", ""),
+            })
+    cols = ["player_name", "team", "position", "status", "injury_type", "espn_id",
+            "player_id", "updated", "comment"]
+    return pd.DataFrame(rows, columns=cols)
+
+
+def week_window(season, week, schedule=None):
+    """``(since, until)`` in UTC: news inside this belongs to ``week``.
+
+    From the day after the previous week's last game to the day after this
+    week's last game, each at the rollover hour. None when the schedule does not
+    have the week.
+    """
+    if schedule is None:
+        import nflreadpy as nfl
+        schedule = to_pandas(nfl.load_schedules(seasons=[season]))
+    sch = to_pandas(schedule)
+    sch = sch[(sch.season == season) & (sch.game_type == "REG")]
+    days = pd.to_datetime(sch.gameday, utc=True, errors="coerce")
+    this = days[sch.week == week]
+    if this.dropna().empty:
+        return None
+    roll = pd.Timedelta(days=1, hours=_WEEK_ROLLOVER_HOUR_UTC)
+    prev = days[sch.week == week - 1].dropna()
+    since = prev.max() + roll if not prev.empty else this.min() - pd.Timedelta(days=10)
+    return since, this.max() + roll
+
+
+def overlay_espn(injuries, espn, since, until):
+    """The report with ESPN's in-week news on top. ``(injuries, changes)``.
+
+    A player ESPN updated inside the window takes ESPN's status, in either
+    direction: Questionable -> Out benches him, Doubtful -> Active clears him.
+    Matched to the report's entry by gsis id, then by name and team. Players
+    ESPN has not touched this week keep the report's status, so a stale "Out"
+    from last Sunday never benches anyone.
+    """
+    from .names import name_key, team_key
+
+    out = dict(injuries)
+    changes = []
+    if espn is None or espn.empty:
+        return out, changes
+    fresh = espn[(espn.updated >= since) & (espn.updated < until)]
+    by_id = {str(v.get("player_id")): k for k, v in out.items() if v.get("player_id")}
+    by_name = {(name_key(k), team_key(v.get("team"))): k for k, v in out.items()}
+    for _, row in fresh.iterrows():
+        key = (by_id.get(row.player_id) if row.player_id else None) \
+            or by_name.get((name_key(row.player_name), row.team))
+        before = out[key]["status"] if key else None
+        if row.status == "ACTIVE":
+            if key:
+                del out[key]
+                changes.append({"player": key, "team": row.team, "position": row.position,
+                                "player_id": row.player_id, "from": before, "to": "ACTIVE"})
+            continue
+        if before == row.status:
+            continue
+        name = key or row.player_name
+        out[name] = {
+            "status": row.status,
+            "injury_type": row.injury_type,
+            "position": row.position,
+            "team": row.team,
+            "practice_status": (injuries.get(key) or {}).get("practice_status", "") if key else "",
+            "player_id": row.player_id,
+            "source": "espn",
+        }
+        changes.append({"player": name, "team": row.team, "position": row.position,
+                        "player_id": row.player_id, "from": before, "to": row.status})
+    return out, changes
+
+
+def espn_overlay_for_week(injuries, season, week, schedule=None, payload=None,
+                          crosswalk=None):
+    """Fetch ESPN and overlay it. ``(injuries, provenance)``; never raises."""
+    try:
+        window = week_window(season, week, schedule)
+        if window is None:
+            return injuries, {"espn_error": f"no schedule for week {week}"}
+        if payload is None:
+            payload = fetch_espn_payload()
+        if crosswalk is None:
+            crosswalk = espn_crosswalk()
+        espn = parse_espn_injuries(payload, crosswalk)
+    except Exception as e:  # network, schema drift: the report still stands
+        logger.warning("ESPN injury overlay skipped: %s", e)
+        return injuries, {"espn_error": str(e)}
+    merged, changes = overlay_espn(injuries, espn, *window)
+    fresh = int(((espn.updated >= window[0]) & (espn.updated < window[1])).sum())
+    return merged, {"espn_rows": int(len(espn)), "espn_fresh": fresh,
+                    "espn_since": window[0].isoformat(), "espn_changes": changes}
+
+
 # -- Sportradar source (optional fallback) ----------------------------------
 
 class SportradarInjuryAnalyzer:
@@ -434,7 +614,7 @@ def integrate_injuries(week, roster_data, depth_charts, season=2025, source="nfl
 
 
 def integrate_injuries_detailed(week, roster_data, depth_charts, season=2025,
-                                source="nflverse"):
+                                source="nflverse", schedule=None):
     """``(injury_overrides, backup_situations, provenance)``.
 
     ``provenance`` is what the sources offered for *this* week — which weeks the
@@ -454,6 +634,12 @@ def integrate_injuries_detailed(week, roster_data, depth_charts, season=2025,
             injuries = fetch_sportradar_injuries(season, week)
             if injuries:
                 used = "sportradar"
+    if source == "nflverse+espn":
+        # Opt-in: the live projection job asks for it; backtests and the
+        # experiment harnesses never do.
+        injuries, espn_prov = espn_overlay_for_week(injuries, season, week, schedule)
+        coverage = {**coverage, **espn_prov}
+        used = "nflverse+espn" if "espn_error" not in espn_prov else "nflverse"
 
     # IR/PUP from rosters is always folded in by build_overrides
     overrides, backups, counts = build_overrides_detailed(

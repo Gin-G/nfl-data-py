@@ -91,6 +91,11 @@ a null at n=100 is "inconclusive", not "no".
   NFL-API's hand-applied `k8s/` directory. It is in the helm chart from
   2026-11-10; before trusting a weekend board, check `computed_at` on
   `GET /projections/runs` rather than assuming the refresh fired.
+- Game-day inactives are **not** in nflverse (Walker, 2026 wk10, still read
+  Questionable after the game). From 2026-11-16 the live job overlays ESPN's
+  public injuries feed for news dated inside the projected week
+  (`source="nflverse+espn"`, opt-in; backtests never pass it). The feed has no
+  history, so it cannot be backtested.
 - The quantile band is ~2.1× the mean (spearman 0.9949), so the optimizer's
   `ceiling` objective **is** its `mean` objective. Only `floor` reorders.
 - `evaluate.backtest` skips `roles.py` entirely; `promotion_endtoend.py` is the
@@ -98,6 +103,8 @@ a null at n=100 is "inconclusive", not "no".
 
 ## Shipping
 
-Commit and push **only when asked**. The NFL-API image installs this package
+Commit and push **without asking** once the full suite passes (user's call,
+2026-11-18: these are dev projects; a push is what triggers the build). Push
+NFL-API too when the change spans both. The NFL-API image installs this package
 from the GitHub main tarball, so **push here first** or that build tests against
 the old code.

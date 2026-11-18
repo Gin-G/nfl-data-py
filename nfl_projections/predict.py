@@ -611,6 +611,7 @@ class Projector:
             overrides, backups, injury_provenance = integrate_injuries_detailed(
                 week=week, roster_data=self.rosters,
                 depth_charts=depth_charts, season=season, source=injury_source,
+                schedule=schedule,
             )
         else:
             overrides, backups = {}, {}
