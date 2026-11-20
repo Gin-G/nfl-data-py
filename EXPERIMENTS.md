@@ -6991,3 +6991,48 @@ applies only within the top slice. The `all` arm fits on every player.
 Status: a small, consistent board-accuracy lead for `/projections`. It is not
 a lineup lead, since the order doesn't move. The cluster run with a 5-seed
 2025 board follows the model reruns. Nothing ships before that.
+
+### Closed model A/Bs re-read on the top slice (2026-11-19, cluster runs 3-4)
+
+`experiments/topslice_rerun.py`, 5 seeds, 60 epochs. Every arm is retrained
+against a baseline on identical player-weeks. Delta = arm minus baseline MAE
+(negative means the arm is better). The CI is a week-clustered bootstrap.
+
+| arm | 2025 full | 2025 top | 2024 full | 2024 top |
+|---|--:|--:|--:|--:|
+| huber (#3) | +0.018 [+0.013, +0.023] | +0.031 [+0.019, +0.043] | +0.003 | −0.001 |
+| opponent (#4/#12) | +0.016 [+0.003, +0.035] | +0.032 [+0.017, +0.055] | +0.008 | +0.008 |
+| shallow (#27, train from s−1) | −0.001 | +0.043 [+0.017, +0.068] | −0.022 [−0.035, −0.009] | −0.019 [−0.041, +0.001] |
+| no_blend | +0.015 | **−0.071** [−0.160, +0.012] | +0.030 | **−0.054** [−0.125, +0.024] |
+
+- **Huber and opponent features stay closed, and the top makes them worse.**
+  - 2025 top: Huber's TE is +0.083, opponent's RB is +0.049.
+  - Matchup as an input does not hide at the top.
+- **Shallow history is a coin flip by season** (2025 top +0.043, 2024 top −0.019).
+  - Nothing to act on.
+  - It sits beside #26, which is also the owner's call.
+- **no_blend is the one arm that flips sign at the top, in both seasons:**
+
+  | position | 2025 top | 2024 top |
+  |---|--:|--:|
+  | WR | −0.135 | −0.202 [−0.309, −0.096] |
+  | TE | −0.182 [−0.269, −0.097] | −0.091 [−0.162, −0.020] |
+  | QB (the other way) | +0.148 | +0.264 [+0.067, +0.454] |
+
+  RB is in between.
+- **Suspected artifact.** The slice ranks by trailing-5 form, and trailing-5
+  form *is* the blend partner (`fanduel_fantasy_points_roll5`). Choosing
+  players for a high roll5 picks the ones whose roll5 overstates them, so an
+  arm that leans less on roll5 is flattered on this slice by construction.
+- **The 1-seed baseline already shows it.**
+  - On the form5 slice the board over-projects WR by −0.52 and TE by −0.65
+    (actual minus predicted).
+  - On a slice chosen by trailing-16 form that is −0.15 and −0.33.
+  - On a slice chosen by prior-season PPG it is −0.07 and −0.24.
+- **The check is `experiments/topslice_reslice.py`.** It re-scores the cached
+  boards on slices chosen by form16, prior-season PPG and hindsight actual. It
+  is queued after the opportunity gate.
+- **Decision rule.** If WR/TE no_blend holds on the form16 and prior slices,
+  per-position blend weights are a lead for the standard backtest. If it
+  vanishes, the form5 slice has a known blind spot for anything touching the
+  blend, and the other residual readings on it should be read with that in mind.
