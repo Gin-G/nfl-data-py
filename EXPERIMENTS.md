@@ -7101,3 +7101,38 @@ tier on vs off (`TOP_TIER_THRESHOLDS` emptied):
 - The first, uncontrolled check (fresh network vs the cached board) read WR/TE
   *worse*. That was training noise: QB moved on 100% of rows there despite no QB
   rule. Compare blend changes on one network, never across trainings.
+
+### Cluster runs 7-8: the re-slice and the 5-seed opportunity gate (2026-11-20)
+
+**Run 7, `topslice_reslice.py`: no_blend minus baseline, 5 seeds.**
+
+| slice key | 2024 WR | 2024 TE | 2025 WR | 2025 TE |
+|---|--:|--:|--:|--:|
+| form5 | −0.202 | −0.091 | −0.135 | −0.182 |
+| form16 | −0.162 [−0.256, −0.064] | −0.045 | −0.066 | −0.124 [−0.209, −0.039] |
+| prior PPG | −0.166 [−0.259, −0.073] | −0.007 | −0.050 | −0.105 [−0.206, −0.007] |
+| actual (hindsight) | +0.110 | +0.050 | +0.153 | +0.015 |
+
+- The WR/TE effect survives slice keys that are not the blend partner, at roughly
+  half to full strength. It is a real effect, not a slice artifact.
+- Across all positions it shrinks to about −0.02 because QB loses. That is the
+  reason QB is out of the shipped tier.
+- Hindsight slicing flips the sign, as expected (it selects on the upside). Never
+  read it as the answer.
+
+**Run 8, `opportunity_gate.py`.** Fit on 2021-24 1-seed boards, test on the
+2025 5-seed board.
+
+| term, arm | top slice | full pool | WR (top) | RB (top) | RB top-12 overlap |
+|---|---|---|---|---|---|
+| xFP, `top` | +0.025 [+0.012, +0.038] | +0.010 [+0.005, +0.015] | +0.042 | +0.030 | +0.019 [+0.005, +0.037], 4 up / 0 down |
+| share, `top` | +0.019 | — | — | — | — |
+
+- The `all` arm hurts the top again (xFP −0.010). The term must be fitted among starters.
+- **Not shipped yet, for two reasons:**
+  1. It was fitted against the pre-tier board. The tier blend changes residuals
+     for exactly these players, so the two may overlap.
+  2. `xfp_prior` does not exist in the production pipeline (`opportunity_share.weeks()`
+     is experiment code).
+- **Next lead:** re-run the gate on boards built with the tier blend. If xFP
+  still pays on top of it, port `xfp_prior` into the projection features.
