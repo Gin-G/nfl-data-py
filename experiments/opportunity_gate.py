@@ -190,7 +190,7 @@ def main():
             beta = slopes(fit, term, arm)
             fixed = apply(test, term, beta, arm)
             print(f"\n=== {label}, arm {arm}: slopes "
-                  + ", ".join(f"{p} {s:+.2f}" for p, (s, _) in beta.items()))
+                  + ", ".join(f"{p} {s:+.4f} @ {c:.3f}" for p, (s, c) in beta.items()))
             for pos in ["ALL", *osh.POSITIONS]:
                 pm = (test.position == pos).to_numpy() if pos != "ALL" else allm
                 print(f"  {pos:3s} " + score(test, fixed, pm & allm, "all")
