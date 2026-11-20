@@ -855,6 +855,16 @@ class Projector:
                 weights=blend_mod.weights_for_mode(preseason),
                 n_games=n_form_games, form16=form16,
             )
+            # Volume correction for the hot RBs/WRs (volume.py). Folded in
+            # before blend_ratio so the floor/ceiling band moves with it.
+            from . import volume
+
+            if (volume.ENABLED and not preseason
+                    and "fanduel_fantasy_points" in actual_games.columns):
+                form5 = blend_mod.tier_form(reg["fanduel_fantasy_points"], 5)
+                this_season = reg[pd.to_numeric(reg["season"], errors="coerce") == self.season]
+                blended = max(0.0, blended + volume.adjustment(
+                    position, form5, volume.xfp_prior(position, this_season)))
             if result["fanduel_fantasy_points"]:
                 blend_ratio = blended / result["fanduel_fantasy_points"]
             # Each component is blended against its OWN trailing average rather

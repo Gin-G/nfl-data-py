@@ -56,11 +56,32 @@ def _tier_form(prior_games, player_ids, points_col="fanduel_fantasy_points"):
     return means.reindex(player_ids).to_numpy(dtype=float)
 
 
+def _volume_adjust(prior_games, player_ids, positions, season):
+    """volume.py's correction per player, from the games before the week: the
+    trailing-5 regular-season form and this season's targets/carries."""
+    from . import volume
+
+    if "fanduel_fantasy_points" not in prior_games.columns:
+        return np.zeros(len(player_ids))
+    g = prior_games.sort_values(["season", "week"])
+    by = {pid: grp for pid, grp in g.groupby("player_id")}
+    out = np.zeros(len(player_ids))
+    for i, (pid, pos) in enumerate(zip(player_ids, positions)):
+        if pos not in volume.XFP_SLOPES or pid not in by:
+            continue
+        rows = by[pid]
+        pts = pd.to_numeric(rows["fanduel_fantasy_points"], errors="coerce").dropna()
+        form5 = float(pts.tail(5).mean()) if len(pts) else np.nan
+        this = rows[pd.to_numeric(rows["season"], errors="coerce") == season]
+        out[i] = volume.adjustment(pos, form5, volume.xfp_prior(pos, this))
+    return out
+
+
 def backtest(dataset, season, weeks=None, positions=None, trained=None,
              epochs=100, min_season=config.TRAINING_MIN_SEASON, use_opponent=False,
              schedule=None, loss="mse", scheme_form=None, include_coarse=True,
              target_cols=None, include_components=False, n_seeds=None,
-             scale_targets=True, blend_form=True):
+             scale_targets=True, blend_form=True, volume_correction=None):
     """Backtest the model over a season. Returns a results DataFrame with one
     row per player-week: predicted vs. actual FanDuel points.
 
@@ -78,6 +99,8 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
             A/B deltas smaller than that are not readable.
         blend_form: blend the network output with trailing-5 form, as the
             Projector does (blend.py). Pass False to score the raw network.
+        volume_correction: add volume.py's xFP correction for hot RBs/WRs (with
+            the blend only). None follows volume.ENABLED, as the Projector does.
     """
     from . import model as model_mod
     from .opponent import OPPONENT_FEATURES
@@ -200,6 +223,11 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
                 blend_mod.blend_value(h, f, p, form16=t)
                 for h, f, p, t in zip(headline, form, positions, form16)
             ])
+            from . import volume as volume_mod
+
+            if volume_mod.ENABLED if volume_correction is None else volume_correction:
+                headline = np.maximum(0.0, headline + _volume_adjust(
+                    prior, week_games["player_id"].values, positions, season))
 
         week_result = pd.DataFrame({
             "player_id": week_games["player_id"].values,
