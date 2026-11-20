@@ -319,7 +319,8 @@ def board_rows():
                                     n_seeds=BOARD_SEEDS, include_components=True)
             res.to_parquet(path)
         frames.append(pd.read_parquet(path))
-    return pd.concat(frames, ignore_index=True)
+    from _population import restrict
+    return restrict(pd.concat(frames, ignore_index=True))
 
 
 def fit(sub, y, xcols):

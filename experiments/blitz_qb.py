@@ -685,7 +685,8 @@ def board_rows():
                                     n_seeds=BOARD_SEEDS, include_components=True)
             res.to_parquet(path)
         frames.append(pd.read_parquet(path))
-    return pd.concat(frames, ignore_index=True)
+    from _population import restrict
+    return restrict(pd.concat(frames, ignore_index=True))
 
 
 def _paired(e, a, c, bb=2000, seed=SEED):
@@ -812,6 +813,9 @@ def board(d, s):
                 "o0": len(act & set(wk.nlargest(n_top, "predicted").index)) / n_top,
                 "o1": len(act & set(wk.nlargest(n_top, "fixed").index)) / n_top})
         o = pd.DataFrame(rows)
+        if o.empty:
+            print("  %-4s %6d  (no week has 2x top-N rows in this population)" % (pos, n_top))
+            continue
         lo, hi = _paired(o, "o1", "o0")
         print("  %-4s %6d %10.4f %10.4f %+9.4f %5d/%d  [%+.4f, %+.4f]"
               % (pos, n_top, o.o0.mean(), o.o1.mean(), o.o1.mean() - o.o0.mean(),

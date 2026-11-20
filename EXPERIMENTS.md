@@ -6886,3 +6886,51 @@ anything, and per-position readings stay inconclusive below ~0.1.
 FTN, trench, blocking, opportunity share) select their own population inside
 each script. They need a slice filter added one at a time, and the plan is to
 do them in that order after the model arms.
+
+### Residual tests re-read on the top slice (2026-11-19)
+
+`experiments/_population.py`: `POPULATION=all|top` is applied to the board rows
+in `blitz_qb.py`, `coverage_grades.py` and `opportunity_share.py`. Both
+readings deduplicate player-weeks and cover the same cached 2021-25 boards. NGS,
+FTN, trench and blocking score against a trailing rate, not the board, so
+this does not apply to them.
+
+**Blitz rate (#51): HELD.** The RB slope on the board's error steepens from
+−0.243 to −0.446 [−0.784, −0.113], so it is real and larger among starters. It
+still pays nothing: slope-only MAE gain at every position is within ±0.005
+and every CI spans zero. Ordering moves by 0.000 at every position.
+
+**Coverage grades: HELD.** The TE corner-spread slope quadruples (0.128 →
+0.497 [0.240, 0.767]) and RB completion % rises (0.305 → 0.443). Neither pays:
+TE +0.009 [−0.013, +0.030], RB +0.007 [−0.008, +0.022]. WR ADOT now loses,
+−0.004 [−0.0085, −0.0003]. This is matchup context and stays out of the
+objective in any case.
+
+**Opportunity share (#53): THE DECISION FLIPS AT WR.** The full pool said
+"pays on MAE, moves no order", so it was kept as context beside `value`.
+
+| | full pool | top slice |
+|---|--:|--:|
+| WR opp share slope | +0.634 [+0.058, +1.228] | **+2.915 [+1.595, +4.327]** |
+| RB opp share slope | +0.339 [+0.031, +0.654] | **+1.305 [+0.572, +2.041]** |
+| WR opp share MAE gain | +0.060 (1.43%), 74/75 wks | **+0.168 (2.81%) [+0.107, +0.230]** |
+| TE opp share MAE gain | +0.085 (2.56%) | +0.119 (2.37%) [+0.062, +0.173] |
+| RB xFP MAE gain | +0.012 (0.26%) | +0.037 (0.59%) [+0.019, +0.056] |
+| **WR opp share, top-24 overlap** | +0.0022 [−0.0011, +0.0061] | **+0.0110 [+0.0029, +0.0190]**, 20/57 wks |
+| WR xFP, top-24 overlap | −0.0000 | +0.0080 [+0.0007, +0.0161] |
+| RB opp share, top-12 overlap | −0.0011 | +0.0078 [−0.0022, +0.0178] |
+
+Among the players a lineup actually chooses from, the board under-uses
+receiver volume by about three times what the full pool showed. The correction
+then **reorders** them: about one more of the week's actual top 24 WRs in the
+board's top 24 every 4 weeks. Twelve terms were tested, but this interval
+clears zero by more than that correction would eat. It also matches the full
+pool's sign, and the RB terms move the same way.
+
+Next: opportunity share goes through the standard gate as a board term. That
+is the long-pending cluster backtest, now scored on both populations. It is
+volume, not matchup, so the objective rule does not bar it. It still waits for
+the backtest.
+
+The opponent-volume term stays negative on both populations (QB −3.8%, RB
+−2.0% at the top), so it remains closed.

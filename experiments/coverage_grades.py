@@ -260,7 +260,8 @@ def against_the_board(d):
         print("\n(no cached board rows; run experiments/blitz_qb.py with"
               " BLITZ_BOARD=1 first)")
         return
-    b = pd.concat([pd.read_parquet(p) for p in paths], ignore_index=True)
+    from _population import restrict
+    b = restrict(pd.concat([pd.read_parquet(p) for p in paths], ignore_index=True))
     opp = pd.read_csv(config.DATASET_PATH,
                       usecols=["player_id", "season", "week", "season_type",
                                "opponent_team", "targets"], low_memory=False)
@@ -382,6 +383,9 @@ def does_it_pay(b):
                          "o0": len(act & set(wk.nlargest(n_top, "predicted").index)) / n_top,
                          "o1": len(act & set(wk.nlargest(n_top, "fixed").index)) / n_top})
         o = pd.DataFrame(rows)
+        if o.empty:
+            print("  %-4s %6d  (no week has 2x top-N rows in this population)" % (pos, n_top))
+            continue
         lo, hi = _paired(o, "o1", "o0")
         print("  %-4s %6d %10.4f %10.4f %+10.4f %4d/%d  [%+.4f, %+.4f]"
               % (pos, n_top, o.o0.mean(), o.o1.mean(), o.o1.mean() - o.o0.mean(),
