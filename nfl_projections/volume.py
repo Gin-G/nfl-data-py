@@ -38,9 +38,11 @@ XFP_RATES = {"RB": (0.9671, 0.7207), "WR": (1.4815, 0.8556)}
 XFP_SLOPES = {"RB": 0.2025, "WR": 0.3498}
 XFP_CENTRES = {"RB": 12.367, "WR": 10.767}
 MIN_PRIOR_GAMES = 3
-# Off until the same-network ship check (experiments/volume_verify.py) passes.
-# The backtest and the Projector both read it.
-ENABLED = False
+# The backtest and the Projector both read this. Shipped 2026-11-20 after the
+# same-network check (experiments/volume_verify.py, 5 seeds, on minus off):
+#   2025 (out of sample) full pool -0.019 [-0.033, -0.008], RB -0.026, WR -0.029;
+#   2024 (partly in-sample) -0.012 [-0.022, -0.002]. QB/TE untouched.
+ENABLED = True
 
 
 def xfp_prior(position, games_this_season):

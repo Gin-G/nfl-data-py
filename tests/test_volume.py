@@ -56,3 +56,11 @@ def test_backtest_volume_adjust_reads_prior_games_only():
     xfp = 10 * volume.XFP_RATES["WR"][0]
     assert got[0] == pytest.approx(volume.XFP_SLOPES["WR"] * (xfp - volume.XFP_CENTRES["WR"]))
     assert got[1] == 0.0
+
+
+def test_backtest_follows_the_switch_by_default():
+    import inspect
+    from nfl_projections import evaluate
+
+    assert inspect.signature(evaluate.backtest).parameters["volume_correction"].default is None
+    assert volume.ENABLED is True

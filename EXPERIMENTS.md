@@ -7193,3 +7193,41 @@ about −0.023 on independently trained networks in both seasons.
 - **Next: `tier5`**, the `top` population as a fixed last-5 threshold fitted on
   the fit seasons (2023-24 fit: QB 12.6, RB 7.1, WR 7.1, TE 6.0). Runs 13-14,
   both seasons. If it replicates, it is the shape to port.
+
+### xFP volume correction for hot RBs/WRs — SHIPPED (2026-11-20, cluster runs 13-16)
+
+**Gate, `tier5` arm.** The population is a fixed trailing-5 threshold, so it does
+not depend on which players are in the pool. Fit on earlier seasons; tier boards.
+
+| test season | full pool | RB | WR | thresholds (RB / WR) |
+|---|---|---|---|---|
+| 2025 | +0.019 [+0.007, +0.030] | +0.026 | +0.027 | 7.4 / 7.3 |
+| 2024 | +0.013 [−0.001, +0.026] | +0.018 | +0.019 | 7.5 / 7.2 |
+
+**Shipped as `nfl_projections/volume.py`:**
+- RB/WR with trailing-5 ≥ 7.4 / 7.3 and 3+ games this season.
+- Correction: + slope × (xFP − centre).
+  - xFP is this season's mean targets and carries, valued at league points per
+    opportunity (2018-25 mean).
+  - Slope and centre: RB 0.2025 @ 12.367, WR 0.3498 @ 10.767, fitted on the
+    2021-24 tier boards (run 15).
+- Folded into the blended value before `blend_ratio`, so the floor/ceiling band
+  moves with it. Clipped at 0.
+- The backtest applies the same rule (`evaluate._volume_adjust`).
+
+**Ship check, run 16 (`volume_verify.py`).** One 5-seed network per season,
+scored with the correction on minus off.
+
+| | full pool | RB | WR | top slice | rows changed |
+|---|---|---|---|---|---|
+| 2025, out of sample | **−0.019 [−0.033, −0.008]** | −0.026 [−0.051, −0.005] | −0.029 [−0.053, −0.008] | −0.047 [−0.082, −0.018] | 19% |
+| 2024, partly in-sample | −0.012 [−0.022, −0.002] | — | — | — | — |
+
+QB and TE are untouched.
+
+**Combined with the top-tier blend,** the 2025 standard board moves about 4.150 →
+4.10. The top slice moves about twice as much.
+
+**Gotcha found along the way.** A fixed trailing-16 tier (the blend's) does not
+carry xFP. A trailing-5 tier does. The two corrections live on different
+populations on purpose.
