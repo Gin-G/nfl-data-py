@@ -7165,3 +7165,31 @@ trained networks.
 - **Next.** Replicate on 2024 (run 10: fit 2021-23, test 2024 tier board). If
   it holds, port `xfp_prior` into the projection features, RB/WR only, top tier
   only (the `all` arm still hurts the top).
+
+### xFP replication on 2024, and which tier shape carries it (2026-11-20, cluster runs 10-12)
+
+**The tier blend, second season.** The 2024 5-seed board went from 4.249 to
+**4.227** (−0.022). Together with 2025 (4.150 → 4.125), the shipped change reads
+about −0.023 on independently trained networks in both seasons.
+
+**xFP, full-pool MAE gain** (5-seed tier boards, fit on earlier seasons only):
+
+| arm (population fitted and corrected) | 2025 | 2024 |
+|---|---|---|
+| `top`: last-5 rank, top 24/36/50/18 | +0.021 [+0.012, +0.030] | **+0.016 [+0.003, +0.029]** |
+| `tier`: shipped last-16 threshold | +0.013 [+0.005, +0.022] | +0.001 [−0.008, +0.011] |
+
+- **The `top` arm replicates on 2024.**
+  - Top slice +0.040 [+0.007, +0.072].
+  - RB +0.049 [+0.007, +0.095].
+  - WR +0.061 [−0.003, +0.124].
+  - TE +0.000.
+- **The `tier` shape does not replicate.** The last-16 tier holds settled
+  starters, whose volume the board already reads. The players xFP corrects are
+  the ones whose recent form is high, which is where volume has recently moved.
+- **The `top` arm cannot ship as written.** A rank depends on the pool, and the
+  production pool (about 490 rostered players) is not the backtest pool (players
+  who played).
+- **Next: `tier5`**, the `top` population as a fixed last-5 threshold fitted on
+  the fit seasons (2023-24 fit: QB 12.6, RB 7.1, WR 7.1, TE 6.0). Runs 13-14,
+  both seasons. If it replicates, it is the shape to port.
