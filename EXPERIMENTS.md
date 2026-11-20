@@ -6959,3 +6959,35 @@ current-season-only model on the players that matter, and the shadow model
 The full-pool delta is now +0.012, smaller than #26's original +0.068,
 because the code and data have changed since. Weeks 5-10 still cost the most
 (+0.049 full pool).
+
+### Opportunity share forward: real at the top, but a quarter of the pooled reading (2026-11-19)
+
+`experiments/opportunity_gate.py`. The slope per position is fitted only on
+seasons before the test season, using 1-seed boards. It is applied fixed to
+the test season and scored on both populations. The `top` arm fits and
+applies only within the top slice. The `all` arm fits on every player.
+
+| top slice, `top` arm | 2023 (fit 21-22) | 2024 (fit 21-23) | 2025 (fit 21-24) |
+|---|--:|--:|--:|
+| opp share, MAE gain ALL | +0.006 [−0.009, +0.021] | +0.019 [−0.002, +0.039] | +0.020 [+0.005, +0.036] |
+| opp share, WR | −0.003 | +0.035 [+0.007, +0.064] | +0.038 [+0.008, +0.071] |
+| xFP, MAE gain ALL | +0.008 [−0.003, +0.022] | +0.026 [+0.009, +0.043] | +0.025 [+0.011, +0.040] |
+| xFP, RB | +0.027 [+0.004, +0.051] | +0.024 | +0.030 [+0.002, +0.060] |
+| xFP, WR | +0.004 | +0.041 [+0.014, +0.068] | +0.044 [+0.017, +0.075] |
+| WR top-24 overlap, xFP | +0.007 [−0.002, +0.016] | +0.009 [−0.000, +0.019] | −0.005 [−0.016, +0.007] |
+
+- **The gain is real and points the same way every season,** but it is about
+  0.02 MAE on the top slice and 0.04 at WR. That is a quarter of the pooled
+  leave-one-season-out +0.168. That number centred the term on all seasons,
+  test season included, and fitted with later seasons. Season-level drift in
+  share was being credited to the term.
+- **The ordering gain did not survive going forward.** WR top-24 is +0.007,
+  +0.009 and −0.005, none clear of zero.
+- **The `all` arm helps the full pool and HURTS the top** (2025 WR −0.024
+  [−0.038, −0.009]). One slope for everyone is the wrong shape. The term
+  only works fitted among starters.
+- xFP is the slightly better of the two terms.
+
+Status: a small, consistent board-accuracy lead for `/projections`. It is not
+a lineup lead, since the order doesn't move. The cluster run with a 5-seed
+2025 board follows the model reruns. Nothing ships before that.
