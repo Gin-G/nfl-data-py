@@ -6934,3 +6934,28 @@ the backtest.
 
 The opponent-volume term stays negative on both populations (QB −3.8%, RB
 −2.0% at the top), so it remains closed.
+
+### #26 training window re-read on the top slice (2026-11-19, cluster run 2)
+
+`topslice_window.py`, 2025, retrained every week from 5 to 18, five seeds. The
+saved predictions were gone, so the run retrained from scratch: 4,554
+player-weeks on both arms, of which 1,792 are in the top slice.
+
+| current-season-only minus fully trained | full pool | top slice |
+|---|--:|--:|
+| ALL | +0.012 [−0.013, +0.042] | +0.035 [−0.011, +0.085] |
+| QB | +0.063 | +0.053 |
+| RB | −0.006 | +0.029 |
+| WR | −0.001 | +0.023 |
+| TE | +0.030 [+0.005, +0.058] | +0.054 [−0.004, +0.112] |
+| corr ALL | 0.642 → 0.637 | 0.445 → 0.435 |
+
+The cost of the live policy is about three times larger at the top. It is
+worse at every position there and costs correlation at every position, but
+the pooled interval still spans zero. This is a measurement, not a
+relitigation: the policy is the owner's call. It leans further against the
+current-season-only model on the players that matter, and the shadow model
+(`GET /projections/shadow/accuracy`) is where that keeps being scored live.
+The full-pool delta is now +0.012, smaller than #26's original +0.068,
+because the code and data have changed since. Weeks 5-10 still cost the most
+(+0.049 full pool).
