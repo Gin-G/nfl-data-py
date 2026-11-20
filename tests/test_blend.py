@@ -211,3 +211,50 @@ class TestFormAdequacy:
             {"fanduel_fantasy_points": 9.0, "rushing_yards": 20.0}, rows, n_games=5)
         assert thin["rushing_yards"] == pytest.approx(20.0)
         assert deep["rushing_yards"] == pytest.approx(50.0)
+
+
+# -- top tier (trailing-16 form) ---------------------------------------------
+
+def test_top_tier_raises_model_weight_for_rb_wr_te():
+    for pos in ("RB", "WR", "TE"):
+        thr = blend.TOP_TIER_THRESHOLDS[pos]
+        assert blend.model_weight(pos, form16=thr) == blend.TOP_TIER_MODEL_WEIGHTS[pos]
+        assert blend.model_weight(pos, form16=thr - 0.01) == blend.DEFAULT_MODEL_WEIGHTS[pos]
+        assert blend.model_weight(pos) == blend.DEFAULT_MODEL_WEIGHTS[pos]
+        assert blend.model_weight(pos, form16=float("nan")) == blend.DEFAULT_MODEL_WEIGHTS[pos]
+
+
+def test_top_tier_leaves_qb_and_preseason_alone():
+    assert "QB" not in blend.TOP_TIER_THRESHOLDS
+    assert blend.model_weight("QB", form16=40.0) == blend.DEFAULT_MODEL_WEIGHTS["QB"]
+    pre = blend.PRESEASON_MODEL_WEIGHTS
+    assert blend.model_weight("WR", weights=pre, form16=40.0) == pre["WR"]
+
+
+def test_top_tier_blend_value_leans_on_the_model():
+    w = blend.TOP_TIER_MODEL_WEIGHTS["WR"]
+    got = blend.blend_value(10.0, 20.0, "WR", form16=15.0)
+    assert got == pytest.approx(w * 10.0 + (1 - w) * 20.0)
+    # below the threshold the usual weight applies
+    w0 = blend.DEFAULT_MODEL_WEIGHTS["WR"]
+    assert blend.blend_value(10.0, 20.0, "WR", form16=1.0) == pytest.approx(w0 * 10 + (1 - w0) * 20)
+
+
+def test_tier_form_is_the_last_sixteen():
+    pts = list(range(20))                       # 0..19, time-ordered
+    assert blend.tier_form(pts) == pytest.approx(np.mean(range(4, 20)))
+    assert blend.tier_form([3.0, None, 5.0]) == pytest.approx(4.0)
+    assert np.isnan(blend.tier_form([]))
+
+
+def test_backtest_tier_form_uses_prior_games_only():
+    from nfl_projections.evaluate import _tier_form
+
+    prior = pd.DataFrame({"player_id": ["a"] * 20 + ["b"] * 2,
+                          "season": [2024] * 20 + [2025] * 2,
+                          "week": list(range(1, 21)) + [1, 2],
+                          "fanduel_fantasy_points": [float(i) for i in range(20)] + [5.0, 7.0]})
+    got = _tier_form(prior, np.array(["b", "a", "zz"]))
+    assert got[0] == pytest.approx(6.0)
+    assert got[1] == pytest.approx(np.mean(range(4, 20)))
+    assert np.isnan(got[2])

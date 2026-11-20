@@ -7036,3 +7036,68 @@ against a baseline on identical player-weeks. Delta = arm minus baseline MAE
   per-position blend weights are a lead for the standard backtest. If it
   vanishes, the form5 slice has a known blind spot for anything touching the
   blend, and the other residual readings on it should be read with that in mind.
+
+### Top-tier form blend: the starters want the model, not their last five (2026-11-20, cluster run 6) — SHIPPED
+
+`experiments/blend_sweep.py` (5 seeds, 2024 and 2025).
+- **Method.**
+  - One raw network output (the cached `no_blend` board) is re-blended at every
+    weight.
+  - Every comparison therefore shares one training run and carries no training
+    noise.
+  - Weights and thresholds are fit on one season and scored on the other.
+  - The headline is the **full pool**: every row is scored, so the slice-choice
+    bias from the entry above cannot reach it.
+- **The rows-3/4 artifact check.** The WR/TE preference for less blend at the top
+  holds on slices chosen by trailing-16 form and by prior-season PPG, not only
+  trailing-5. Neither is the blend partner. The effect is smaller there, but it
+  is real.
+
+  | slice | WR MAE-optimal model weight |
+  |---|---|
+  | full pool | 0.7–0.8 |
+  | trailing-16 tier | 0.9–1.0 |
+  | prior-PPG tier | 0.9–1.0 |
+
+  TE follows the same pattern. QB wants 0.5–0.7 everywhere.
+- **Shape.** Players in the top tier get a higher model weight. The tier is
+  trailing-16 FanDuel PPG ≥ a fixed per-position threshold, about 40% of rows.
+  Everyone else keeps the current weights.
+- **Out of sample, full pool, threshold version:**
+
+  | test season | fit on | thresholds and weights | full pool | by position |
+  |---|---|---|---|---|
+  | 2024 | 2025 | RB ≥7.4 → 0.7, WR ≥7.2 → 0.9, TE ≥6.9 → 1.0, QB ≥13.3 → 0.7 | **−0.024 [−0.043, −0.006]** | WR −0.060 [−0.090, −0.030]; QB +0.047 |
+  | 2025 | 2024 | RB ≥7.4 → 0.8, WR ≥7.4 → 1.0, TE ≥6.0 → 0.9, QB → 0.4 | **−0.025 [−0.053, +0.001]** | RB −0.027 [−0.049, −0.007], TE −0.034 [−0.053, −0.016]; QB +0.034 |
+
+  The rank-tier version reads −0.030 [−0.047, −0.013] and −0.023 [−0.051, +0.002].
+- **QB is the only loser.** Every fit that moved the QB weight cost QBs, in both
+  directions. So QB is excluded, and the shipped gain should be slightly larger
+  than the pooled reading above (+0.004–0.005 of it was QB).
+- **Re-fitting the single per-position weight on the full pool** (no tier) buys
+  only −0.010 a season. The tier is the shape.
+
+**Shipped** (`blend.py` TOP_TIER_*):
+- Thresholds RB 7.4, WR 7.3, TE 6.5. These are the two fits' means; TE's differ by 0.9.
+- Model weights RB 0.75, WR 0.95, TE 0.95.
+- In-season only.
+- Production computes trailing-16 from the same this-season-and-last window the
+  predictor reads. The backtest (`evaluate._tier_form`) uses the same window, and
+  so does the quantile band ratio.
+- Expected on the standard yardstick: about −0.025 to −0.03 MAE. That is below
+  the 0.05 single-seed bar, but it is a paired 5-seed reading, out of sample in
+  both seasons, and holds on every unbiased slice.
+
+**Implementation check.** `evaluate.backtest` scored one 1-seed network per season,
+tier on vs off (`TOP_TIER_THRESHOLDS` emptied):
+
+| season | full pool | top slice | by position |
+|---|---|---|---|
+| 2024 | −0.028 [−0.047, −0.011] | −0.074 | WR −0.056 |
+| 2025 | −0.010 [−0.024, +0.004] | −0.043 [−0.081, −0.007] | RB −0.037 [−0.056, −0.018]; TE +0.014 [−0.006, +0.032] |
+
+- QB rows: 0% changed.
+- About a third of rows changed.
+- The first, uncontrolled check (fresh network vs the cached board) read WR/TE
+  *worse*. That was training noise: QB moved on 100% of rows there despite no QB
+  rule. Compare blend changes on one network, never across trainings.

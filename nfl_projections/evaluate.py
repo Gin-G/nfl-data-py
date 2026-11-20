@@ -42,6 +42,20 @@ def component_fantasy_points(pred_df):
     ))
 
 
+def _tier_form(prior_games, player_ids, points_col="fanduel_fantasy_points"):
+    """Each player's trailing-16 regular-season points per game from the games
+    before the week (blend.TOP_TIER_FORM_GAMES), aligned to ``player_ids``; the
+    same window production reads (this season and last)."""
+    from . import blend as blend_mod
+
+    if points_col not in prior_games.columns:
+        return np.full(len(player_ids), np.nan)
+    g = prior_games[["player_id", "season", "week", points_col]].dropna(subset=[points_col])
+    g = g.sort_values(["season", "week"]).groupby("player_id").tail(blend_mod.TOP_TIER_FORM_GAMES)
+    means = g.groupby("player_id")[points_col].mean()
+    return means.reindex(player_ids).to_numpy(dtype=float)
+
+
 def backtest(dataset, season, weeks=None, positions=None, trained=None,
              epochs=100, min_season=config.TRAINING_MIN_SEASON, use_opponent=False,
              schedule=None, loss="mse", scheme_form=None, include_coarse=True,
@@ -181,9 +195,10 @@ def backtest(dataset, season, weeks=None, positions=None, trained=None,
 
             form = blend_mod.recent_form_from_rows(stat_rows).values
             positions = week_games["position"].values
+            form16 = _tier_form(prior, week_games["player_id"].values)
             headline = np.array([
-                blend_mod.blend_value(h, f, p)
-                for h, f, p in zip(headline, form, positions)
+                blend_mod.blend_value(h, f, p, form16=t)
+                for h, f, p, t in zip(headline, form, positions, form16)
             ])
 
         week_result = pd.DataFrame({
@@ -675,8 +690,14 @@ def backtest_quantiles(dataset, season, quantiles=None, weeks=None, positions=No
             base = model_mod.predict_batch(trained, mean_input)["fanduel_fantasy_points"].values
             form = blend_mod.recent_form_from_rows(stat_rows).values
             positions_arr = week_games["position"].values
+            prior = history_games[
+                (history_games["season"] < season)
+                | ((history_games["season"] == season) & (history_games["week"] < week))
+            ]
+            form16 = _tier_form(prior, week_games["player_id"].values)
             blended = np.array([
-                blend_mod.blend_value(b, f, p) for b, f, p in zip(base, form, positions_arr)
+                blend_mod.blend_value(b, f, p, form16=t)
+                for b, f, p, t in zip(base, form, positions_arr, form16)
             ])
             ratios = np.divide(blended, base, out=np.ones_like(blended, dtype=float),
                                where=np.asarray(base) != 0)

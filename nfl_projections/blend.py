@@ -106,24 +106,73 @@ def form_col_for_mode(preseason=False):
     return SEASON_FORM_COL if preseason else RECENT_FORM_COL
 
 
-def model_weight(position, weights=None):
-    """Model weight for a position; the rest goes to recent form."""
+# The players who actually score want far less of the blend. The weights above
+# were fitted on the whole backtest pool, a quarter of whom finish under a
+# point, and for them leaning on trailing-5 form is right. For an established
+# starter, trailing-5 form is mostly noise around a level the network already
+# knows, and pulling toward it costs accuracy. Measured on 5-seed 2024 and 2025
+# boards (experiments/blend_sweep.py, EXPERIMENTS.md 2026-11-20), with the
+# threshold and the weight fitted on one season and scored on the other:
+#   full pool MAE -0.024 [-0.043, -0.006] on 2024, -0.025 [-0.053, +0.001] on 2025;
+#   WR -0.060 on 2024; RB -0.027 and TE -0.034 on 2025.
+# The tier is a fixed points threshold on the player's trailing-16 FanDuel
+# points per game (about the top 36 RB / 50 WR / 18 TE a week; the two seasons'
+# fits agree to within 0.2 points at RB and WR; TE's differ by 0.9 and 6.5 is
+# their mean) rather than a rank, so it does
+# not depend on which players a given pool holds. QB is left out on purpose:
+# every fit that moved the QB weight made QBs worse (+0.03 to +0.05).
+# In-season only; a preseason board has its own weights.
+TOP_TIER_FORM_GAMES = 16
+TOP_TIER_THRESHOLDS = {"RB": 7.4, "WR": 7.3, "TE": 6.5}
+TOP_TIER_MODEL_WEIGHTS = {"RB": 0.75, "WR": 0.95, "TE": 0.95}
+
+
+def tier_form(points, n_games=TOP_TIER_FORM_GAMES):
+    """Mean of the last ``n_games`` of an already time-ordered points series
+    (regular season only is the caller's job); NaN when there are none."""
+    p = pd.to_numeric(pd.Series(points), errors="coerce").dropna()
+    return float(p.tail(n_games).mean()) if len(p) else float("nan")
+
+
+def in_top_tier(position, form16):
+    """True when a player's trailing-16 form puts them in the top tier."""
+    thr = TOP_TIER_THRESHOLDS.get(position)
+    if thr is None or form16 is None:
+        return False
+    try:
+        f = float(form16)
+    except (TypeError, ValueError):
+        return False
+    return not np.isnan(f) and f >= thr
+
+
+def model_weight(position, weights=None, form16=None):
+    """Model weight for a position; the rest goes to recent form.
+
+    ``form16`` (the player's trailing-16 points per game) moves a player in the
+    top tier to TOP_TIER_MODEL_WEIGHTS. It applies to the in-season weights
+    only; pass nothing for a preseason board.
+    """
     weights = DEFAULT_MODEL_WEIGHTS if weights is None else weights
+    if weights is DEFAULT_MODEL_WEIGHTS and in_top_tier(position, form16):
+        return float(TOP_TIER_MODEL_WEIGHTS[position])
     default = PRESEASON_WEIGHT if weights is PRESEASON_MODEL_WEIGHTS else DEFAULT_WEIGHT
     return float(weights.get(position, default))
 
 
-def blend_value(projection, recent_form, position, weights=None, n_games=None):
+def blend_value(projection, recent_form, position, weights=None, n_games=None,
+                form16=None):
     """Blend one projection with one recent-form number.
 
     ``recent_form`` of None/NaN (a player with no scoring history — rookies,
     debutants) leaves the projection untouched: there is no form to blend.
     ``n_games`` is how many games back the form window, and shrinks the weight
     on it when that is too few to mean anything (see MIN_FORM_GAMES).
+    ``form16`` is the top-tier key (see TOP_TIER_THRESHOLDS).
     """
     if recent_form is None or (isinstance(recent_form, float) and np.isnan(recent_form)):
         return float(projection)
-    form_w = (1.0 - model_weight(position, weights)) * form_adequacy(n_games)
+    form_w = (1.0 - model_weight(position, weights, form16)) * form_adequacy(n_games)
     return (1.0 - form_w) * float(projection) + form_w * float(recent_form)
 
 

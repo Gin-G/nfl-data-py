@@ -17,7 +17,7 @@ import pandas as pd
 
 from . import config, features
 from .injuries import integrate_injuries_detailed
-from .utils import normalize_player_name, to_pandas
+from .utils import normalize_player_name, regular_games, to_pandas
 
 logger = logging.getLogger(__name__)
 
@@ -845,10 +845,15 @@ class Projector:
             # How many recent games back the form window — too few and the
             # "trailing average" is one game wearing a five-game label.
             n_form_games = len(actual_games)
+            # Trailing-16 regular-season points: the top-tier key (blend.py)
+            form16 = None
+            if not preseason and "fanduel_fantasy_points" in actual_games.columns:
+                reg = regular_games(actual_games).sort_values(["season", "week"])
+                form16 = blend_mod.tier_form(reg["fanduel_fantasy_points"])
             blended = blend_mod.blend_value(
                 result["fanduel_fantasy_points"], form, position,
                 weights=blend_mod.weights_for_mode(preseason),
-                n_games=n_form_games,
+                n_games=n_form_games, form16=form16,
             )
             if result["fanduel_fantasy_points"]:
                 blend_ratio = blended / result["fanduel_fantasy_points"]
