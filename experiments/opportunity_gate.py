@@ -16,7 +16,8 @@ Three arms per term. `all`: slope fitted on every player, applied to every playe
 `top`: slope fitted on the top slice, applied only to it (the slice is chosen
 from trailing form before the game, so a production board could do the same).
 `tier`: fitted and applied on blend.py's top tier -- the fixed trailing-16
-thresholds the shipped blend uses, the shape a production term would take.
+thresholds the shipped blend uses. `tier5`: the `top` population as a fixed
+trailing-5 threshold fitted on the fit seasons (pool-independent, shippable).
 
     TEST_SEASON=2025 SEEDS=5 python experiments/opportunity_gate.py
     BOARD=tier TEST_SEASON=2025 SEEDS=5 python experiments/opportunity_gate.py   # on the tier board
@@ -170,10 +171,22 @@ def main():
     test = prepare(board(ds, TEST_SEASON, SEEDS,
                          CACHE / f"topslice_{TEST_SEASON}_baseline_{SEEDS}s{EPOCHS}e{TAG}.parquet"),
                    ds, d)
+    # `tier5`: the rank arm's population as a fixed trailing-5 threshold (the
+    # fit seasons' mean weekly N-th best form), so it does not depend on the pool
+    thr = {}
+    for pos in osh.POSITIONS:
+        g = fit[fit.position == pos]
+        n = evaluate.TOP_N[pos]
+        vals = [x.nlargest(n).iloc[-1] for _, x in g.groupby(["season", "week"])["form"]
+                if x.notna().sum() >= n]
+        thr[pos] = float(np.mean(vals)) if vals else np.inf
+    print("tier5 thresholds (trailing-5 pts): " + ", ".join(f"{p} {t:.1f}" for p, t in thr.items()))
+    for frame in (fit, test):
+        frame["tier5"] = (frame["form"] >= frame["position"].map(thr)).fillna(False).to_numpy()
     allm = np.ones(len(test), bool)
     topm = test["top"].to_numpy()
     for term, label in TERMS.items():
-        for arm in ("all", "top", "tier"):
+        for arm in ("all", "top", "tier", "tier5"):
             beta = slopes(fit, term, arm)
             fixed = apply(test, term, beta, arm)
             print(f"\n=== {label}, arm {arm}: slopes "
