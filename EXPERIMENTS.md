@@ -7136,3 +7136,32 @@ tier on vs off (`TOP_TIER_THRESHOLDS` emptied):
      is experiment code).
 - **Next lead:** re-run the gate on boards built with the tier blend. If xFP
   still pays on top of it, port `xfp_prior` into the projection features.
+
+### xFP re-gated on the tier board: it pays MORE, not less (2026-11-20, cluster run 9)
+
+`BOARD=tier opportunity_gate.py`. Boards are retrained with the shipped top-tier
+blend. Fit on 2021-24 (1 seed), test on 2025 (5 seeds).
+
+**The tier shows on the standard yardstick.** The 2025 5-seed board went from
+4.150 to **4.125** MAE (−0.025). That is the sweep's prediction, on independently
+trained networks.
+
+| xFP, `top` arm | pre-tier (run 8) | tier board (run 9) |
+|---|--:|--:|
+| WR slope | +0.16 | +0.35 |
+| top slice ALL | +0.025 | **+0.053 [+0.029, +0.079]** |
+| full pool ALL | +0.010 | **+0.021 [+0.012, +0.030]** |
+| RB (top) | +0.030 | +0.064 [+0.020, +0.109] |
+| WR (top) | +0.042 | +0.089 [+0.041, +0.140] |
+| TE (top) | — | +0.005 (nothing) |
+| QB (top) | — | −0.002 (nothing) |
+
+- **Why it doubled.** The tier took weight off trailing-5 form for exactly these
+  players, and trailing-5 form was carrying some of their volume signal. With
+  that weight gone, the board under-uses volume more, and xFP fills the gap.
+- **The two changes complement each other; they don't overlap.**
+- **Ordering** is still flat (WR top-24 +0.002).
+- The opp-share term reads the same way, slightly weaker (top +0.044).
+- **Next.** Replicate on 2024 (run 10: fit 2021-23, test 2024 tier board). If
+  it holds, port `xfp_prior` into the projection features, RB/WR only, top tier
+  only (the `all` arm still hurts the top).
