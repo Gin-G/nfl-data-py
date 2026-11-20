@@ -12,9 +12,11 @@ partly on later seasons. This is the forward version a shipped term would be:
   reuses topslice_rerun.py's baseline when it is on the volume);
 * scored on the full pool and the top slice, for MAE and for top-N overlap.
 
-Two arms per term. `all`: slope fitted on every player, applied to every player.
+Three arms per term. `all`: slope fitted on every player, applied to every player.
 `top`: slope fitted on the top slice, applied only to it (the slice is chosen
 from trailing form before the game, so a production board could do the same).
+`tier`: fitted and applied on blend.py's top tier -- the fixed trailing-16
+thresholds the shipped blend uses, the shape a production term would take.
 
     TEST_SEASON=2025 SEEDS=5 python experiments/opportunity_gate.py
     BOARD=tier TEST_SEASON=2025 SEEDS=5 python experiments/opportunity_gate.py   # on the tier board
@@ -79,15 +81,26 @@ def prepare(b, ds, d):
                 on=["player_id", "season", "week"], how="left")
     b["form"] = evaluate.trailing_form(ds, b)
     b["top"] = evaluate.top_slice(b, "form")
+    # The shippable tier: blend.py's fixed trailing-16 thresholds (QB has none)
+    from nfl_projections import blend
+    f16 = evaluate.trailing_form(ds, b, n_games=blend.TOP_TIER_FORM_GAMES)
+    b["tier"] = [blend.in_top_tier(p, f) for p, f in zip(b["position"], f16)]
     b["resid"] = b["actual"] - b["predicted"]
     b["usable"] = b["prior_games"].fillna(0) >= osh.MIN_PRIOR_GAMES
     return b
 
 
-def slopes(fit, term, only_top):
+def _arm_mask(frame, arm):
+    """Rows an arm fits and applies on: all, the rank top slice, or the tier."""
+    if arm == "all":
+        return np.ones(len(frame), bool)
+    return frame[arm].to_numpy(dtype=bool)
+
+
+def slopes(fit, term, arm):
     out = {}
     for pos in osh.POSITIONS:
-        g = fit[(fit.position == pos) & fit.usable & (fit.top if only_top else True)]
+        g = fit[((fit.position == pos) & fit.usable).to_numpy() & _arm_mask(fit, arm)]
         g = g[["resid", term]].replace([np.inf, -np.inf], np.nan).dropna()
         if len(g) < 300:
             continue
@@ -97,11 +110,11 @@ def slopes(fit, term, only_top):
     return out
 
 
-def apply(test, term, beta, only_top):
+def apply(test, term, beta, arm):
     adj = np.zeros(len(test))
     for pos, (slope, centre) in beta.items():
-        m = ((test.position == pos) & test.usable & test[term].notna()
-             & (test.top if only_top else True)).to_numpy()
+        m = ((test.position == pos) & test.usable & test[term].notna()).to_numpy() \
+            & _arm_mask(test, arm)
         adj[m] = slope * (test.loc[m, term].to_numpy() - centre)
     return test["predicted"].to_numpy() + adj
 
@@ -160,9 +173,9 @@ def main():
     allm = np.ones(len(test), bool)
     topm = test["top"].to_numpy()
     for term, label in TERMS.items():
-        for arm, only_top in (("all", False), ("top", True)):
-            beta = slopes(fit, term, only_top)
-            fixed = apply(test, term, beta, only_top)
+        for arm in ("all", "top", "tier"):
+            beta = slopes(fit, term, arm)
+            fixed = apply(test, term, beta, arm)
             print(f"\n=== {label}, arm {arm}: slopes "
                   + ", ".join(f"{p} {s:+.2f}" for p, (s, _) in beta.items()))
             for pos in ["ALL", *osh.POSITIONS]:
