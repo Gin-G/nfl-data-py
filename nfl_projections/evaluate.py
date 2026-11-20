@@ -235,6 +235,77 @@ def season_totals_from_backtest(results, min_weeks=8):
     return g[g["weeks"] >= min_weeks].copy()
 
 
+# ---------------------------------------------------------------------------
+# The top of the board: the players who actually score
+# ---------------------------------------------------------------------------
+#
+# A backtest scores every player with a stat line that week, ~330 a week, and a
+# quarter of them finish under one point. The board gets that tail right almost
+# for free, so it pads MAE and correlation and dilutes any change whose effect
+# lives among the players a lineup would use (2026-11-19: on 2021-25 boards the
+# full pool reads MAE 4.32 / corr 0.63, the top slice 6.11 / 0.43).
+#
+# The slice is chosen BEFORE the game and independently of any arm being
+# compared: each position's top N by trailing form. Ranking by one arm's own
+# projection would hand the comparison to whichever arm chose the players, and
+# ranking by the actual finish conditions on the outcome (it makes every board
+# look like it under-projects by ~4 points). The sizes are a 12-team league's
+# useful depth: 2 QB, 3 RB, 4 WR, 1.5 TE a team.
+
+TOP_N = {"QB": 24, "RB": 36, "WR": 50, "TE": 18}
+
+
+def trailing_form(history, results, n_games=5, points_col="fanduel_fantasy_points"):
+    """Each result row's form going in: mean points over the player's last
+    ``n_games`` regular-season games strictly before that week, across season
+    boundaries. NaN for a player with no prior game. Aligned to ``results``.
+    """
+    h = regular_games(history)[["player_id", "season", "week", points_col]].dropna(
+        subset=[points_col])
+    h = h.drop_duplicates(["player_id", "season", "week"]).copy()
+    h["_k"] = h["season"].astype(int) * 100 + h["week"].astype(int)
+    h = h.sort_values(["player_id", "_k"])
+    h["_form"] = (h.groupby("player_id")[points_col]
+                  .transform(lambda s: s.rolling(n_games, min_periods=1).mean()))
+    r = results[["player_id", "season", "week"]].copy()
+    r["_k"] = r["season"].astype(int) * 100 + r["week"].astype(int) - 1   # strictly before
+    r["_i"] = np.arange(len(r))
+    out = pd.merge_asof(r.sort_values("_k"), h[["player_id", "_k", "_form"]].sort_values("_k"),
+                        on="_k", by="player_id", direction="backward")
+    return out.sort_values("_i")["_form"].to_numpy()
+
+
+def top_slice(results, by, top_n=None):
+    """Boolean mask: the top ``top_n[position]`` rows per season-week-position
+    ranked by ``by`` (a column name or an array aligned to ``results``),
+    highest first; NaN ranks last; ties broken by order. Positions missing from
+    ``top_n`` are excluded."""
+    top_n = TOP_N if top_n is None else top_n
+    key = results[by] if isinstance(by, str) else pd.Series(np.asarray(by), index=results.index)
+    frame = pd.DataFrame({"season": results["season"].values, "week": results["week"].values,
+                          "position": results["position"].values,
+                          "key": pd.to_numeric(key, errors="coerce").fillna(-np.inf).values},
+                         index=results.index)
+    rank = frame.groupby(["season", "week", "position"])["key"].rank(
+        ascending=False, method="first")
+    limit = frame["position"].map(top_n)
+    return (rank <= limit).fillna(False).to_numpy()
+
+
+def slice_metrics(results, mask=None, pred_col="predicted", actual_col="actual"):
+    """MAE / bias / corr overall and by position, on the rows in ``mask``."""
+    r = results if mask is None else results[np.asarray(mask)]
+
+    def stats(g):
+        err = g[pred_col] - g[actual_col]
+        return pd.Series({"n": len(g), "mae": err.abs().mean(), "bias": err.mean(),
+                          "corr": g[pred_col].corr(g[actual_col])})
+
+    overall = stats(r).to_frame("ALL").T
+    by_pos = r.groupby("position").apply(stats, include_groups=False)
+    return pd.concat([overall, by_pos])
+
+
 def _spearman(a, b):
     """Rank correlation without a scipy dependency."""
     if len(a) < 3:

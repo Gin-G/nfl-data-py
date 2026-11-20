@@ -162,8 +162,9 @@ idea again.
 - [Player identity: names were doing an id's job (2026-11-13)](#player-identity-names-were-doing-an-ids-job-2026-11-13) — **shipped**
 - [Reruns on clean data: what the identity bugs did to earlier results (2026-11-13)](#reruns-on-clean-data-what-the-identity-bugs-did-to-earlier-results-2026-11-13)
 - [The RB2 who takes the job: Kenneth Walker out, and two failures (2026-11-16)](#the-rb2-who-takes-the-job-kenneth-walker-out-and-two-failures-2026-11-16) — **shipped**
-- [Vacated opportunity: pricing the inherited work, and week 10 rebuilt with the scratch (2026-11-16)](#vacated-opportunity-pricing-the-inherited-work-and-week-10-rebuilt-with-the-scratch-2026-11-16) — negative (model); scratch tool confirmed
-- [ESPN injury overlay: Sunday news the Friday report never carries (2026-11-16)](#espn-injury-overlay-sunday-news-the-friday-report-never-carries-2026-11-16) — **shipped**, not backtestable
+- [Vacated opportunity: pricing the inherited work, and week 10 rebuilt with the scratch (2026-11-16)](#vacated-opportunity-pricing-the-inherited-work-and-week-10-rebuilt-with-the-scratch-2026-11-16) — **shipped**
+- [ESPN injury overlay: Sunday news the Friday report never carries (2026-11-16)](#espn-injury-overlay-sunday-news-the-friday-report-never-carries-2026-11-16) — **closed**
+- [The top of the board: the full pool flatters every number in this file (2026-11-19)](#the-top-of-the-board-the-full-pool-flatters-every-number-in-this-file-2026-11-19)
 
 ## Findings
 - **Band width is ~90% a function of the median — and that's mostly correct.**
@@ -6826,3 +6827,62 @@ applies nothing.
 Why no backtest: the feed is current-state only, one row per player, no
 history. What would show it is wrong: a prospective week where an ESPN-only
 Out played. Each run's changes are in its provenance (`espn_changes`).
+
+## The top of the board: the full pool flatters every number in this file (2026-11-19)
+
+**Question (user).** Most players in a backtest score next to nothing, and the
+board projects that easily. Has that easy tail made the full-pool metrics, and
+the experiments read on them, blind to what happens among the players who
+actually score?
+
+**Population.** `evaluate.backtest` scores every player with a stat line that
+week: ~318 a week on 2021-25, **22.8% under one point, 55% under five.** The top
+slice (`evaluate.top_slice`) is, per week, the top 24 QB / 36 RB / 50 WR / 18 TE
+by **trailing-5 form**: 128 a week, 40% of rows. It is chosen before the game and
+is the same for every arm. Ranking by an arm's own projection would let that arm
+pick its own exam, and ranking by the actual finish conditions on the outcome
+(that slice reads bias −4.3: every board "under-projects" the players who
+boomed). Form and board pick almost the same players (actual top-N captured:
+67.6% vs 68.7%).
+
+**The baseline board, 2021-25 weeks 1-18** (cached single-seed boards, 28,630
+player-weeks):
+
+| | n | MAE | bias | corr |
+|---|--:|--:|--:|--:|
+| full pool | 28,630 | 4.317 | −0.095 | **0.632** |
+| top slice | 11,520 | 6.089 | −0.014 | **0.442** |
+
+| position | full corr | top corr | full MAE | top MAE |
+|---|--:|--:|--:|--:|
+| QB | 0.491 | 0.276 | 6.60 | 6.79 |
+| RB | 0.600 | 0.363 | 4.47 | 6.25 |
+| WR | 0.553 | 0.297 | 4.18 | 6.06 |
+| TE | 0.523 | 0.268 | 3.18 | 4.93 |
+
+**Most of the headline correlation is the board telling starters from
+scrubs.** Among starters it falls by about half at every position. The slice
+is 40% of rows but carries 56.7% of the absolute error.
+
+**What it does to old A/Bs.** A change that moves only the slice by δ reads
+≈0.40δ on the full pool. The 0.05 noise bar on the full pool therefore hid any
+top-end effect under ~0.12. The slice is noisier, though: a pure-noise arm on
+2025 alone gives a week-clustered 95% CI of about ±0.05 on the pooled slice and
+±0.1–0.2 per position. A rerun needs two seasons and five seeds to say
+anything, and per-position readings stay inconclusive below ~0.1.
+
+**Built.**
+- `evaluate.TOP_N`, `trailing_form`, `top_slice` and `slice_metrics`
+  (`tests/test_top_slice.py`).
+- `experiments/topslice_rerun.py`: retrains the baseline plus arms on
+  identical player-weeks and prints paired deltas on both populations. Arms
+  are huber (#3), opponent (#4/#12), no_blend, and shallow (#27). Per-row
+  results are cached for later.
+- `experiments/topslice_window.py`: re-slices #26's saved predictions
+  (current-season-only vs fully trained). This is the live training-window
+  decision.
+
+**Pending: cluster runs.** The residual-test experiments (coverage, blitz, NGS,
+FTN, trench, blocking, opportunity share) select their own population inside
+each script. They need a slice filter added one at a time, and the plan is to
+do them in that order after the model arms.
