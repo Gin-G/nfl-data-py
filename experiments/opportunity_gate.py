@@ -17,6 +17,7 @@ Two arms per term. `all`: slope fitted on every player, applied to every player.
 from trailing form before the game, so a production board could do the same).
 
     TEST_SEASON=2025 SEEDS=5 python experiments/opportunity_gate.py
+    BOARD=tier TEST_SEASON=2025 SEEDS=5 python experiments/opportunity_gate.py   # on the tier board
 """
 import os
 import pathlib
@@ -43,6 +44,11 @@ TERMS = {"share_prior": "opp share", "xfp_prior": "xFP"}
 OVERLAP_N = {"QB": 12, "RB": 12, "WR": 24, "TE": 12}
 CACHE = HERE / "_cache"
 BOOT = 2000
+# BOARD=tier trains (or reuses) boards built by the current backtest, which
+# applies blend.py's top-tier weights (2026-11-20), under their own cache names,
+# so the gate reads xFP on top of the shipped board, not the pre-tier one.
+BOARD = os.environ.get("BOARD", "")
+TAG = f"_{BOARD}" if BOARD else ""
 
 
 def dataset():
@@ -143,12 +149,13 @@ def main():
     ds = dataset()
     d = osh.weeks()
     d = osh.priors(d, osh.points_per_opportunity(d))
-    print(f"fit on {FIT_SEASONS} (1-seed boards), test {TEST_SEASON} ({SEEDS}-seed board)")
-    fit = pd.concat([board(ds, s, 1, CACHE / f"blitz_board_{s}_1s{EPOCHS}e.parquet")
+    print(f"fit on {FIT_SEASONS} (1-seed boards), test {TEST_SEASON} ({SEEDS}-seed board)"
+          + (f", boards: {BOARD}" if BOARD else ""))
+    fit = pd.concat([board(ds, s, 1, CACHE / f"blitz_board_{s}_1s{EPOCHS}e{TAG}.parquet")
                      for s in FIT_SEASONS], ignore_index=True)
     fit = prepare(fit, ds, d)
     test = prepare(board(ds, TEST_SEASON, SEEDS,
-                         CACHE / f"topslice_{TEST_SEASON}_baseline_{SEEDS}s{EPOCHS}e.parquet"),
+                         CACHE / f"topslice_{TEST_SEASON}_baseline_{SEEDS}s{EPOCHS}e{TAG}.parquet"),
                    ds, d)
     allm = np.ones(len(test), bool)
     topm = test["top"].to_numpy()
