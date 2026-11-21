@@ -925,8 +925,12 @@ class TestContestPresets:
             kw.pop("objective")
             built = optimizer.optimize_lineups(pool, objective="mean",
                                                salary_cap=60000, max_per_team=None,
+                                               # The toy pool is too thin for
+                                               # either team rule; both are
+                                               # tested on real-sized slates.
                                                **{k: v for k, v in kw.items()
-                                                  if k != "max_per_team"})
+                                                  if k not in ("max_per_team",
+                                                               "offense_per_team")})
             assert len(built) >= 1
 
 
@@ -1456,3 +1460,67 @@ class TestItDoesNotReturnALineupTwice:
             pool, num_lineups=4, max_usage_percentage=100,
             seen_lineups=[set(l["Nickname"]) for l in first], report=report)
         assert report["pooled_with"] == 0
+
+class TestOffensePerTeam:
+    """Cash: no two offensive players from one team; the defense is exempt."""
+
+    TEAMS = (("HOU", 6.0), ("DAL", 0.0), ("NYG", -1.0), ("SEA", -2.0), ("MIA", -3.0),
+             ("CHI", -4.0), ("KC", -4.5), ("BUF", -5.0), ("DET", -5.5), ("TB", -6.0))
+
+    def _slate(self, teams=None):
+        rows = []
+
+        def add(nick, team, pos, salary, points):
+            rows.append({"Nickname": nick, "Team": team, "Roster Position": pos,
+                         "Salary": salary, "FPPG": points,
+                         "fanduel_fantasy_points": points, "ceiling": points * 2,
+                         "floor": points / 2, "projection_median": points,
+                         "Injury Indicator": ""})
+
+        teams = teams or self.TEAMS
+        for i, (team, edge) in enumerate(teams):
+            add(f"QB-{team}", team, "QB", 7000, 18 + edge)
+            for j in range(3):
+                add(f"RB{j}-{team}", team, "RB/FLEX", 6000 - j * 500, 14 + edge - j)
+                add(f"WR{j}-{team}", team, "WR/FLEX", 6000 - j * 500, 13 + edge - j)
+            add(f"TE-{team}", team, "TE/FLEX", 4500, 9 + edge)
+            add(f"DEF-{team}", team, "DEF", 3500, 8 + edge)
+        df = pd.DataFrame(rows)
+        opp = {t: teams[i ^ 1][0] for i, (t, _) in enumerate(teams)}
+        df["Opponent"] = df["Team"].map(opp)
+        return df
+
+    def _build(self, teams=None, **kwargs):
+        lineups = optimizer.optimize_lineups(self._slate(teams), num_lineups=1,
+                                             salary_cap=60000, **kwargs)
+        assert lineups, "no lineup was built"
+        return lineups[0]
+
+    def test_offense_cap_keeps_one_offensive_player_per_team(self):
+        lineup = self._build(offense_per_team=1)
+        offense = lineup[lineup["Roster Position"] != "DEF"]
+        assert len(lineup) == 9
+        assert max(Counter(offense["Team"]).values()) == 1
+
+    def test_offense_cap_leaves_a_back_with_his_own_defense_legal(self):
+        # HOU has the best defense and the best players; the defense does not
+        # count, so it can sit beside the one Houston player.
+        lineup = self._build(offense_per_team=1)
+        assert lineup[lineup["Roster Position"] == "DEF"].iloc[0]["Team"] == "HOU"
+        assert (lineup["Team"] == "HOU").sum() == 2
+        assert not lineup["Team"].astype(str).str.endswith("/DEF").any()
+
+    def test_offense_cap_also_holds_when_avoiding_rb_vs_defense(self):
+        lineup = self._build(offense_per_team=1, rb_vs_opposing_def=False)
+        offense = lineup[lineup["Roster Position"] != "DEF"]
+        assert max(Counter(offense["Team"]).values()) == 1
+
+    def test_a_short_slate_loosens_the_cap_instead_of_failing(self):
+        with pytest.warns(RuntimeWarning, match="using 2"):
+            lineup = self._build(teams=self.TEAMS[:6], offense_per_team=1)
+        offense = lineup[lineup["Roster Position"] != "DEF"]
+        assert len(lineup) == 9 and max(Counter(offense["Team"]).values()) == 2
+
+    def test_cash_preset_forbids_same_team_offense_and_gpp_does_not(self):
+        assert optimizer.contest_settings("cash", 50)["offense_per_team"] == 1
+        assert "offense_per_team" not in optimizer.contest_settings("gpp", 50)
