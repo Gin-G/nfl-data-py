@@ -1524,3 +1524,36 @@ class TestOffensePerTeam:
     def test_cash_preset_forbids_same_team_offense_and_gpp_does_not(self):
         assert optimizer.contest_settings("cash", 50)["offense_per_team"] == 1
         assert "offense_per_team" not in optimizer.contest_settings("gpp", 50)
+
+    @staticmethod
+    def _pairs(lineup):
+        offense = lineup[lineup["Roster Position"] != "DEF"]
+        return {t: n for t, n in Counter(offense["Team"]).items() if n > 1}
+
+    def test_one_pair_is_allowed_when_it_clears_the_margin(self):
+        # Houston's skill players are 6 points better than anyone's, so a
+        # second Houston player beats every way around the rule.
+        strict = self._build(offense_per_team=1)
+        paired = self._build(offense_per_team=1, pair_margin=3.0)
+        assert self._pairs(paired) == {"HOU": 2}
+        assert (paired["lineup_points"].sum()
+                >= strict["lineup_points"].sum() + 3.0)
+
+    def test_never_more_than_one_pair_even_when_two_would_pay(self):
+        # DAL is the second-best team too, so the loosened build doubles both.
+        loose = self._build(offense_per_team=2)
+        assert len(self._pairs(loose)) >= 2
+        paired = self._build(offense_per_team=1, pair_margin=0.1)
+        assert len(self._pairs(paired)) == 1
+
+    def test_a_pair_that_does_not_clear_the_margin_stays_out(self):
+        paired = self._build(offense_per_team=1, pair_margin=50.0)
+        assert self._pairs(paired) == {}
+
+    def test_the_pair_rule_holds_with_rb_vs_defense_on(self):
+        paired = self._build(offense_per_team=1, pair_margin=3.0, rb_vs_opposing_def=False)
+        assert len(self._pairs(paired)) == 1
+
+    def test_cash_preset_carries_the_pair_margin_and_gpp_does_not(self):
+        assert optimizer.contest_settings("cash", 50)["pair_margin"] == optimizer.PAIR_MARGIN
+        assert "pair_margin" not in optimizer.contest_settings("gpp", 50)

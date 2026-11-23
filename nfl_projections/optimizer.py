@@ -623,7 +623,7 @@ def _opponent_of(df):
 
 def _without_rb_against_def(df, cap, roster_slots, salary_step, *,
                             max_per_team, stack_qb, rb_with_qb,
-                            offense_per_team=None):
+                            offense_per_team=None, team_caps=None):
     """`best_lineup`, with no running back facing the rostered defense.
 
     Solved by enumerating the defense, because there is one per team and the
@@ -644,7 +644,7 @@ def _without_rb_against_def(df, cap, roster_slots, salary_step, *,
         return best_lineup(df, cap, roster_slots, salary_step,
                            max_per_team=max_per_team, stack_qb=stack_qb,
                            rb_with_qb=rb_with_qb,
-                           offense_per_team=offense_per_team)
+                           offense_per_team=offense_per_team, team_caps=team_caps)
 
     frame = df if "_slots" in df.columns else add_eligibility(df.copy())
     teams = frame["Team"].astype(str).str.upper()
@@ -664,7 +664,7 @@ def _without_rb_against_def(df, cap, roster_slots, salary_step, *,
     found = best_lineup(frame, cap, roster_slots, salary_step,
                         max_per_team=max_per_team, stack_qb=stack_qb,
                         rb_with_qb=rb_with_qb,
-                           offense_per_team=offense_per_team)
+                           offense_per_team=offense_per_team, team_caps=team_caps)
     if found is None or breaks(found[0]) is None:
         return found
 
@@ -693,7 +693,7 @@ def _without_rb_against_def(df, cap, roster_slots, salary_step, *,
         # this to stay an upper bound.
         got = best_lineup(skill, cap - price, without_def, salary_step,
                           max_per_team=max_per_team, stack_qb=0, rb_with_qb=True,
-                          offense_per_team=offense_per_team)
+                          offense_per_team=offense_per_team, team_caps=team_caps)
         rest_at[price] = got[2] if got is not None else float("-inf")
 
     order = frame.loc[is_def[is_def].index].sort_values("lineup_points", ascending=False)
@@ -711,7 +711,7 @@ def _without_rb_against_def(df, cap, roster_slots, salary_step, *,
         candidate = best_lineup(frame[keep], cap, roster_slots, salary_step,
                                 max_per_team=max_per_team, stack_qb=stack_qb,
                                 rb_with_qb=rb_with_qb,
-                           offense_per_team=offense_per_team)
+                           offense_per_team=offense_per_team, team_caps=team_caps)
         if candidate is not None and (best is None or candidate[2] > best[2]):
             best = candidate
             if best[2] >= ceiling:
@@ -719,9 +719,54 @@ def _without_rb_against_def(df, cap, roster_slots, salary_step, *,
     return best
 
 
+def _offense_counts(df, picks):
+    """Offensive players per team in `picks`, the defense not counted."""
+    frame = df if "_slots" in df.columns else add_eligibility(df.copy())
+    counts = Counter()
+    for idx in picks:
+        if "DEF" not in frame.at[idx, "_slots"]:
+            counts[str(frame.at[idx, "Team"])] += 1
+    return counts
+
+
+def _with_one_pair(df, cap, roster_slots, salary_step, pair_margin, *,
+                   offense_per_team, **rules):
+    """`best_lineup` under offense_per_team, unless one team going one over it
+    is worth `pair_margin` points.
+
+    The lineup with the cap loosened everywhere is an upper bound on any
+    one-pair lineup, so when even it is not `pair_margin` ahead the strict
+    lineup stands after two solves. Otherwise each team that lineup doubles up
+    is tried as the one allowed pair. When it doubles just one team it is
+    itself the answer; with more, the best pair is searched among those teams
+    only, which can miss a pair it did not use -- a short-cut, not a proof.
+    """
+    strict = best_lineup(df, cap, roster_slots, salary_step,
+                         offense_per_team=offense_per_team, **rules)
+    loose = best_lineup(df, cap, roster_slots, salary_step,
+                        offense_per_team=offense_per_team + 1, **rules)
+    if loose is None or (strict is not None and loose[2] - strict[2] < pair_margin):
+        return strict
+    doubled = [t for t, n in _offense_counts(df, loose[0]).items() if n > offense_per_team]
+    if len(doubled) <= 1:
+        best = loose
+    else:
+        best = None
+        for team in doubled:
+            got = best_lineup(df, cap, roster_slots, salary_step,
+                              offense_per_team=offense_per_team,
+                              team_caps={team: offense_per_team + 1}, **rules)
+            if got is not None and (best is None or got[2] > best[2]):
+                best = got
+    if best is not None and (strict is None or best[2] - strict[2] >= pair_margin):
+        return best
+    return strict
+
+
 def best_lineup(df, cap, roster_slots=None, salary_step=100, *,
                 max_per_team=None, stack_qb=0, rb_with_qb=True,
-                rb_vs_opposing_def=True, offense_per_team=None):
+                rb_vs_opposing_def=True, offense_per_team=None, team_caps=None,
+                pair_margin=None):
     """The highest-scoring legal lineup at or under `cap`, or None if none fits.
 
     Exact, where the old fill was greedy. It filled slot by slot taking the best
@@ -756,17 +801,29 @@ def best_lineup(df, cap, roster_slots=None, salary_step=100, *,
           on one game script, which is what a tournament wants and a cash
           lineup does not. Applied by giving each defense a team of its own
           and tightening the team cap to this number.
+      team_caps: {team: cap} overriding the team cap for the teams named.
+      pair_margin: with offense_per_team, let ONE team go one over it when
+          that lineup projects at least this many points above the best one
+          that keeps the rule (user's call, 2026-11-23: "this QB WR pairing is
+          too good to pass up"). The rule is still the default and the pair
+          has to earn its way in. The margin is a judgment, not a measurement.
 
     All of these need a `Team` column, which every FanDuel player list has.
 
     Returns (indices, salary, points).
     """
     roster_slots = roster_slots or ROSTER_SLOTS
+    if pair_margin is not None and offense_per_team and "Team" in df.columns:
+        return _with_one_pair(df, cap, roster_slots, salary_step, pair_margin,
+                              max_per_team=max_per_team, stack_qb=stack_qb,
+                              rb_with_qb=rb_with_qb,
+                              rb_vs_opposing_def=rb_vs_opposing_def,
+                              offense_per_team=offense_per_team)
     if not rb_vs_opposing_def:
         return _without_rb_against_def(
             df, cap, roster_slots, salary_step, max_per_team=max_per_team,
             stack_qb=stack_qb, rb_with_qb=rb_with_qb,
-            offense_per_team=offense_per_team)
+            offense_per_team=offense_per_team, team_caps=team_caps)
     if "_slots" not in df.columns:
         add_eligibility(df)
     if offense_per_team and "Team" in df.columns and (
@@ -788,6 +845,7 @@ def best_lineup(df, cap, roster_slots=None, salary_step=100, *,
                           RuntimeWarning, stacklevel=2)
         df.loc[is_def, "Team"] = df.loc[is_def, "Team"].astype(str) + "/DEF"
         max_per_team = max(int(offense_per_team), cap_needed)
+    caps = {str(t): int(c) for t, c in (team_caps or {}).items()}
     budget = int(cap // salary_step)
     correlated = bool(stack_qb) or not rb_with_qb
     if "Team" not in df.columns:
@@ -831,10 +889,10 @@ def best_lineup(df, cap, roster_slots=None, salary_step=100, *,
         if found is None or not max_per_team:
             break
         over = [team for team, n in _team_counts(df, found[0]).items()
-                if n > max_per_team]
+                if n > caps.get(team, max_per_team)]
         if not over:
             break
-        limits.update({team: max_per_team for team in over})
+        limits.update({team: caps.get(team, max_per_team) for team in over})
     else:
         found = None
     if found is None:
@@ -894,6 +952,9 @@ def cheapest_lineup_cost(df, roster_slots=None):
 #     unexploited effect found: -0.339, an 18.8-to-11.2 swing across quartiles.
 #     Blocked in both contests, because it is not a preference.
 CONTESTS = ("cash", "gpp")
+# Points a one-pair cash lineup must project above the no-pair one. A judgment:
+# on a ~120-point board it is a pair that clearly beats every way around it.
+PAIR_MARGIN = 3.0
 
 
 def contest_settings(contest="cash", aggression=50, num_lineups=None):
@@ -942,6 +1003,11 @@ def contest_settings(contest="cash", aggression=50, num_lineups=None):
             # The defense is not counted, so RB + his own defense stays legal;
             # nothing forces it.
             offense_per_team=1,
+            # ...unless one pair is too good to pass up (user's call,
+            # 2026-11-23, after week 11's field won on Dak + Lamb): one team may
+            # put two on the field when that lineup projects PAIR_MARGIN above
+            # the best one without. Unmeasured; the cash log is what judges it.
+            pair_margin=PAIR_MARGIN,
             stack_qb=0,
             rb_with_qb=True,
             ownership_weight=0.0,
@@ -1077,7 +1143,8 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
                      matchup_threshold=58.0, matchup_positions=("RB",),
                      target=None, sims=None, candidates=None, diversify=None,
                      player_rules=None, lock_players=None, seen_lineups=None,
-                     pool_exposure=False, report=None, offense_per_team=None):
+                     pool_exposure=False, report=None, offense_per_team=None,
+                     pair_margin=None):
     """Build FanDuel lineups: the best one under the cap, then cheaper ones.
 
     Args:
@@ -1127,6 +1194,9 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
         rb_with_qb: when False, no running back from the quarterback's team.
         offense_per_team: at most this many offensive players from one team,
             the defense not counted (see `best_lineup`). The cash preset sets 1.
+        pair_margin: with offense_per_team, one team may go one over it when
+            that lineup projects this many points above the best that keeps
+            it (see `best_lineup`). The cash preset sets PAIR_MARGIN.
         ownership_weight: points to charge per percent of projected ownership.
             0 ignores the field. The charge is linear and additive, so the
             solve stays exact; at 0.1 a 30%-owned player has to out-project a
@@ -1429,7 +1499,8 @@ def optimize_lineups(df, num_lineups=5, salary_cap=60000, exclude_players=None,
                             max_per_team=max_per_team, stack_qb=stack_qb,
                             rb_with_qb=rb_with_qb,
                             rb_vs_opposing_def=rb_vs_opposing_def,
-                            offense_per_team=offense_per_team)
+                            offense_per_team=offense_per_team,
+                            pair_margin=pair_margin)
         if found is None:
             break
         picks, spent, _ = found
